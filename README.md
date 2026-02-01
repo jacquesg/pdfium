@@ -1,92 +1,214 @@
-# @hyzyla/pdfium
+# @jacquesg/pdfium
 
-📃 [Documentation](https://pdfium.js.org/docs/intro)
+Universal PDFium WASM wrapper for Browser and Node.js with modern TypeScript patterns.
 
-TypeScript/JavaScript wrapper for the PDFium library:
+## Features
 
-- ⬇️ [pdfium](https://pdfium.googlesource.com/pdfium/) - source code of the PDFium library, developed by Google and used in Chrome.
-- ⬇️ [pdfium-lib](https://github.com/paulocoutinhox/pdfium-lib) - project to compile PDFium library to multiple platforms, including WebAssembly.
-- 📍 [@hyzyla/pdfium](https://github.com/hyzyla/pdfium) - (you are here)
- TypeScript/JavaScript wrapper for the WebAssembly build of PDFium library.
-
-# Features
--  📦 Zero dependencies - PDFium library is compiled to WebAssembly and bundled with the package.
-- 🚀 Fast - PDFium can be faster than PDF.js, because it's originally written in C++ and compiled to WebAssembly, while PDF.js is entirely written in JavaScript.
-- 🔒 Type-safe - TypeScript definitions are included.
-- 🗼 Works in browser and Node.js
+- **Zero dependencies** - PDFium compiled to WebAssembly and bundled with the package
+- **Type-safe** - Full TypeScript support with branded types and strict mode
+- **Automatic resource cleanup** - `Symbol.dispose` support (`using` keyword)
+- **Typed exceptions** - Error subclasses with error codes for precise handling
+- **Universal** - Works in Node.js 22+ and modern browsers
+- **ESM-only** - Modern ES2024 module format
+- **Worker support** - Off-main-thread processing via `WorkerProxy`
 
 ## Installation
 
 ```sh
-# yarn add @hyzyla/pdfium
-# pnpm install @hyzyla/pdfium
-npm install @hyzyla/pdfium
+pnpm add @jacquesg/pdfium
 ```
 
-## Usage
+## Quick Start
 
-```ts
-import { PDFiumLibrary } from "@hyzyla/pdfium";
-import { promises as fs } from 'fs';
-import sharp from 'sharp';
+```typescript
+import { PDFium } from '@jacquesg/pdfium';
 
+// Initialise the library
+using pdfium = await PDFium.init();
 
-/**
- * For this and the following examples, we will use "sharp" library to convert
- * the raw bitmap data to PNG images. You can use any other library or write
- * your own function to convert the raw bitmap data to PNG images.
- */
-async function renderFunction(options: PDFiumPageRenderOptions) {
-  return await sharp(options.data, {
-    raw: {
-      width: options.width,
-      height: options.height,
-      channels: 4,
-    },
-  })
-    .png()
-    .toBuffer();
+// Open a PDF document
+using document = await pdfium.openDocument(pdfBytes);
+console.log(`Document has ${document.pageCount} pages`);
+
+// Iterate over pages
+for (const page of document.pages()) {
+  using p = page;
+
+  // Get page dimensions
+  const { width, height } = p.size;
+  console.log(`Page ${p.index}: ${width}x${height} points`);
+
+  // Extract text
+  const text = p.getText();
+  console.log(text);
+
+  // Render to RGBA bitmap
+  const { data, width: renderWidth, height: renderHeight } = p.render({ scale: 2 });
+  // data is a Uint8Array of RGBA pixels
 }
+```
 
+## Error Handling
 
-async function main() {
-  const buff = await fs.readFile('test2.pdf');
+All operations throw typed error subclasses on failure:
 
-  // Initialize the library, you can do this once for the whole application
-  // and reuse the library instance.
-  const library = await PDFiumLibrary.init();
+```typescript
+import { PDFium, DocumentError, PageError } from '@jacquesg/pdfium';
 
-  // Load the document from the buffer
-  // You can also pass "password" as the second argument if the document is encrypted.
-  const document = await library.loadDocument(buff);
-
-  // Iterate over the pages, render them to PNG images and
-  // save to the output folder
-  for (const page of document.pages()) {
-    console.log(`${page.number} - rendering...`);
-
-    // Render PDF page to PNG image
-    const image = await page.render({
-      scale: 3, // 3x scale (72 DPI is the default)
-      render: renderFunction,  // sharp function to convert raw bitmap data to PNG
-    });
-
-    // Save the PNG image to the output folder
-    await fs.writeFile(`output/${page.number}.png`, Buffer.from(image.data));
+try {
+  using pdfium = await PDFium.init();
+  using document = await pdfium.openDocument(corruptBytes);
+} catch (error) {
+  if (error instanceof DocumentError) {
+    console.error(error.code);    // numeric error code
+    console.error(error.message); // human-readable message
+    console.error(error.context); // optional context data
   }
-
-  // Do not forget to destroy the document and the library
-  // when you are done.
-  document.destroy();
-  library.destroy();
 }
-
-main();
 ```
 
+## API Overview
 
-## Release
+### `PDFium`
 
-1. Bump version in `package.json`: `npm version patch`
-2. Create a new release in GitHub
-3. Check status of the [GitHub Actions](https://github.com/hyzyla/pdfium/actions)
+The main entry point for the library.
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `PDFium.init(options?)` | `Promise<PDFium>` | Initialise the library |
+| `pdfium.openDocument(data, options?)` | `Promise<PDFiumDocument>` | Open a PDF document |
+
+### `PDFiumDocument`
+
+Represents a loaded PDF document.
+
+| Property/Method | Returns | Description |
+|-----------------|---------|-------------|
+| `document.pageCount` | `number` | Number of pages |
+| `document.getPage(index)` | `PDFiumPage` | Load a page by index |
+| `document.pages()` | `Generator<PDFiumPage>` | Iterate all pages |
+
+### `PDFiumPage`
+
+Represents a single page in a PDF document.
+
+| Property/Method | Returns | Description |
+|-----------------|---------|-------------|
+| `page.index` | `number` | Zero-based page index |
+| `page.size` | `PageSize` | Page dimensions in points |
+| `page.width` | `number` | Page width in points |
+| `page.height` | `number` | Page height in points |
+| `page.objectCount` | `number` | Number of objects on the page |
+| `page.render(options?)` | `RenderResult` | Render to RGBA bitmap |
+| `page.getText()` | `string` | Extract text content |
+
+### Render Options
+
+```typescript
+interface RenderOptions {
+  scale?: number;           // Scale factor (default: 1)
+  width?: number;           // Target width in pixels (overrides scale)
+  height?: number;          // Target height in pixels (overrides scale)
+  renderFormFields?: boolean; // Include form fields (default: false)
+  backgroundColour?: number;  // ARGB integer (default: 0xFFFFFFFF)
+}
+```
+
+### Error Classes
+
+| Error Class | Thrown By | Description |
+|-------------|----------|-------------|
+| `InitialisationError` | `PDFium.init()` | WASM load or library init failure |
+| `DocumentError` | `pdfium.openDocument()` | Invalid format, password, file not found |
+| `PageError` | `document.getPage()` | Page not found, load failure, out of range |
+| `RenderError` | `page.render()` | Bitmap creation failure, invalid dimensions |
+| `TextError` | `page.getText()` | Text extraction or text page load failure |
+| `MemoryError` | Internal | WASM memory allocation failure |
+| `WorkerError` | `WorkerProxy` | Worker creation or communication failure |
+
+### Error Codes
+
+| Range | Category | Examples |
+|-------|----------|---------|
+| 1xx | Initialisation | WASM load failure, library init failure |
+| 2xx | Document | Invalid format, password required, file not found |
+| 3xx | Page | Page not found, load failure, out of range |
+| 4xx | Render | Bitmap creation failure, invalid dimensions |
+| 5xx | Memory | Allocation failure, buffer overflow |
+| 6xx | Text | Extraction failure, text page load failure |
+| 7xx | Object | Unknown type, access failure |
+| 8xx | Worker | Creation failure, communication error, timeout |
+
+## Resource Management
+
+All PDFium resources implement `Symbol.dispose` for automatic cleanup:
+
+```typescript
+// Recommended: using keyword (automatic cleanup)
+{
+  using page = document.getPage(0);
+  // page is automatically disposed when scope exits
+}
+
+// Alternative: explicit dispose
+const page = document.getPage(0);
+try {
+  // use page
+} finally {
+  page.dispose();
+}
+```
+
+A `FinalizationRegistry` provides a safety net - if a resource is garbage collected
+without being disposed, a warning is logged in development mode.
+
+## Browser Usage
+
+In browser environments, provide the WASM binary explicitly:
+
+```typescript
+import { PDFium } from '@jacquesg/pdfium';
+
+// Option 1: Fetch from a URL
+const wasmResponse = await fetch('/pdfium.wasm');
+const wasmBinary = await wasmResponse.arrayBuffer();
+
+using pdfium = await PDFium.init({ wasmBinary });
+```
+
+## Worker Mode
+
+For off-main-thread processing:
+
+```typescript
+import { WorkerProxy } from '@jacquesg/pdfium';
+
+using proxy = await WorkerProxy.create('/worker.js', wasmBinary);
+const { documentId, pageCount } = await proxy.openDocument(pdfArrayBuffer);
+// All operations happen in the worker thread
+```
+
+## Requirements
+
+- **Node.js**: >= 22 LTS
+- **Browsers**: Chrome 117+, Firefox 104+, Safari 16.4+
+- **Module format**: ESM only
+
+## Migration from @hyzyla/pdfium
+
+See [MIGRATION.md](MIGRATION.md) for a detailed migration guide.
+
+| @hyzyla/pdfium v2 | @jacquesg/pdfium v3 |
+|-------------------|---------------------|
+| `PDFiumLibrary.init()` | `PDFium.init()` |
+| `library.loadDocument(buff)` | `pdfium.openDocument(data)` |
+| `document.destroy()` | `document.dispose()` or `using` |
+| `document.getPage(i)` | `document.getPage(i)` |
+| `document.getPageCount()` | `document.pageCount` |
+| `page.render({ scale, render })` | `page.render({ scale })` |
+| `page.getText()` | `page.getText()` |
+| Throws exceptions | Throws typed exceptions |
+
+## Licence
+
+MIT
