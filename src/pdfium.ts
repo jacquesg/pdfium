@@ -6,7 +6,8 @@
 
 import { Disposable } from './core/disposable.js';
 import { DocumentError, InitialisationError, PDFiumErrorCode } from './core/errors.js';
-import type { PDFiumInitOptions, WASMPointer } from './core/types.js';
+import type { PDFiumInitOptions } from './core/types.js';
+import { WASMAllocation } from './wasm/allocation.js';
 import { loadWASM, type PDFiumWASM, PDFiumNativeErrorCode, type WASMLoadOptions } from './wasm/index.js';
 import { NULL_PTR, WASMMemoryManager } from './wasm/memory.js';
 import { PDFiumDocument } from './document/document.js';
@@ -70,17 +71,10 @@ export class PDFium extends Disposable {
    * Initialise the PDFium library with configuration.
    */
   #initialiseLibrary(): void {
-    // Allocate config structure (just version field for now)
-    const configPtr = this.#memory.malloc(4);
-
-    try {
-      // Set version to 2
-      this.#memory.writeInt32(configPtr, 2);
-      this.#module._FPDF_InitLibraryWithConfig(configPtr);
-      this.#libraryInitialised = true;
-    } finally {
-      this.#memory.free(configPtr);
-    }
+    using config = this.#memory.alloc(4);
+    this.#memory.writeInt32(config.ptr, 2);
+    this.#module._FPDF_InitLibraryWithConfig(config.ptr);
+    this.#libraryInitialised = true;
   }
 
   /**
@@ -99,43 +93,41 @@ export class PDFium extends Disposable {
 
     const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : data;
 
-    // Copy document data to WASM memory
-    let dataPtr: WASMPointer;
+    using dataAlloc = this.#allocDocumentData(bytes);
+    using passwordAlloc = options.password !== undefined
+      ? this.#allocPassword(options.password)
+      : undefined;
+
+    const passwordPtr = passwordAlloc !== undefined ? passwordAlloc.ptr : NULL_PTR;
+    const documentHandle = this.#module._FPDF_LoadMemDocument(dataAlloc.ptr, bytes.length, passwordPtr);
+
+    if (documentHandle === 0) {
+      throw this.#getDocumentError();
+    }
+
+    // Transfer data ownership to PDFiumDocument; password auto-freed at scope exit
+    const dataPtr = dataAlloc.take();
+    return new PDFiumDocument(this.#module, this.#memory, documentHandle, dataPtr);
+  }
+
+  #allocDocumentData(bytes: Uint8Array): WASMAllocation {
     try {
-      dataPtr = this.#memory.copyToWASM(bytes);
+      return this.#memory.allocFrom(bytes);
     } catch (error) {
       throw new DocumentError(PDFiumErrorCode.DOC_LOAD_UNKNOWN, 'Failed to allocate memory for document', {
         cause: error,
       });
     }
+  }
 
-    // Copy password if provided
-    let passwordPtr = NULL_PTR;
-    if (options.password !== undefined) {
-      try {
-        passwordPtr = this.#memory.copyStringToWASM(options.password);
-      } catch (error) {
-        this.#memory.free(dataPtr);
-        throw new DocumentError(PDFiumErrorCode.DOC_LOAD_UNKNOWN, 'Failed to allocate memory for password', {
-          cause: error,
-        });
-      }
+  #allocPassword(password: string): WASMAllocation {
+    try {
+      return this.#memory.allocString(password);
+    } catch (error) {
+      throw new DocumentError(PDFiumErrorCode.DOC_LOAD_UNKNOWN, 'Failed to allocate memory for password', {
+        cause: error,
+      });
     }
-
-    // Load the document
-    const documentHandle = this.#module._FPDF_LoadMemDocument(dataPtr, bytes.length, passwordPtr);
-
-    // Clean up password memory (document data is still needed)
-    if (passwordPtr !== NULL_PTR) {
-      this.#memory.free(passwordPtr);
-    }
-
-    if (documentHandle === 0) {
-      this.#memory.free(dataPtr);
-      throw this.#getDocumentError();
-    }
-
-    return new PDFiumDocument(this.#module, this.#memory, documentHandle, dataPtr);
   }
 
   /**

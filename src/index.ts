@@ -32,6 +32,7 @@ export { PDFiumPage } from './document/page.js';
 export { PDFium } from './pdfium.js';
 
 // WASM types for advanced usage
+export type { NativeHandle, WASMAllocation } from './wasm/allocation.js';
 export type { PDFiumWASM, WASMLoadOptions } from './wasm/bindings.js';
 export { BitmapFormat, PDFiumNativeErrorCode, RenderFlags } from './wasm/bindings.js';
 export type { WASMMemoryManager } from './wasm/memory.js';

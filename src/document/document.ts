@@ -7,6 +7,7 @@
 import { Disposable } from '../core/disposable.js';
 import { MemoryError, PageError, PDFiumErrorCode } from '../core/errors.js';
 import type { WASMPointer } from '../core/types.js';
+import { WASMAllocation } from '../wasm/allocation.js';
 import type { PDFiumWASM } from '../wasm/bindings.js';
 import { NULL_PTR, type WASMMemoryManager } from '../wasm/memory.js';
 import { PDFiumPage } from './page.js';
@@ -59,32 +60,38 @@ export class PDFiumDocument extends Disposable {
    * Initialise the form fill environment for rendering interactive form fields.
    */
   #initFormFillEnvironment(): void {
-    // Allocate FPDF_FORMFILLINFO structure
-    let formInfoPtr: WASMPointer;
+    using formInfo = this.#tryAllocFormInfo();
+    if (formInfo === undefined) {
+      return;
+    }
+
+    // Zero out the structure (required - callback pointers must be null)
+    this.#memory.heapU8.fill(0, formInfo.ptr, formInfo.ptr + FORM_FILL_INFO_SIZE);
+
+    // Set version to 2 (supports XFA and other features)
+    this.#memory.writeInt32(formInfo.ptr, 2);
+
+    // Initialise form fill environment
+    this.#formHandle = this.#module._FPDFDOC_InitFormFillEnvironment(this.#documentHandle, formInfo.ptr);
+
+    // If initialisation failed, formInfo auto-freed at scope exit
+    if (this.#formHandle === 0) {
+      return;
+    }
+
+    // Transfer ownership to instance
+    this.#formInfoPtr = formInfo.take();
+  }
+
+  #tryAllocFormInfo(): WASMAllocation | undefined {
     try {
-      formInfoPtr = this.#memory.malloc(FORM_FILL_INFO_SIZE);
+      return this.#memory.alloc(FORM_FILL_INFO_SIZE);
     } catch (error) {
       // Form fill is optional - continue without it if allocation fails
       if (error instanceof MemoryError) {
-        return;
+        return undefined;
       }
       throw error;
-    }
-    this.#formInfoPtr = formInfoPtr;
-
-    // Zero out the structure (required - callback pointers must be null)
-    this.#memory.heapU8.fill(0, this.#formInfoPtr, this.#formInfoPtr + FORM_FILL_INFO_SIZE);
-
-    // Set version to 2 (supports XFA and other features)
-    this.#memory.writeInt32(this.#formInfoPtr, 2);
-
-    // Initialise form fill environment
-    this.#formHandle = this.#module._FPDFDOC_InitFormFillEnvironment(this.#documentHandle, this.#formInfoPtr);
-
-    // If initialisation failed, clean up and continue without form support
-    if (this.#formHandle === 0) {
-      this.#memory.free(this.#formInfoPtr);
-      this.#formInfoPtr = NULL_PTR;
     }
   }
 

@@ -8,6 +8,7 @@
 
 import { MemoryError, PDFiumErrorCode } from '../core/errors.js';
 import type { WASMPointer } from '../core/types.js';
+import { WASMAllocation } from './allocation.js';
 import type { PDFiumWASM } from './bindings.js';
 
 /**
@@ -186,6 +187,52 @@ export class WASMMemoryManager {
       this.#module.wasmExports.free(ptr);
     }
     this.#allocations.clear();
+  }
+
+  /**
+   * Allocate a block and return an RAII wrapper.
+   *
+   * The returned `WASMAllocation` is disposable via the `using` keyword.
+   *
+   * @param size - Number of bytes to allocate
+   * @returns A disposable allocation wrapper
+   * @throws {MemoryError} If allocation fails
+   */
+  alloc(size: number): WASMAllocation {
+    return new WASMAllocation(this.malloc(size), this);
+  }
+
+  /**
+   * Copy a Uint8Array to WASM memory and return an RAII wrapper.
+   *
+   * @param data - Data to copy
+   * @returns A disposable allocation wrapper
+   * @throws {MemoryError} If allocation fails
+   */
+  allocFrom(data: Uint8Array): WASMAllocation {
+    return new WASMAllocation(this.copyToWASM(data), this);
+  }
+
+  /**
+   * Copy a null-terminated UTF-8 string to WASM memory and return an RAII wrapper.
+   *
+   * @param str - String to copy
+   * @returns A disposable allocation wrapper
+   * @throws {MemoryError} If allocation fails
+   */
+  allocString(str: string): WASMAllocation {
+    return new WASMAllocation(this.copyStringToWASM(str), this);
+  }
+
+  /**
+   * Copy an ArrayBuffer to WASM memory and return an RAII wrapper.
+   *
+   * @param buffer - Buffer to copy
+   * @returns A disposable allocation wrapper
+   * @throws {MemoryError} If allocation fails
+   */
+  allocBuffer(buffer: ArrayBuffer): WASMAllocation {
+    return new WASMAllocation(this.copyBufferToWASM(buffer), this);
   }
 
   /**

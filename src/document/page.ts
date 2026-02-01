@@ -7,6 +7,7 @@
 import { Disposable } from '../core/disposable.js';
 import { PDFiumErrorCode, RenderError, TextError } from '../core/errors.js';
 import type { PageSize, RenderOptions, RenderResult, WASMPointer } from '../core/types.js';
+import { NativeHandle, WASMAllocation } from '../wasm/allocation.js';
 import { BitmapFormat, type PDFiumWASM, RenderFlags } from '../wasm/bindings.js';
 import type { WASMMemoryManager } from '../wasm/memory.js';
 
@@ -122,9 +123,9 @@ export class PDFiumPage extends Disposable {
     const stride = renderWidth * 4;
     const bufferSize = stride * renderHeight;
 
-    let bufferPtr: WASMPointer;
+    let bufferAlloc: WASMAllocation;
     try {
-      bufferPtr = this.#memory.malloc(bufferSize);
+      bufferAlloc = this.#memory.alloc(bufferSize);
     } catch (error) {
       throw new RenderError(PDFiumErrorCode.RENDER_BITMAP_FAILED, 'Failed to allocate bitmap buffer', {
         width: renderWidth,
@@ -132,74 +133,69 @@ export class PDFiumPage extends Disposable {
         cause: error,
       });
     }
+    using _buffer = bufferAlloc;
 
-    try {
-      // Create bitmap
-      const bitmapHandle = this.#module._FPDFBitmap_CreateEx(
+    // Create bitmap
+    const bitmapHandle = this.#module._FPDFBitmap_CreateEx(
+      renderWidth,
+      renderHeight,
+      BitmapFormat.BGRA,
+      bufferAlloc.ptr,
+      stride,
+    );
+
+    if (bitmapHandle === 0) {
+      throw new RenderError(PDFiumErrorCode.RENDER_BITMAP_FAILED, 'Failed to create bitmap', {
+        width: renderWidth,
+        height: renderHeight,
+      });
+    }
+
+    using _bitmap = new NativeHandle(bitmapHandle, (h) => this.#module._FPDFBitmap_Destroy(h));
+
+    // Fill with background colour
+    const bgColour = options.backgroundColour ?? DEFAULT_BACKGROUND_COLOUR;
+    this.#module._FPDFBitmap_FillRect(bitmapHandle, 0, 0, renderWidth, renderHeight, bgColour);
+
+    // Render page
+    const flags = RenderFlags.ANNOT;
+    this.#module._FPDF_RenderPageBitmap(
+      bitmapHandle,
+      this.#pageHandle,
+      0,
+      0,
+      renderWidth,
+      renderHeight,
+      0,
+      flags,
+    );
+
+    // Render form fields if requested
+    if (options.renderFormFields && this.#formHandle !== 0) {
+      this.#module._FPDF_FFLDraw(
+        this.#formHandle,
+        bitmapHandle,
+        this.#pageHandle,
+        0,
+        0,
         renderWidth,
         renderHeight,
-        BitmapFormat.BGRA,
-        bufferPtr,
-        stride,
+        0,
+        flags,
       );
-
-      if (bitmapHandle === 0) {
-        this.#memory.free(bufferPtr);
-        throw new RenderError(PDFiumErrorCode.RENDER_BITMAP_FAILED, 'Failed to create bitmap', {
-          width: renderWidth,
-          height: renderHeight,
-        });
-      }
-
-      try {
-        // Fill with background colour
-        const bgColour = options.backgroundColour ?? DEFAULT_BACKGROUND_COLOUR;
-        this.#module._FPDFBitmap_FillRect(bitmapHandle, 0, 0, renderWidth, renderHeight, bgColour);
-
-        // Render page
-        const flags = RenderFlags.ANNOT;
-        this.#module._FPDF_RenderPageBitmap(
-          bitmapHandle,
-          this.#pageHandle,
-          0,
-          0,
-          renderWidth,
-          renderHeight,
-          0,
-          flags,
-        );
-
-        // Render form fields if requested
-        if (options.renderFormFields && this.#formHandle !== 0) {
-          this.#module._FPDF_FFLDraw(
-            this.#formHandle,
-            bitmapHandle,
-            this.#pageHandle,
-            0,
-            0,
-            renderWidth,
-            renderHeight,
-            0,
-            flags,
-          );
-        }
-
-        // Convert BGRA to RGBA and copy to JavaScript
-        const data = this.#convertBGRAtoRGBA(bufferPtr, bufferSize);
-
-        return {
-          width: renderWidth,
-          height: renderHeight,
-          originalWidth: pageWidth,
-          originalHeight: pageHeight,
-          data,
-        };
-      } finally {
-        this.#module._FPDFBitmap_Destroy(bitmapHandle);
-      }
-    } finally {
-      this.#memory.free(bufferPtr);
     }
+
+    // Convert BGRA to RGBA and copy to JavaScript
+    const data = this.#convertBGRAtoRGBA(bufferAlloc.ptr, bufferSize);
+
+    return {
+      width: renderWidth,
+      height: renderHeight,
+      originalWidth: pageWidth,
+      originalHeight: pageHeight,
+      data,
+    };
+    // _bitmap destroyed first (LIFO), then _buffer freed
   }
 
   /**
@@ -244,26 +240,24 @@ export class PDFiumPage extends Disposable {
 
     // Allocate buffer for UTF-16LE text (2 bytes per char + null terminator)
     const bufferSize = (charCount + 1) * 2;
-    let bufferPtr: WASMPointer;
+
+    let bufferAlloc: WASMAllocation;
     try {
-      bufferPtr = this.#memory.malloc(bufferSize);
+      bufferAlloc = this.#memory.alloc(bufferSize);
     } catch (error) {
       throw new TextError(PDFiumErrorCode.TEXT_EXTRACTION_FAILED, 'Failed to allocate text buffer', {
         cause: error,
       });
     }
+    using _buffer = bufferAlloc;
 
-    try {
-      const extractedCount = this.#module._FPDFText_GetText(this.#textPageHandle, 0, charCount, bufferPtr);
-      if (extractedCount <= 0) {
-        return '';
-      }
-
-      // Read UTF-16LE text (-1 to exclude null terminator)
-      return this.#memory.readUTF16LE(bufferPtr, extractedCount - 1);
-    } finally {
-      this.#memory.free(bufferPtr);
+    const extractedCount = this.#module._FPDFText_GetText(this.#textPageHandle, 0, charCount, bufferAlloc.ptr);
+    if (extractedCount <= 0) {
+      return '';
     }
+
+    // Read UTF-16LE text (-1 to exclude null terminator)
+    return this.#memory.readUTF16LE(bufferAlloc.ptr, extractedCount - 1);
   }
 
   /**
