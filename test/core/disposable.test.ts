@@ -105,14 +105,14 @@ describe('Disposable', () => {
       expect(() => resource.doSomething()).toThrow(PDFiumError);
     });
 
-    it('throws with correct error code', () => {
+    it('throws with default RESOURCE_DISPOSED error code', () => {
       const resource = new TestDisposable();
       resource.dispose();
       try {
         resource.doSomething();
       } catch (e) {
         expect(e).toBeInstanceOf(PDFiumError);
-        expect((e as PDFiumError).code).toBe(PDFiumErrorCode.DOC_ALREADY_CLOSED);
+        expect((e as PDFiumError).code).toBe(PDFiumErrorCode.RESOURCE_DISPOSED);
       }
     });
 
@@ -123,6 +123,32 @@ describe('Disposable', () => {
         resource.doSomething();
       } catch (e) {
         expect((e as Error).message).toContain('MyResource');
+      }
+    });
+  });
+
+  describe('custom error code', () => {
+    it('uses custom error code when provided', () => {
+      class CustomDisposable extends Disposable {
+        constructor() {
+          super('CustomResource', PDFiumErrorCode.DOC_ALREADY_CLOSED);
+        }
+
+        protected disposeInternal(): void {}
+
+        public doSomething(): string {
+          this.ensureNotDisposed();
+          return 'done';
+        }
+      }
+
+      const resource = new CustomDisposable();
+      resource.dispose();
+      try {
+        resource.doSomething();
+      } catch (e) {
+        expect(e).toBeInstanceOf(PDFiumError);
+        expect((e as PDFiumError).code).toBe(PDFiumErrorCode.DOC_ALREADY_CLOSED);
       }
     });
   });
@@ -219,6 +245,90 @@ describe('AsyncDisposable', () => {
       const resource = new TestAsyncDisposable();
       await resource.dispose();
       expect(() => resource.doSomething()).toThrow(PDFiumError);
+    });
+
+    it('throws with default RESOURCE_DISPOSED error code', async () => {
+      const resource = new TestAsyncDisposable();
+      await resource.dispose();
+      try {
+        resource.doSomething();
+      } catch (e) {
+        expect(e).toBeInstanceOf(PDFiumError);
+        expect((e as PDFiumError).code).toBe(PDFiumErrorCode.RESOURCE_DISPOSED);
+      }
+    });
+
+    it('includes resource name in error message', async () => {
+      const resource = new TestAsyncDisposable('MyAsyncResource');
+      await resource.dispose();
+      try {
+        resource.doSomething();
+      } catch (e) {
+        expect((e as Error).message).toContain('MyAsyncResource');
+      }
+    });
+  });
+
+  describe('custom error code', () => {
+    it('uses custom error code when provided', async () => {
+      class CustomAsyncDisposable extends AsyncDisposable {
+        constructor() {
+          super('CustomAsync', PDFiumErrorCode.DOC_ALREADY_CLOSED);
+        }
+
+        protected async disposeInternalAsync(): Promise<void> {}
+
+        public doSomething(): string {
+          this.ensureNotDisposed();
+          return 'done';
+        }
+      }
+
+      const resource = new CustomAsyncDisposable();
+      await resource.dispose();
+      try {
+        resource.doSomething();
+      } catch (e) {
+        expect(e).toBeInstanceOf(PDFiumError);
+        expect((e as PDFiumError).code).toBe(PDFiumErrorCode.DOC_ALREADY_CLOSED);
+      }
+    });
+  });
+
+  describe('setFinalizerCleanup', () => {
+    it('registers cleanup callback', () => {
+      class CleanupAsyncDisposable extends AsyncDisposable {
+        constructor() {
+          super('CleanupAsync');
+          this.setFinalizerCleanup(() => {});
+        }
+
+        protected async disposeInternalAsync(): Promise<void> {}
+      }
+
+      const resource = new CleanupAsyncDisposable();
+      expect(resource.disposed).toBe(false);
+      resource.dispose();
+    });
+  });
+
+  describe('resourceName', () => {
+    it('provides resource name for subclasses', () => {
+      class NamedAsync extends AsyncDisposable {
+        constructor() {
+          super('NamedAsyncResource');
+        }
+
+        protected async disposeInternalAsync(): Promise<void> {}
+
+        public getName(): string {
+          return this.resourceName;
+        }
+      }
+
+      const resource = new NamedAsync();
+      expect(resource.getName()).toBe('NamedAsyncResource');
+      resource.dispose();
     });
   });
 });

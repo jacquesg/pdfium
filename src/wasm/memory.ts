@@ -11,11 +11,24 @@ import type { WASMPointer } from '../core/types.js';
 import { WASMAllocation } from './allocation.js';
 import type { PDFiumWASM } from './bindings.js';
 
+/** Module-level text encoder/decoder instances. */
+const textEncoder = new TextEncoder();
+const utf16leDecoder = new TextDecoder('utf-16le');
+
 /**
  * Creates a branded WASM pointer from a number.
  */
 export function asPointer(value: number): WASMPointer {
   return value as WASMPointer;
+}
+
+/**
+ * Creates a branded handle from a number.
+ *
+ * @internal
+ */
+export function asHandle<T extends number & { readonly __brand: string }>(value: number): T {
+  return value as T;
 }
 
 /**
@@ -47,6 +60,12 @@ export class WASMMemoryManager {
    * @throws {MemoryError} If allocation fails
    */
   malloc(size: number): WASMPointer {
+    if (size <= 0) {
+      throw new MemoryError(PDFiumErrorCode.MEMORY_ALLOCATION_FAILED, `Invalid allocation size: ${size}`, {
+        requestedSize: size,
+      });
+    }
+
     const ptr = asPointer(this.#module.wasmExports.malloc(size));
     if (ptr === NULL_PTR) {
       throw new MemoryError(PDFiumErrorCode.MEMORY_ALLOCATION_FAILED, `Failed to allocate ${size} bytes in WASM heap`, {
@@ -108,6 +127,18 @@ export class WASMMemoryManager {
    * @returns Copy of the data
    */
   copyFromWASM(ptr: WASMPointer, length: number): Uint8Array {
+    if (length <= 0) {
+      throw new MemoryError(PDFiumErrorCode.MEMORY_BUFFER_OVERFLOW, `Invalid read length: ${length}`, {
+        length,
+      });
+    }
+    if (ptr + length > this.#module.HEAPU8.length) {
+      throw new MemoryError(PDFiumErrorCode.MEMORY_BUFFER_OVERFLOW, 'Read exceeds WASM heap bounds', {
+        ptr,
+        length,
+        heapSize: this.#module.HEAPU8.length,
+      });
+    }
     return this.#module.HEAPU8.slice(ptr, ptr + length);
   }
 
@@ -118,6 +149,12 @@ export class WASMMemoryManager {
    * @returns The integer value
    */
   readInt32(ptr: WASMPointer): number {
+    if ((ptr & 3) !== 0) {
+      throw new MemoryError(PDFiumErrorCode.MEMORY_INVALID_POINTER, `Misaligned pointer for 32-bit read: ${ptr}`, {
+        ptr,
+        alignment: ptr & 3,
+      });
+    }
     // HEAP32 is indexed by 32-bit words, not bytes
     const index = ptr >> 2;
     const value = this.#module.HEAP32[index];
@@ -134,6 +171,12 @@ export class WASMMemoryManager {
    * @param value - Value to write
    */
   writeInt32(ptr: WASMPointer, value: number): void {
+    if ((ptr & 3) !== 0) {
+      throw new MemoryError(PDFiumErrorCode.MEMORY_INVALID_POINTER, `Misaligned pointer for 32-bit write: ${ptr}`, {
+        ptr,
+        alignment: ptr & 3,
+      });
+    }
     // HEAP32 is indexed by 32-bit words, not bytes
     this.#module.HEAP32[ptr >> 2] = value;
   }
@@ -146,8 +189,7 @@ export class WASMMemoryManager {
    * @throws {MemoryError} If allocation fails
    */
   copyStringToWASM(str: string): WASMPointer {
-    const encoder = new TextEncoder();
-    const encoded = encoder.encode(str);
+    const encoded = textEncoder.encode(str);
     const ptr = this.malloc(encoded.length + 1); // +1 for null terminator
     this.#module.HEAPU8.set(encoded, ptr);
     this.#module.HEAPU8[ptr + encoded.length] = 0; // null terminator
@@ -164,10 +206,25 @@ export class WASMMemoryManager {
    * @returns The decoded string
    */
   readUTF16LE(ptr: WASMPointer, charCount: number): string {
+    if (charCount < 0) {
+      throw new MemoryError(PDFiumErrorCode.MEMORY_BUFFER_OVERFLOW, `Invalid character count: ${charCount}`, {
+        charCount,
+      });
+    }
+    if (charCount === 0) {
+      return '';
+    }
     const byteLength = charCount * 2; // UTF-16 is 2 bytes per character
+    if (ptr + byteLength > this.#module.HEAPU8.length) {
+      throw new MemoryError(PDFiumErrorCode.MEMORY_BUFFER_OVERFLOW, 'UTF-16LE read exceeds WASM heap bounds', {
+        ptr,
+        charCount,
+        byteLength,
+        heapSize: this.#module.HEAPU8.length,
+      });
+    }
     const bytes = this.#module.HEAPU8.subarray(ptr, ptr + byteLength);
-    const decoder = new TextDecoder('utf-16le');
-    return decoder.decode(bytes);
+    return utf16leDecoder.decode(bytes);
   }
 
   /**

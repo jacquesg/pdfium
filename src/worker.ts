@@ -15,6 +15,8 @@
  * @packageDocumentation
  */
 
+import { setupWorker } from './context/worker-script.js';
+
 export * from './core/index.js';
 
 // Re-export version info
@@ -24,6 +26,5 @@ declare const __WASM_HASH__: string;
 export const VERSION = __PACKAGE_VERSION__;
 export const WASM_HASH = __WASM_HASH__;
 
-// TODO: Phase 5 - Implement worker script
-// import { setupWorker } from './context/worker-script.js';
-// setupWorker();
+// Set up the worker message handler
+setupWorker();

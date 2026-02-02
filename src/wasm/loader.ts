@@ -25,7 +25,7 @@ export async function loadWASM(options: WASMLoadOptions): Promise<PDFiumWASM> {
     }
     throw new InitialisationError(
       PDFiumErrorCode.INIT_WASM_LOAD_FAILED,
-      `Failed to load WASM module: ${error instanceof Error ? error.message : String(error)}`,
+      'Failed to load WASM module',
     );
   }
 }
@@ -39,15 +39,41 @@ async function resolveWASMBinary(options: WASMLoadOptions): Promise<ArrayBuffer>
     return options.wasmBinary;
   }
 
-  // Option 2: Auto-detect environment and load
+  // Option 2: Fetch from URL (browser environments)
+  if (options.wasmUrl) {
+    return fetchWASMBinary(options.wasmUrl);
+  }
+
+  // Option 3: Auto-detect environment and load
   if (isNodeEnvironment()) {
     return loadWASMFromNodeModules();
   }
 
   throw new InitialisationError(
     PDFiumErrorCode.INIT_INVALID_OPTIONS,
-    'No WASM source provided. In browser environments, provide wasmBinary in the init options.',
+    'No WASM source provided. In browser environments, provide wasmBinary or wasmUrl in the init options.',
   );
+}
+
+/**
+ * Fetch WASM binary from a URL.
+ */
+async function fetchWASMBinary(url: string): Promise<ArrayBuffer> {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) {
+      throw new InitialisationError(
+        PDFiumErrorCode.INIT_WASM_LOAD_FAILED,
+        `Failed to fetch WASM binary: HTTP ${String(response.status)}`,
+      );
+    }
+    return response.arrayBuffer();
+  } catch (error) {
+    if (error instanceof InitialisationError) {
+      throw error;
+    }
+    throw new InitialisationError(PDFiumErrorCode.INIT_WASM_LOAD_FAILED, 'Failed to fetch WASM binary from URL');
+  }
 }
 
 /**
@@ -75,7 +101,7 @@ async function loadWASMFromNodeModules(): Promise<ArrayBuffer> {
   } catch (error) {
     throw new InitialisationError(
       PDFiumErrorCode.INIT_WASM_LOAD_FAILED,
-      `Failed to load WASM from package: ${error instanceof Error ? error.message : String(error)}`,
+      'Failed to load WASM binary from package directory',
     );
   }
 }

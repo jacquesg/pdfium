@@ -5,12 +5,29 @@
  */
 
 import { Disposable } from '../core/disposable.js';
-import { MemoryError, PageError, PDFiumErrorCode } from '../core/errors.js';
-import type { WASMPointer } from '../core/types.js';
+import { DocumentError, MemoryError, PageError, PDFiumErrorCode } from '../core/errors.js';
+import {
+  DEFAULT_LIMITS,
+  type AttachmentHandle,
+  type Bookmark,
+  type BookmarkHandle,
+  type DocumentHandle,
+  type FormHandle,
+  type PDFAttachment,
+  type PDFiumLimits,
+  SaveFlags,
+  type SaveOptions,
+  type WASMPointer,
+} from '../core/types.js';
 import { WASMAllocation } from '../wasm/allocation.js';
 import type { PDFiumWASM } from '../wasm/bindings.js';
-import { NULL_PTR, type WASMMemoryManager } from '../wasm/memory.js';
+import { asHandle, asPointer, NULL_PTR, type WASMMemoryManager } from '../wasm/memory.js';
 import { PDFiumPage } from './page.js';
+
+/** Null handle constants. */
+const NULL_FORM: FormHandle = asHandle<FormHandle>(0);
+const NULL_BOOKMARK: BookmarkHandle = asHandle<BookmarkHandle>(0);
+const NULL_ATTACHMENT: AttachmentHandle = asHandle<AttachmentHandle>(0);
 
 /**
  * Size of the FPDF_FORMFILLINFO structure.
@@ -40,20 +57,41 @@ const FORM_FILL_INFO_SIZE = 256;
 export class PDFiumDocument extends Disposable {
   readonly #module: PDFiumWASM;
   readonly #memory: WASMMemoryManager;
-  readonly #documentHandle: number;
+  readonly #documentHandle: DocumentHandle;
   readonly #dataPtr: WASMPointer;
-  #formHandle: number = 0;
+  readonly #limits: Readonly<Required<PDFiumLimits>>;
+  readonly #pages = new Set<PDFiumPage>();
+  #formHandle: FormHandle = NULL_FORM;
   #formInfoPtr: WASMPointer = NULL_PTR;
 
-  constructor(module: PDFiumWASM, memory: WASMMemoryManager, documentHandle: number, dataPtr: WASMPointer) {
-    super('PDFiumDocument');
+  constructor(
+    module: PDFiumWASM,
+    memory: WASMMemoryManager,
+    documentHandle: DocumentHandle,
+    dataPtr: WASMPointer,
+    limits?: Readonly<Required<PDFiumLimits>>,
+  ) {
+    super('PDFiumDocument', PDFiumErrorCode.DOC_ALREADY_CLOSED);
     this.#module = module;
     this.#memory = memory;
     this.#documentHandle = documentHandle;
     this.#dataPtr = dataPtr;
+    this.#limits = limits ?? DEFAULT_LIMITS;
 
     // Initialise form fill environment
     this.#initFormFillEnvironment();
+
+    // Register finalizer cleanup for safety-net GC disposal
+    this.setFinalizerCleanup(() => {
+      if (this.#formHandle !== NULL_FORM) {
+        this.#module._FPDFDOC_ExitFormFillEnvironment(this.#formHandle);
+      }
+      this.#module._FPDF_CloseDocument(this.#documentHandle);
+      this.#memory.free(this.#dataPtr);
+      if (this.#formInfoPtr !== NULL_PTR) {
+        this.#memory.free(this.#formInfoPtr);
+      }
+    });
   }
 
   /**
@@ -75,7 +113,7 @@ export class PDFiumDocument extends Disposable {
     this.#formHandle = this.#module._FPDFDOC_InitFormFillEnvironment(this.#documentHandle, formInfo.ptr);
 
     // If initialisation failed, formInfo auto-freed at scope exit
-    if (this.#formHandle === 0) {
+    if (this.#formHandle === NULL_FORM) {
       return;
     }
 
@@ -123,18 +161,28 @@ export class PDFiumDocument extends Disposable {
     }
 
     const pageHandle = this.#module._FPDF_LoadPage(this.#documentHandle, pageIndex);
-    if (pageHandle === 0) {
+    if (pageHandle === asHandle(0)) {
       throw new PageError(PDFiumErrorCode.PAGE_LOAD_FAILED, `Failed to load page ${pageIndex}`, {
         requestedIndex: pageIndex,
       });
     }
 
     // Notify form system after loading page
-    if (this.#formHandle !== 0) {
+    if (this.#formHandle !== NULL_FORM) {
       this.#module._FORM_OnAfterLoadPage(pageHandle, this.#formHandle);
     }
 
-    return new PDFiumPage(this.#module, this.#memory, this.#documentHandle, pageHandle, pageIndex, this.#formHandle);
+    const page = new PDFiumPage(
+      this.#module,
+      this.#memory,
+      pageHandle,
+      pageIndex,
+      this.#formHandle,
+      this.#limits,
+      (p: PDFiumPage) => this.#pages.delete(p),
+    );
+    this.#pages.add(page);
+    return page;
   }
 
   /**
@@ -159,11 +207,207 @@ export class PDFiumDocument extends Disposable {
   }
 
   /**
+   * Get the bookmark (outline) tree for this document.
+   *
+   * Returns an array of top-level bookmarks, each with nested children.
+   * Returns an empty array if the document has no bookmarks.
+   */
+  getBookmarks(): Bookmark[] {
+    this.ensureNotDisposed();
+    return this.#readBookmarkChildren(NULL_BOOKMARK);
+  }
+
+  #readBookmarkChildren(parent: BookmarkHandle): Bookmark[] {
+    const bookmarks: Bookmark[] = [];
+    let current = this.#module._FPDFBookmark_GetFirstChild(this.#documentHandle, parent);
+
+    while (current !== NULL_BOOKMARK) {
+      const title = this.#readBookmarkTitle(current);
+      const dest = this.#module._FPDFBookmark_GetDest(this.#documentHandle, current);
+      const pageIndex = dest !== asHandle(0)
+        ? this.#module._FPDFDest_GetDestPageIndex(this.#documentHandle, dest)
+        : undefined;
+      const children = this.#readBookmarkChildren(current);
+
+      bookmarks.push({ title, pageIndex: pageIndex === -1 ? undefined : pageIndex, children });
+      current = this.#module._FPDFBookmark_GetNextSibling(this.#documentHandle, current);
+    }
+
+    return bookmarks;
+  }
+
+  #readBookmarkTitle(bookmark: BookmarkHandle): string {
+    // First call with 0 buffer to get required size (in bytes, including null terminator)
+    const requiredBytes = this.#module._FPDFBookmark_GetTitle(bookmark, 0 as WASMPointer, 0);
+    if (requiredBytes <= 2) {
+      return '';
+    }
+
+    using buffer = this.#memory.alloc(requiredBytes);
+    this.#module._FPDFBookmark_GetTitle(bookmark, buffer.ptr, requiredBytes);
+
+    // UTF-16LE: 2 bytes per char, subtract 2 for null terminator
+    const charCount = (requiredBytes - 2) / 2;
+    return this.#memory.readUTF16LE(buffer.ptr, charCount);
+  }
+
+  /**
+   * Get the number of file attachments in this document.
+   */
+  get attachmentCount(): number {
+    this.ensureNotDisposed();
+    return this.#module._FPDFDoc_GetAttachmentCount(this.#documentHandle);
+  }
+
+  /**
+   * Get a file attachment by index.
+   *
+   * @param index - Zero-based attachment index
+   * @returns The attachment metadata and data
+   * @throws {DocumentError} If the attachment cannot be loaded
+   */
+  getAttachment(index: number): PDFAttachment {
+    this.ensureNotDisposed();
+
+    const count = this.#module._FPDFDoc_GetAttachmentCount(this.#documentHandle);
+    if (index < 0 || index >= count) {
+      throw new DocumentError(
+        PDFiumErrorCode.DOC_FORMAT_INVALID,
+        `Attachment index ${index} out of range [0, ${count})`,
+      );
+    }
+
+    const handle = this.#module._FPDFDoc_GetAttachment(this.#documentHandle, index);
+    if (handle === NULL_ATTACHMENT) {
+      throw new DocumentError(PDFiumErrorCode.DOC_LOAD_UNKNOWN, `Failed to load attachment ${index}`);
+    }
+
+    const name = this.#readAttachmentName(handle);
+    const data = this.#readAttachmentData(handle);
+
+    return { index, name, data };
+  }
+
+  /**
+   * Get all file attachments in this document.
+   */
+  getAttachments(): PDFAttachment[] {
+    this.ensureNotDisposed();
+
+    const count = this.#module._FPDFDoc_GetAttachmentCount(this.#documentHandle);
+    const attachments: PDFAttachment[] = [];
+
+    for (let i = 0; i < count; i++) {
+      const handle = this.#module._FPDFDoc_GetAttachment(this.#documentHandle, i);
+      if (handle === NULL_ATTACHMENT) {
+        continue;
+      }
+
+      const name = this.#readAttachmentName(handle);
+      const data = this.#readAttachmentData(handle);
+      attachments.push({ index: i, name, data });
+    }
+
+    return attachments;
+  }
+
+  #readAttachmentName(handle: AttachmentHandle): string {
+    // First call with 0 buffer to get required size (in bytes, including null terminator)
+    const requiredBytes = this.#module._FPDFAttachment_GetName(handle, 0 as WASMPointer, 0);
+    if (requiredBytes <= 2) {
+      return '';
+    }
+
+    using buffer = this.#memory.alloc(requiredBytes);
+    this.#module._FPDFAttachment_GetName(handle, buffer.ptr, requiredBytes);
+
+    // UTF-16LE: 2 bytes per char, subtract 2 for null terminator
+    const charCount = (requiredBytes - 2) / 2;
+    return this.#memory.readUTF16LE(buffer.ptr, charCount);
+  }
+
+  #readAttachmentData(handle: AttachmentHandle): Uint8Array {
+    // First call to get size
+    using sizeOut = this.#memory.alloc(8);
+    const hasData = this.#module._FPDFAttachment_GetFile(handle, 0 as WASMPointer, 0, sizeOut.ptr);
+    if (!hasData) {
+      return new Uint8Array(0);
+    }
+
+    // Read the size (unsigned long = 4 bytes on WASM32)
+    const fileSize = this.#memory.readInt32(sizeOut.ptr);
+    if (fileSize <= 0) {
+      return new Uint8Array(0);
+    }
+
+    // Allocate and read data
+    using dataBuf = this.#memory.alloc(fileSize);
+    this.#module._FPDFAttachment_GetFile(handle, dataBuf.ptr, fileSize, sizeOut.ptr);
+
+    return this.#memory.heapU8.slice(dataBuf.ptr, dataBuf.ptr + fileSize);
+  }
+
+  /**
+   * Save the document to a new byte array.
+   *
+   * @param options - Save options (flags, version)
+   * @returns The serialised PDF bytes
+   * @throws {DocumentError} If the save operation fails
+   */
+  save(options: SaveOptions = {}): Uint8Array {
+    this.ensureNotDisposed();
+
+    const flags = options.flags ?? SaveFlags.None;
+    const chunks: Uint8Array[] = [];
+    let totalSize = 0;
+
+    // Create the JS callback that PDFium will call with each chunk
+    const writeBlock = (_pThis: number, pData: number, size: number): number => {
+      if (size > 0 && pData > 0) {
+        const chunk = this.#module.HEAPU8.slice(pData, pData + size);
+        chunks.push(chunk);
+        totalSize += size;
+      }
+      return 1; // Return non-zero for success
+    };
+
+    // Register callback as WASM function pointer
+    // Signature: 'iiii' = returns int, takes (int pThis, int pData, int size)
+    const funcPtr = this.#module.addFunction(writeBlock, 'iiii');
+
+    try {
+      // Allocate FPDF_FILEWRITE struct (8 bytes: version + WriteBlock pointer)
+      using fileWrite = this.#memory.alloc(8);
+      this.#memory.writeInt32(fileWrite.ptr, 1); // version = 1
+      this.#memory.writeInt32(asPointer(fileWrite.ptr + 4), funcPtr); // WriteBlock function pointer
+
+      const success = options.version !== undefined
+        ? this.#module._FPDF_SaveWithVersion(this.#documentHandle, fileWrite.ptr, flags, options.version)
+        : this.#module._FPDF_SaveAsCopy(this.#documentHandle, fileWrite.ptr, flags);
+
+      if (!success) {
+        throw new DocumentError(PDFiumErrorCode.DOC_LOAD_UNKNOWN, 'Failed to save document');
+      }
+    } finally {
+      this.#module.removeFunction(funcPtr);
+    }
+
+    // Concatenate all chunks
+    const result = new Uint8Array(totalSize);
+    let offset = 0;
+    for (const chunk of chunks) {
+      result.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return result;
+  }
+
+  /**
    * Get the internal document handle for advanced usage.
    *
    * @internal
    */
-  get handle(): number {
+  get handle(): DocumentHandle {
     this.ensureNotDisposed();
     return this.#documentHandle;
   }
@@ -173,16 +417,22 @@ export class PDFiumDocument extends Disposable {
    *
    * @internal
    */
-  get formHandle(): number {
+  get formHandle(): FormHandle {
     this.ensureNotDisposed();
     return this.#formHandle;
   }
 
   protected disposeInternal(): void {
+    // Dispose all tracked pages first (safe ordering)
+    for (const page of this.#pages) {
+      page.dispose();
+    }
+    this.#pages.clear();
+
     // Exit form fill environment
-    if (this.#formHandle !== 0) {
+    if (this.#formHandle !== NULL_FORM) {
       this.#module._FPDFDOC_ExitFormFillEnvironment(this.#formHandle);
-      this.#formHandle = 0;
+      this.#formHandle = NULL_FORM;
     }
 
     // Free form info structure

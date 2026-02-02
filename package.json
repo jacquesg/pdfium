@@ -1,6 +1,6 @@
 {
   "name": "@jacquesg/pdfium",
-  "version": "3.0.0-alpha.1",
+  "version": "0.0.0",
   "description": "Universal PDFium WASM wrapper for Browser and Node.js with modern TypeScript patterns",
   "type": "module",
   "engines": {
@@ -95,6 +95,5 @@
   "publishConfig": {
     "access": "public",
     "registry": "https://registry.npmjs.org/"
-  },
-  "packageManager": "pnpm@9.17.1"
+  }
 }

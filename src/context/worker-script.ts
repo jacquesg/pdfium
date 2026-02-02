@@ -6,25 +6,35 @@
  * @module context/worker-script
  */
 
-import { PDFium } from '../pdfium.js';
+import { PDFiumErrorCode } from '../core/errors.js';
+import type { SerialisedError } from '../core/types.js';
 import type { PDFiumDocument } from '../document/document.js';
 import type { PDFiumPage } from '../document/page.js';
-import type { SerialisedError } from '../core/types.js';
+import { PDFium } from '../pdfium.js';
 import type {
+  LoadPageResponse,
+  OpenDocumentResponse,
+  PageSizeResponse,
+  RenderPageResponse,
   WorkerRequest,
   WorkerResponse,
-  RenderPageResponse,
-  OpenDocumentResponse,
-  LoadPageResponse,
-  PageSizeResponse,
 } from './protocol.js';
+
+/** Default maximum number of open documents. */
+const DEFAULT_MAX_DOCUMENTS = 10;
+
+/** Default maximum number of open pages. */
+const DEFAULT_MAX_PAGES = 100;
 
 // Global state
 let pdfium: PDFium | null = null;
 const documents = new Map<number, PDFiumDocument>();
 const pages = new Map<number, PDFiumPage>();
+const pageDocumentMap = new WeakMap<PDFiumPage, number>();
 let nextDocumentId = 1;
 let nextPageId = 1;
+let maxDocuments = DEFAULT_MAX_DOCUMENTS;
+let maxPages = DEFAULT_MAX_PAGES;
 
 /**
  * Post a success response to the main thread.
@@ -61,10 +71,25 @@ function postError(id: string, error: Error | SerialisedError): void {
 /**
  * Handle initialisation request.
  */
-async function handleInit(id: string, wasmBinary: ArrayBuffer): Promise<void> {
+async function handleInit(
+  id: string,
+  wasmBinary: ArrayBuffer,
+  options?: { maxDocuments?: number; maxPages?: number },
+): Promise<void> {
   if (pdfium !== null) {
-    postError(id, { name: 'InitialisationError', message: 'Worker already initialised', code: 101 });
+    postError(id, {
+      name: 'InitialisationError',
+      message: 'Worker already initialised',
+      code: PDFiumErrorCode.INIT_LIBRARY_FAILED,
+    });
     return;
+  }
+
+  if (options?.maxDocuments !== undefined) {
+    maxDocuments = options.maxDocuments;
+  }
+  if (options?.maxPages !== undefined) {
+    maxPages = options.maxPages;
   }
 
   pdfium = await PDFium.init({ wasmBinary });
@@ -76,7 +101,20 @@ async function handleInit(id: string, wasmBinary: ArrayBuffer): Promise<void> {
  */
 async function handleOpenDocument(id: string, data: ArrayBuffer, password: string | undefined): Promise<void> {
   if (pdfium === null) {
-    postError(id, { name: 'InitialisationError', message: 'Worker not initialised', code: 101 });
+    postError(id, {
+      name: 'InitialisationError',
+      message: 'Worker not initialised',
+      code: PDFiumErrorCode.INIT_LIBRARY_FAILED,
+    });
+    return;
+  }
+
+  if (documents.size >= maxDocuments) {
+    postError(id, {
+      name: 'WorkerError',
+      message: `Document limit reached (max ${String(maxDocuments)})`,
+      code: PDFiumErrorCode.WORKER_RESOURCE_LIMIT,
+    });
     return;
   }
 
@@ -98,13 +136,17 @@ async function handleOpenDocument(id: string, data: ArrayBuffer, password: strin
 function handleCloseDocument(id: string, documentId: number): void {
   const document = documents.get(documentId);
   if (document === undefined) {
-    postError(id, { name: 'DocumentError', message: `Document ${documentId} not found`, code: 205 });
+    postError(id, {
+      name: 'DocumentError',
+      message: `Document ${String(documentId)} not found`,
+      code: PDFiumErrorCode.DOC_ALREADY_CLOSED,
+    });
     return;
   }
 
   // Close all pages belonging to this document
   for (const [pageId, page] of pages) {
-    if ((page as { documentId?: number }).documentId === documentId) {
+    if (pageDocumentMap.get(page) === documentId) {
       page.dispose();
       pages.delete(pageId);
     }
@@ -121,7 +163,11 @@ function handleCloseDocument(id: string, documentId: number): void {
 function handleGetPageCount(id: string, documentId: number): void {
   const document = documents.get(documentId);
   if (document === undefined) {
-    postError(id, { name: 'DocumentError', message: `Document ${documentId} not found`, code: 205 });
+    postError(id, {
+      name: 'DocumentError',
+      message: `Document ${String(documentId)} not found`,
+      code: PDFiumErrorCode.DOC_ALREADY_CLOSED,
+    });
     return;
   }
 
@@ -134,16 +180,27 @@ function handleGetPageCount(id: string, documentId: number): void {
 function handleLoadPage(id: string, documentId: number, pageIndex: number): void {
   const document = documents.get(documentId);
   if (document === undefined) {
-    postError(id, { name: 'DocumentError', message: `Document ${documentId} not found`, code: 205 });
+    postError(id, {
+      name: 'DocumentError',
+      message: `Document ${String(documentId)} not found`,
+      code: PDFiumErrorCode.DOC_ALREADY_CLOSED,
+    });
+    return;
+  }
+
+  if (pages.size >= maxPages) {
+    postError(id, {
+      name: 'WorkerError',
+      message: `Page limit reached (max ${String(maxPages)})`,
+      code: PDFiumErrorCode.WORKER_RESOURCE_LIMIT,
+    });
     return;
   }
 
   const page = document.getPage(pageIndex);
   const pageId = nextPageId++;
   pages.set(pageId, page);
-
-  // Store documentId for cleanup
-  (page as { documentId?: number }).documentId = documentId;
+  pageDocumentMap.set(page, documentId);
 
   const response: LoadPageResponse = {
     pageId,
@@ -160,7 +217,11 @@ function handleLoadPage(id: string, documentId: number, pageIndex: number): void
 function handleClosePage(id: string, pageId: number): void {
   const page = pages.get(pageId);
   if (page === undefined) {
-    postError(id, { name: 'PageError', message: `Page ${pageId} not found`, code: 302 });
+    postError(id, {
+      name: 'PageError',
+      message: `Page ${String(pageId)} not found`,
+      code: PDFiumErrorCode.PAGE_ALREADY_CLOSED,
+    });
     return;
   }
 
@@ -175,7 +236,11 @@ function handleClosePage(id: string, pageId: number): void {
 function handleGetPageSize(id: string, pageId: number): void {
   const page = pages.get(pageId);
   if (page === undefined) {
-    postError(id, { name: 'PageError', message: `Page ${pageId} not found`, code: 302 });
+    postError(id, {
+      name: 'PageError',
+      message: `Page ${String(pageId)} not found`,
+      code: PDFiumErrorCode.PAGE_ALREADY_CLOSED,
+    });
     return;
   }
 
@@ -192,7 +257,11 @@ function handleGetPageSize(id: string, pageId: number): void {
 function handleRenderPage(id: string, pageId: number, options: import('../core/types.js').RenderOptions): void {
   const page = pages.get(pageId);
   if (page === undefined) {
-    postError(id, { name: 'PageError', message: `Page ${pageId} not found`, code: 302 });
+    postError(id, {
+      name: 'PageError',
+      message: `Page ${String(pageId)} not found`,
+      code: PDFiumErrorCode.PAGE_ALREADY_CLOSED,
+    });
     return;
   }
 
@@ -216,7 +285,11 @@ function handleRenderPage(id: string, pageId: number, options: import('../core/t
 function handleGetText(id: string, pageId: number): void {
   const page = pages.get(pageId);
   if (page === undefined) {
-    postError(id, { name: 'PageError', message: `Page ${pageId} not found`, code: 302 });
+    postError(id, {
+      name: 'PageError',
+      message: `Page ${String(pageId)} not found`,
+      code: PDFiumErrorCode.PAGE_ALREADY_CLOSED,
+    });
     return;
   }
 
@@ -250,16 +323,26 @@ function handleDestroy(id: string): void {
 }
 
 /**
+ * Set up the worker message handler.
+ *
+ * Call this from the worker entry point to initialise
+ * message handling for off-main-thread PDF processing.
+ */
+export function setupWorker(): void {
+  self.onmessage = handleMessage;
+}
+
+/**
  * Handle incoming messages from the main thread.
  */
-self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
+async function handleMessage(event: MessageEvent<WorkerRequest>): Promise<void> {
   const request = event.data;
   const { type, id } = request;
 
   try {
     switch (type) {
       case 'INIT':
-        await handleInit(id, request.payload.wasmBinary);
+        await handleInit(id, request.payload.wasmBinary, request.payload as { maxDocuments?: number; maxPages?: number });
         break;
 
       case 'OPEN_DOCUMENT':
@@ -299,14 +382,18 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
         break;
 
       default:
-        postError(id, { name: 'WorkerError', message: `Unknown request type: ${(request as { type: string }).type}`, code: 801 });
+        postError(id, {
+          name: 'WorkerError',
+          message: `Unknown request type: ${(request as { type: string }).type}`,
+          code: PDFiumErrorCode.WORKER_COMMUNICATION_FAILED,
+        });
     }
   } catch (error) {
     postError(
       id,
       error instanceof Error
         ? error
-        : { name: 'WorkerError', message: String(error), code: 801 },
+        : { name: 'WorkerError', message: String(error), code: PDFiumErrorCode.WORKER_COMMUNICATION_FAILED },
     );
   }
-};
+}

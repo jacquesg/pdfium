@@ -91,6 +91,12 @@ export enum PDFiumErrorCode {
   WORKER_COMMUNICATION_FAILED = 801,
   /** Worker operation timed out */
   WORKER_TIMEOUT = 802,
+  /** Worker resource limit exceeded */
+  WORKER_RESOURCE_LIMIT = 803,
+
+  // Resource errors (9xx)
+  /** Attempted to use a resource that has been disposed */
+  RESOURCE_DISPOSED = 900,
 }
 
 /**
@@ -125,6 +131,8 @@ const ERROR_MESSAGES: Record<PDFiumErrorCode, string> = {
   [PDFiumErrorCode.WORKER_CREATE_FAILED]: 'Failed to create worker',
   [PDFiumErrorCode.WORKER_COMMUNICATION_FAILED]: 'Worker communication error',
   [PDFiumErrorCode.WORKER_TIMEOUT]: 'Worker operation timed out',
+  [PDFiumErrorCode.WORKER_RESOURCE_LIMIT]: 'Worker resource limit exceeded',
+  [PDFiumErrorCode.RESOURCE_DISPOSED]: 'Attempted to use a resource that has been disposed',
 };
 
 /**

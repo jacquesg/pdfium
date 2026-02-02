@@ -11,18 +11,32 @@
 import { PDFiumError, PDFiumErrorCode } from './errors.js';
 
 /**
- * Registry to track non-disposed resources and warn developers.
+ * Held value for FinalizationRegistry.
  *
- * When a resource is garbage collected without being disposed, a warning
- * is logged to help identify memory leaks during development.
+ * Contains the resource name for diagnostics and an optional cleanup
+ * callback that runs when the resource is garbage collected without
+ * being disposed.
  */
-const disposalRegistry = new FinalizationRegistry<string>((resourceName) => {
+interface FinalizerHeldValue {
+  readonly name: string;
+  cleanup: (() => void) | undefined;
+}
+
+/**
+ * Registry to track non-disposed resources and perform safety-net cleanup.
+ *
+ * When a resource is garbage collected without being disposed:
+ * 1. In dev mode, logs a warning to help identify memory leaks
+ * 2. Calls the cleanup callback (if registered) to free native resources
+ */
+const disposalRegistry = new FinalizationRegistry<FinalizerHeldValue>((held) => {
   if (__DEV__) {
     console.warn(
-      `[PDFium] Resource "${resourceName}" was garbage collected without being disposed. ` +
+      `[PDFium] Resource "${held.name}" was garbage collected without being disposed. ` +
         'This may cause memory leaks. Use the "using" keyword or call dispose() explicitly.',
     );
   }
+  held.cleanup?.();
 });
 
 // Declare the global __DEV__ variable
@@ -54,12 +68,16 @@ declare const __DEV__: boolean;
 export abstract class Disposable implements globalThis.Disposable {
   #disposed = false;
   readonly #resourceName: string;
+  readonly #disposedErrorCode: PDFiumErrorCode;
   readonly #registrationToken: object;
+  readonly #heldValue: FinalizerHeldValue;
 
-  constructor(resourceName: string) {
+  constructor(resourceName: string, disposedErrorCode: PDFiumErrorCode = PDFiumErrorCode.RESOURCE_DISPOSED) {
     this.#resourceName = resourceName;
+    this.#disposedErrorCode = disposedErrorCode;
     this.#registrationToken = {};
-    disposalRegistry.register(this, resourceName, this.#registrationToken);
+    this.#heldValue = { name: resourceName, cleanup: undefined };
+    disposalRegistry.register(this, this.#heldValue, this.#registrationToken);
   }
 
   /**
@@ -116,11 +134,19 @@ export abstract class Disposable implements globalThis.Disposable {
    */
   protected ensureNotDisposed(): void {
     if (this.#disposed) {
-      throw new PDFiumError(
-        PDFiumErrorCode.DOC_ALREADY_CLOSED,
-        `Cannot use ${this.#resourceName} after it has been disposed`,
-      );
+      throw new PDFiumError(this.#disposedErrorCode, `Cannot use ${this.#resourceName} after it has been disposed`);
     }
+  }
+
+  /**
+   * Register a cleanup callback with the FinalizationRegistry.
+   *
+   * This callback runs as a safety net if the resource is garbage
+   * collected without being disposed. Use this to free native WASM
+   * resources that would otherwise leak.
+   */
+  protected setFinalizerCleanup(cleanup: () => void): void {
+    this.#heldValue.cleanup = cleanup;
   }
 
   /**
@@ -148,12 +174,16 @@ export abstract class Disposable implements globalThis.Disposable {
 export abstract class AsyncDisposable implements globalThis.AsyncDisposable {
   #disposed = false;
   readonly #resourceName: string;
+  readonly #disposedErrorCode: PDFiumErrorCode;
   readonly #registrationToken: object;
+  readonly #heldValue: FinalizerHeldValue;
 
-  constructor(resourceName: string) {
+  constructor(resourceName: string, disposedErrorCode: PDFiumErrorCode = PDFiumErrorCode.RESOURCE_DISPOSED) {
     this.#resourceName = resourceName;
+    this.#disposedErrorCode = disposedErrorCode;
     this.#registrationToken = {};
-    disposalRegistry.register(this, resourceName, this.#registrationToken);
+    this.#heldValue = { name: resourceName, cleanup: undefined };
+    disposalRegistry.register(this, this.#heldValue, this.#registrationToken);
   }
 
   /**
@@ -194,11 +224,15 @@ export abstract class AsyncDisposable implements globalThis.AsyncDisposable {
    */
   protected ensureNotDisposed(): void {
     if (this.#disposed) {
-      throw new PDFiumError(
-        PDFiumErrorCode.DOC_ALREADY_CLOSED,
-        `Cannot use ${this.#resourceName} after it has been disposed`,
-      );
+      throw new PDFiumError(this.#disposedErrorCode, `Cannot use ${this.#resourceName} after it has been disposed`);
     }
+  }
+
+  /**
+   * Register a cleanup callback with the FinalizationRegistry.
+   */
+  protected setFinalizerCleanup(cleanup: () => void): void {
+    this.#heldValue.cleanup = cleanup;
   }
 
   /**

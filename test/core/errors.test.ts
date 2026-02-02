@@ -20,45 +20,85 @@ describe('PDFiumErrorCode', () => {
     expect(codes.length).toBe(uniqueCodes.size);
   });
 
-  it('initialisation codes are in 1xx range', () => {
-    expect(PDFiumErrorCode.INIT_WASM_LOAD_FAILED).toBeGreaterThanOrEqual(100);
-    expect(PDFiumErrorCode.INIT_WASM_LOAD_FAILED).toBeLessThan(200);
-    expect(PDFiumErrorCode.INIT_LIBRARY_FAILED).toBeGreaterThanOrEqual(100);
-    expect(PDFiumErrorCode.INIT_LIBRARY_FAILED).toBeLessThan(200);
+  it('has exact initialisation codes', () => {
+    expect(PDFiumErrorCode.INIT_WASM_LOAD_FAILED).toBe(100);
+    expect(PDFiumErrorCode.INIT_LIBRARY_FAILED).toBe(101);
+    expect(PDFiumErrorCode.INIT_INVALID_OPTIONS).toBe(102);
   });
 
-  it('document codes are in 2xx range', () => {
-    expect(PDFiumErrorCode.DOC_FILE_NOT_FOUND).toBeGreaterThanOrEqual(200);
-    expect(PDFiumErrorCode.DOC_FILE_NOT_FOUND).toBeLessThan(300);
-    expect(PDFiumErrorCode.DOC_PASSWORD_REQUIRED).toBeGreaterThanOrEqual(200);
-    expect(PDFiumErrorCode.DOC_PASSWORD_REQUIRED).toBeLessThan(300);
+  it('has exact document codes', () => {
+    expect(PDFiumErrorCode.DOC_FILE_NOT_FOUND).toBe(200);
+    expect(PDFiumErrorCode.DOC_FORMAT_INVALID).toBe(201);
+    expect(PDFiumErrorCode.DOC_PASSWORD_REQUIRED).toBe(202);
+    expect(PDFiumErrorCode.DOC_PASSWORD_INCORRECT).toBe(203);
+    expect(PDFiumErrorCode.DOC_SECURITY_UNSUPPORTED).toBe(204);
+    expect(PDFiumErrorCode.DOC_ALREADY_CLOSED).toBe(205);
+    expect(PDFiumErrorCode.DOC_LOAD_UNKNOWN).toBe(206);
   });
 
-  it('page codes are in 3xx range', () => {
-    expect(PDFiumErrorCode.PAGE_NOT_FOUND).toBeGreaterThanOrEqual(300);
-    expect(PDFiumErrorCode.PAGE_NOT_FOUND).toBeLessThan(400);
+  it('has exact page codes', () => {
+    expect(PDFiumErrorCode.PAGE_NOT_FOUND).toBe(300);
+    expect(PDFiumErrorCode.PAGE_LOAD_FAILED).toBe(301);
+    expect(PDFiumErrorCode.PAGE_ALREADY_CLOSED).toBe(302);
+    expect(PDFiumErrorCode.PAGE_INDEX_OUT_OF_RANGE).toBe(303);
   });
 
-  it('render codes are in 4xx range', () => {
-    expect(PDFiumErrorCode.RENDER_BITMAP_FAILED).toBeGreaterThanOrEqual(400);
-    expect(PDFiumErrorCode.RENDER_BITMAP_FAILED).toBeLessThan(500);
+  it('has exact render codes', () => {
+    expect(PDFiumErrorCode.RENDER_BITMAP_FAILED).toBe(400);
+    expect(PDFiumErrorCode.RENDER_INVALID_DIMENSIONS).toBe(401);
+    expect(PDFiumErrorCode.RENDER_FAILED).toBe(402);
   });
 
-  it('memory codes are in 5xx range', () => {
-    expect(PDFiumErrorCode.MEMORY_ALLOCATION_FAILED).toBeGreaterThanOrEqual(500);
-    expect(PDFiumErrorCode.MEMORY_ALLOCATION_FAILED).toBeLessThan(600);
+  it('has exact memory codes', () => {
+    expect(PDFiumErrorCode.MEMORY_ALLOCATION_FAILED).toBe(500);
+    expect(PDFiumErrorCode.MEMORY_BUFFER_OVERFLOW).toBe(501);
+    expect(PDFiumErrorCode.MEMORY_INVALID_POINTER).toBe(502);
   });
 
-  it('worker codes are in 8xx range', () => {
-    expect(PDFiumErrorCode.WORKER_CREATE_FAILED).toBeGreaterThanOrEqual(800);
-    expect(PDFiumErrorCode.WORKER_CREATE_FAILED).toBeLessThan(900);
+  it('has exact text codes', () => {
+    expect(PDFiumErrorCode.TEXT_EXTRACTION_FAILED).toBe(600);
+    expect(PDFiumErrorCode.TEXT_PAGE_FAILED).toBe(601);
+    expect(PDFiumErrorCode.TEXT_LOAD_FAILED).toBe(602);
+  });
+
+  it('has exact object codes', () => {
+    expect(PDFiumErrorCode.OBJECT_TYPE_UNKNOWN).toBe(700);
+    expect(PDFiumErrorCode.OBJECT_ACCESS_FAILED).toBe(701);
+  });
+
+  it('has exact worker codes', () => {
+    expect(PDFiumErrorCode.WORKER_CREATE_FAILED).toBe(800);
+    expect(PDFiumErrorCode.WORKER_COMMUNICATION_FAILED).toBe(801);
+    expect(PDFiumErrorCode.WORKER_TIMEOUT).toBe(802);
+    expect(PDFiumErrorCode.WORKER_RESOURCE_LIMIT).toBe(803);
+  });
+
+  it('has exact resource disposed code', () => {
+    expect(PDFiumErrorCode.RESOURCE_DISPOSED).toBe(900);
   });
 });
 
 describe('getErrorMessage()', () => {
-  it('returns message for known code', () => {
-    const message = getErrorMessage(PDFiumErrorCode.DOC_PASSWORD_REQUIRED);
-    expect(message).toBe('The document requires a password to open');
+  it('returns correct message for each known code', () => {
+    // Verify every code has a non-empty message
+    const numericCodes = Object.values(PDFiumErrorCode).filter((v): v is number => typeof v === 'number');
+    for (const code of numericCodes) {
+      const message = getErrorMessage(code);
+      expect(message.length).toBeGreaterThan(0);
+      expect(message).not.toMatch(/^Unknown error \(code: \d+\)$/);
+    }
+  });
+
+  it('returns specific message for DOC_PASSWORD_REQUIRED', () => {
+    expect(getErrorMessage(PDFiumErrorCode.DOC_PASSWORD_REQUIRED)).toBe('The document requires a password to open');
+  });
+
+  it('returns specific message for MEMORY_ALLOCATION_FAILED', () => {
+    expect(getErrorMessage(PDFiumErrorCode.MEMORY_ALLOCATION_FAILED)).toBe('Failed to allocate memory in the WASM heap');
+  });
+
+  it('returns specific message for RESOURCE_DISPOSED', () => {
+    expect(getErrorMessage(PDFiumErrorCode.RESOURCE_DISPOSED)).toBe('Attempted to use a resource that has been disposed');
   });
 
   it('returns fallback message for unknown code', () => {
@@ -115,6 +155,24 @@ describe('PDFiumError', () => {
       const json = error.toJSON();
       expect(json.context).toEqual(context);
     });
+
+    it('does not include context key when undefined', () => {
+      const error = new PDFiumError(PDFiumErrorCode.DOC_FORMAT_INVALID, 'Test');
+      const json = error.toJSON();
+      expect(Object.keys(json)).toEqual(['name', 'code', 'message']);
+      expect(json).not.toHaveProperty('context');
+    });
+  });
+
+  it('does not store context when undefined', () => {
+    const error = new PDFiumError(PDFiumErrorCode.DOC_FORMAT_INVALID);
+    expect(error.context).toBeUndefined();
+  });
+
+  it('stores context when provided', () => {
+    const ctx = { a: 1 };
+    const error = new PDFiumError(PDFiumErrorCode.DOC_FORMAT_INVALID, 'msg', ctx);
+    expect(error.context).toBe(ctx);
   });
 });
 

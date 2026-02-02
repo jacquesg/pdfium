@@ -24,10 +24,12 @@ export type {
   WorkerResponse,
 } from './context/protocol.js';
 // Worker proxy for off-main-thread processing
-export { WorkerProxy } from './context/worker-proxy.js';
+export { WorkerProxy, type WorkerProxyOptions } from './context/worker-proxy.js';
 // Document and page classes
+export { PDFiumDocumentBuilder, PDFiumPageBuilder } from './document/builder.js';
 export { PDFiumDocument } from './document/document.js';
 export { PDFiumPage } from './document/page.js';
+export { ProgressivePDFLoader } from './document/progressive.js';
 // Main PDFium class
 export { PDFium } from './pdfium.js';
 

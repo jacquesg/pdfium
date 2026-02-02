@@ -8,15 +8,29 @@
 
 import { Disposable } from '../core/disposable.js';
 import { InitialisationError, PDFiumError, PDFiumErrorCode, WorkerError } from '../core/errors.js';
-import type { SerialisedError, RenderOptions, RenderResult } from '../core/types.js';
+import type { ProgressCallback, RenderOptions, RenderResult, SerialisedError } from '../core/types.js';
 import type {
+  LoadPageResponse,
+  OpenDocumentResponse,
+  PageSizeResponse,
+  RenderPageResponse,
   WorkerRequest,
   WorkerResponse,
-  OpenDocumentResponse,
-  LoadPageResponse,
-  RenderPageResponse,
-  PageSizeResponse,
 } from './protocol.js';
+
+/** Default request timeout in milliseconds. */
+const DEFAULT_TIMEOUT = 30_000;
+
+/** Extended timeout for render operations. */
+const RENDER_TIMEOUT = 120_000;
+
+/**
+ * Options for creating a worker proxy.
+ */
+export interface WorkerProxyOptions {
+  /** Default request timeout in milliseconds (default: 30000) */
+  timeout?: number;
+}
 
 /**
  * Pending request tracking.
@@ -24,6 +38,8 @@ import type {
 interface PendingRequest<T> {
   resolve: (value: T) => void;
   reject: (error: PDFiumError) => void;
+  timer: ReturnType<typeof setTimeout>;
+  onProgress?: ProgressCallback | undefined;
 }
 
 /**
@@ -41,13 +57,19 @@ interface PendingRequest<T> {
 export class WorkerProxy extends Disposable {
   readonly #worker: Worker;
   readonly #pending = new Map<string, PendingRequest<unknown>>();
+  readonly #timeout: number;
   #requestId = 0;
 
-  private constructor(worker: Worker) {
+  private constructor(worker: Worker, timeout: number) {
     super('WorkerProxy');
     this.#worker = worker;
+    this.#timeout = timeout;
     this.#worker.onmessage = this.#handleMessage.bind(this);
     this.#worker.onerror = this.#handleError.bind(this);
+
+    this.setFinalizerCleanup(() => {
+      worker.terminate();
+    });
   }
 
   /**
@@ -55,16 +77,23 @@ export class WorkerProxy extends Disposable {
    *
    * @param workerUrl - URL to the worker script
    * @param wasmBinary - Pre-loaded WASM binary
+   * @param options - Optional configuration
    * @returns The worker proxy instance
    * @throws {InitialisationError} If worker creation or initialisation fails
    */
-  static async create(workerUrl: string | URL, wasmBinary: ArrayBuffer): Promise<WorkerProxy> {
+  static async create(
+    workerUrl: string | URL,
+    wasmBinary: ArrayBuffer,
+    options?: WorkerProxyOptions,
+  ): Promise<WorkerProxy> {
+    const timeout = options?.timeout ?? DEFAULT_TIMEOUT;
+
     try {
       const worker = new Worker(workerUrl, { type: 'module' });
-      const proxy = new WorkerProxy(worker);
+      const proxy = new WorkerProxy(worker, timeout);
 
       try {
-        await proxy.#sendRequest<void>('INIT', { wasmBinary }, [wasmBinary]);
+        await proxy.#sendRequest<void>('INIT', { wasmBinary }, [], timeout);
       } catch (error) {
         worker.terminate();
         throw new InitialisationError(
@@ -156,11 +185,18 @@ export class WorkerProxy extends Disposable {
    *
    * @param pageId - Page ID
    * @param options - Render options
+   * @param onProgress - Optional progress callback
    * @returns The render result
    * @throws {PDFiumError} If rendering fails
    */
-  async renderPage(pageId: number, options: RenderOptions = {}): Promise<RenderResult> {
-    const response = await this.#sendRequest<RenderPageResponse>('RENDER_PAGE', { pageId, options });
+  async renderPage(pageId: number, options: RenderOptions = {}, onProgress?: ProgressCallback): Promise<RenderResult> {
+    const response = await this.#sendRequest<RenderPageResponse>(
+      'RENDER_PAGE',
+      { pageId, options },
+      [],
+      RENDER_TIMEOUT,
+      onProgress,
+    );
     return {
       width: response.width,
       height: response.height,
@@ -188,16 +224,26 @@ export class WorkerProxy extends Disposable {
     type: WorkerRequest['type'],
     payload: Record<string, unknown>,
     transfer: Transferable[] = [],
+    timeout?: number,
+    onProgress?: ProgressCallback,
   ): Promise<T> {
     this.ensureNotDisposed();
 
     const id = String(++this.#requestId);
     const request = { type, id, payload } as WorkerRequest;
+    const effectiveTimeout = timeout ?? this.#timeout;
 
     return new Promise<T>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        this.#pending.delete(id);
+        reject(new WorkerError(PDFiumErrorCode.WORKER_TIMEOUT, `Worker request '${type}' timed out after ${String(effectiveTimeout)}ms`));
+      }, effectiveTimeout);
+
       this.#pending.set(id, {
         resolve: resolve as (value: unknown) => void,
         reject,
+        timer,
+        onProgress,
       });
 
       this.#worker.postMessage(request, transfer);
@@ -213,24 +259,24 @@ export class WorkerProxy extends Disposable {
 
     const pending = this.#pending.get(id);
     if (pending === undefined) {
-      console.warn('[PDFium] Received response for unknown request:', id);
       return;
     }
 
     switch (type) {
       case 'SUCCESS':
+        clearTimeout(pending.timer);
         this.#pending.delete(id);
         pending.resolve(response.payload);
         break;
 
       case 'ERROR':
+        clearTimeout(pending.timer);
         this.#pending.delete(id);
         pending.reject(this.#deserialiseError(response.error));
         break;
 
       case 'PROGRESS':
-        // Progress events don't resolve the promise
-        // Could emit an event here for progress tracking
+        pending.onProgress?.(response.progress);
         break;
     }
   }
@@ -239,15 +285,13 @@ export class WorkerProxy extends Disposable {
    * Handle worker errors.
    */
   #handleError(error: ErrorEvent): void {
-    console.error('[PDFium] Worker error:', error);
-
-    // Reject all pending requests
     const workerError = new WorkerError(
       PDFiumErrorCode.WORKER_COMMUNICATION_FAILED,
       `Worker error: ${error.message}`,
     );
 
     for (const [id, pending] of this.#pending) {
+      clearTimeout(pending.timer);
       pending.reject(workerError);
       this.#pending.delete(id);
     }
@@ -261,6 +305,11 @@ export class WorkerProxy extends Disposable {
   }
 
   protected disposeInternal(): void {
+    // Clear all timers first
+    for (const pending of this.#pending.values()) {
+      clearTimeout(pending.timer);
+    }
+
     // Send destroy message to worker
     const id = String(++this.#requestId);
     this.#worker.postMessage({ type: 'DESTROY', id });

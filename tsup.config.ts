@@ -30,7 +30,7 @@ export default defineConfig((options) => ({
   define: {
     __PACKAGE_VERSION__: JSON.stringify(process.env.npm_package_version ?? '0.0.0'),
     __WASM_HASH__: JSON.stringify(wasmHash),
-    __DEV__: JSON.stringify(process.env.NODE_ENV !== 'production'),
+    __DEV__: JSON.stringify(process.env.NODE_ENV === 'development'),
   },
   esbuildOptions(opts) {
     opts.legalComments = 'none';

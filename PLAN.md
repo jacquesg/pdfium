@@ -1,10 +1,28 @@
 # PLAN.md - @jacquesg/pdfium Library Redesign
 
-## 1. Executive Summary
+> **Status**: Implementation complete as of February 2026. This document is the original design plan and is retained for historical reference. The actual implementation diverged from this plan in several areas — notably, `Result<T, E>` was not implemented; the library uses typed error subclasses thrown as exceptions instead. See MIGRATION.md for the actual API surface.
+
+## Implementation Summary
+
+All 16 phases from the comprehensive hardening plan have been completed:
+
+- **Core**: Error hierarchy with 28 error codes, Disposable/AsyncDisposable with FinalizationRegistry, configurable error codes
+- **Memory**: Bounds-checked allocation, alignment validation, RAII wrappers (`WASMAllocation`)
+- **Input validation**: Document size limits, render dimension limits, text character limits
+- **Performance**: Single-pass BGRA→RGBA, cached page dimensions
+- **Resource lifecycle**: Document tracks child pages, safe disposal ordering
+- **Type safety**: Branded handle types (`DocumentHandle`, `PageHandle`, etc.)
+- **Features**: Save, bookmarks, annotations, page objects, rotation, text search, structure tree, attachments, PDF creation, progressive loading
+- **Vendor**: PDFium WASM v7623 with `addFunction`/`removeFunction` support
+- **Testing**: 226 tests, 88.81% statement coverage, 52.29% mutation score (Stryker)
+
+---
+
+## 1. Executive Summary (Original Design)
 
 This document outlines the complete redesign of the PDFium WASM wrapper, transforming `@hyzyla/pdfium` into `@jacquesg/pdfium`. The redesign addresses three critical pain points in the current implementation: manual memory management prone to leaks, opaque error handling without context, and an API that lacks modern TypeScript ergonomics.
 
-The new library will leverage ES2024 features including `Symbol.dispose` for automatic resource cleanup, a lightweight `Result<T, E>` type for explicit error handling, and a transparent worker abstraction that provides the same API regardless of execution context. The target platforms are Node.js 22 LTS and modern browsers, with ESM-only distribution built using tsup.
+The library leverages ES2024 features including `Symbol.dispose` for automatic resource cleanup, a typed error hierarchy for explicit error handling, and a transparent worker abstraction that provides the same API regardless of execution context. The target platforms are Node.js 22 LTS and modern browsers, with ESM-only distribution built using tsup.
 
 ---
 

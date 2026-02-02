@@ -4,7 +4,22 @@
  * @module wasm/bindings
  */
 
-import type { WASMPointer } from '../core/types.js';
+import type {
+  AnnotationHandle,
+  AttachmentHandle,
+  BitmapHandle,
+  BookmarkHandle,
+  DestinationHandle,
+  DocumentHandle,
+  FormHandle,
+  PageHandle,
+  PageObjectHandle,
+  SearchHandle,
+  StructElementHandle,
+  StructTreeHandle,
+  TextPageHandle,
+  WASMPointer,
+} from '../core/types.js';
 
 /**
  * PDFium WASM module interface.
@@ -18,34 +33,79 @@ export interface PDFiumWASM {
   _FPDF_GetLastError: () => number;
 
   // Document operations
-  _FPDF_LoadMemDocument: (documentPtr: WASMPointer, documentSize: number, passwordPtr: WASMPointer) => number;
-  _FPDF_CloseDocument: (document: number) => void;
-  _FPDF_GetPageCount: (document: number) => number;
+  _FPDF_LoadMemDocument: (documentPtr: WASMPointer, documentSize: number, passwordPtr: WASMPointer) => DocumentHandle;
+  _FPDF_CloseDocument: (document: DocumentHandle) => void;
+  _FPDF_GetPageCount: (document: DocumentHandle) => number;
 
   // Page operations
-  _FPDF_LoadPage: (document: number, pageIndex: number) => number;
-  _FPDF_ClosePage: (page: number) => void;
-  _FPDF_GetPageWidth: (page: number) => number;
-  _FPDF_GetPageHeight: (page: number) => number;
+  _FPDF_LoadPage: (document: DocumentHandle, pageIndex: number) => PageHandle;
+  _FPDF_ClosePage: (page: PageHandle) => void;
+  _FPDF_GetPageWidth: (page: PageHandle) => number;
+  _FPDF_GetPageHeight: (page: PageHandle) => number;
+
+  // Page rotation
+  _FPDFPage_GetRotation: (page: PageHandle) => number;
 
   // Page object operations
-  _FPDFPage_CountObjects: (page: number) => number;
-  _FPDFPage_GetObject: (page: number, index: number) => number;
-  _FPDFPageObj_GetType: (object: number) => number;
+  _FPDFPage_CountObjects: (page: PageHandle) => number;
+  _FPDFPage_GetObject: (page: PageHandle, index: number) => PageObjectHandle;
+  _FPDFPageObj_GetType: (object: PageObjectHandle) => number;
 
   // Image object operations
-  _FPDFImageObj_GetBitmap: (object: number) => number;
-  _FPDFImageObj_GetImageDataRaw: (object: number, buffer: WASMPointer, length: number) => number;
-  _FPDFImageObj_GetImagePixelSize: (object: number, widthPtr: WASMPointer, heightPtr: WASMPointer) => number;
-  _FPDFImageObj_GetImageFilterCount: (object: number) => number;
-  _FPDFImageObj_GetImageFilter: (object: number, index: number, buffer: WASMPointer, length: number) => number;
-  _FPDFImageObj_GetRenderedBitmap: (document: number, page: number, object: number) => number;
+  _FPDFImageObj_GetBitmap: (object: PageObjectHandle) => BitmapHandle;
+  _FPDFImageObj_GetImageDataRaw: (object: PageObjectHandle, buffer: WASMPointer, length: number) => number;
+  _FPDFImageObj_GetImagePixelSize: (
+    object: PageObjectHandle,
+    widthPtr: WASMPointer,
+    heightPtr: WASMPointer,
+  ) => number;
+  _FPDFImageObj_GetImageFilterCount: (object: PageObjectHandle) => number;
+  _FPDFImageObj_GetImageFilter: (
+    object: PageObjectHandle,
+    index: number,
+    buffer: WASMPointer,
+    length: number,
+  ) => number;
+  _FPDFImageObj_GetRenderedBitmap: (
+    document: DocumentHandle,
+    page: PageHandle,
+    object: PageObjectHandle,
+  ) => BitmapHandle;
 
   // Text operations
-  _FPDFText_LoadPage: (page: number) => number;
-  _FPDFText_ClosePage: (textPage: number) => void;
-  _FPDFText_CountChars: (textPage: number) => number;
-  _FPDFText_GetText: (textPage: number, startIndex: number, count: number, buffer: WASMPointer) => number;
+  _FPDFText_LoadPage: (page: PageHandle) => TextPageHandle;
+  _FPDFText_ClosePage: (textPage: TextPageHandle) => void;
+  _FPDFText_CountChars: (textPage: TextPageHandle) => number;
+  _FPDFText_GetText: (textPage: TextPageHandle, startIndex: number, count: number, buffer: WASMPointer) => number;
+
+  // Text search operations
+  _FPDFText_FindStart: (textPage: TextPageHandle, findWhat: WASMPointer, flags: number, startIndex: number) => SearchHandle;
+  _FPDFText_FindNext: (handle: SearchHandle) => number;
+  _FPDFText_FindPrev: (handle: SearchHandle) => number;
+  _FPDFText_FindClose: (handle: SearchHandle) => void;
+  _FPDFText_GetSchResultIndex: (handle: SearchHandle) => number;
+  _FPDFText_GetSchCount: (handle: SearchHandle) => number;
+
+  // Text position operations
+  _FPDFText_CountRects: (textPage: TextPageHandle, startIndex: number, count: number) => number;
+  _FPDFText_GetRect: (
+    textPage: TextPageHandle,
+    rectIndex: number,
+    left: WASMPointer,
+    top: WASMPointer,
+    right: WASMPointer,
+    bottom: WASMPointer,
+  ) => number;
+
+  // Bookmark operations
+  _FPDFBookmark_GetFirstChild: (document: DocumentHandle, bookmark: BookmarkHandle) => BookmarkHandle;
+  _FPDFBookmark_GetNextSibling: (document: DocumentHandle, bookmark: BookmarkHandle) => BookmarkHandle;
+  _FPDFBookmark_GetTitle: (bookmark: BookmarkHandle, buffer: WASMPointer, bufferLen: number) => number;
+  _FPDFBookmark_GetCount: (bookmark: BookmarkHandle) => number;
+  _FPDFBookmark_Find: (document: DocumentHandle, title: WASMPointer) => BookmarkHandle;
+  _FPDFBookmark_GetDest: (document: DocumentHandle, bookmark: BookmarkHandle) => DestinationHandle;
+  _FPDFBookmark_GetAction: (bookmark: BookmarkHandle) => number;
+  _FPDFDest_GetDestPageIndex: (document: DocumentHandle, dest: DestinationHandle) => number;
 
   // Bitmap operations
   _FPDFBitmap_CreateEx: (
@@ -54,26 +114,26 @@ export interface PDFiumWASM {
     format: number,
     buffer: WASMPointer,
     stride: number,
-  ) => number;
+  ) => BitmapHandle;
   _FPDFBitmap_FillRect: (
-    bitmap: number,
+    bitmap: BitmapHandle,
     left: number,
     top: number,
     width: number,
     height: number,
     colour: number,
   ) => void;
-  _FPDFBitmap_Destroy: (bitmap: number) => void;
-  _FPDFBitmap_GetBuffer: (bitmap: number) => WASMPointer;
-  _FPDFBitmap_GetWidth: (bitmap: number) => number;
-  _FPDFBitmap_GetHeight: (bitmap: number) => number;
-  _FPDFBitmap_GetStride: (bitmap: number) => number;
-  _FPDFBitmap_GetFormat: (bitmap: number) => number;
+  _FPDFBitmap_Destroy: (bitmap: BitmapHandle) => void;
+  _FPDFBitmap_GetBuffer: (bitmap: BitmapHandle) => WASMPointer;
+  _FPDFBitmap_GetWidth: (bitmap: BitmapHandle) => number;
+  _FPDFBitmap_GetHeight: (bitmap: BitmapHandle) => number;
+  _FPDFBitmap_GetStride: (bitmap: BitmapHandle) => number;
+  _FPDFBitmap_GetFormat: (bitmap: BitmapHandle) => number;
 
   // Render operations
   _FPDF_RenderPageBitmap: (
-    bitmap: number,
-    page: number,
+    bitmap: BitmapHandle,
+    page: PageHandle,
     startX: number,
     startY: number,
     sizeX: number,
@@ -83,14 +143,14 @@ export interface PDFiumWASM {
   ) => void;
 
   // Form fill operations
-  _FPDFDOC_InitFormFillEnvironment: (document: number, formInfo: WASMPointer) => number;
-  _FPDFDOC_ExitFormFillEnvironment: (formHandle: number) => void;
-  _FORM_OnAfterLoadPage: (page: number, formHandle: number) => void;
-  _FORM_OnBeforeClosePage: (page: number, formHandle: number) => void;
+  _FPDFDOC_InitFormFillEnvironment: (document: DocumentHandle, formInfo: WASMPointer) => FormHandle;
+  _FPDFDOC_ExitFormFillEnvironment: (formHandle: FormHandle) => void;
+  _FORM_OnAfterLoadPage: (page: PageHandle, formHandle: FormHandle) => void;
+  _FORM_OnBeforeClosePage: (page: PageHandle, formHandle: FormHandle) => void;
   _FPDF_FFLDraw: (
-    formHandle: number,
-    bitmap: number,
-    page: number,
+    formHandle: FormHandle,
+    bitmap: BitmapHandle,
+    page: PageHandle,
     startX: number,
     startY: number,
     sizeX: number,
@@ -99,11 +159,111 @@ export interface PDFiumWASM {
     flags: number,
   ) => void;
 
+  // Annotation operations
+  _FPDFPage_GetAnnotCount: (page: PageHandle) => number;
+  _FPDFPage_GetAnnot: (page: PageHandle, index: number) => AnnotationHandle;
+  _FPDFPage_CloseAnnot: (annotation: AnnotationHandle) => void;
+  _FPDFAnnot_GetSubtype: (annotation: AnnotationHandle) => number;
+  _FPDFAnnot_GetRect: (
+    annotation: AnnotationHandle,
+    rect: WASMPointer,
+  ) => number;
+  _FPDFAnnot_GetColor: (
+    annotation: AnnotationHandle,
+    colourType: number,
+    r: WASMPointer,
+    g: WASMPointer,
+    b: WASMPointer,
+    a: WASMPointer,
+  ) => number;
+
+  // Structure tree operations
+  _FPDF_StructTree_GetForPage: (page: PageHandle) => StructTreeHandle;
+  _FPDF_StructTree_Close: (structTree: StructTreeHandle) => void;
+  _FPDF_StructTree_CountChildren: (structTree: StructTreeHandle) => number;
+  _FPDF_StructTree_GetChildAtIndex: (structTree: StructTreeHandle, index: number) => StructElementHandle;
+  _FPDF_StructElement_GetType: (element: StructElementHandle, buffer: WASMPointer, bufferLen: number) => number;
+  _FPDF_StructElement_GetAltText: (element: StructElementHandle, buffer: WASMPointer, bufferLen: number) => number;
+  _FPDF_StructElement_GetLang: (element: StructElementHandle, buffer: WASMPointer, bufferLen: number) => number;
+  _FPDF_StructElement_CountChildren: (element: StructElementHandle) => number;
+  _FPDF_StructElement_GetChildAtIndex: (element: StructElementHandle, index: number) => StructElementHandle;
+
+  // Document creation operations
+  _FPDF_CreateNewDocument: () => DocumentHandle;
+  _FPDFPage_New: (document: DocumentHandle, pageIndex: number, width: number, height: number) => PageHandle;
+  _FPDFPage_Delete: (document: DocumentHandle, pageIndex: number) => void;
+  _FPDFPage_InsertObject: (page: PageHandle, pageObj: PageObjectHandle) => void;
+  _FPDFPage_GenerateContent: (page: PageHandle) => number;
+
+  // Page object creation
+  _FPDFPageObj_CreateNewRect: (x: number, y: number, w: number, h: number) => PageObjectHandle;
+  _FPDFPageObj_CreateNewPath: (x: number, y: number) => PageObjectHandle;
+  _FPDFPageObj_SetFillColor: (obj: PageObjectHandle, r: number, g: number, b: number, a: number) => number;
+  _FPDFPageObj_SetStrokeColor: (obj: PageObjectHandle, r: number, g: number, b: number, a: number) => number;
+  _FPDFPageObj_SetStrokeWidth: (obj: PageObjectHandle, width: number) => number;
+  _FPDFPageObj_Transform: (
+    obj: PageObjectHandle,
+    a: number,
+    b: number,
+    c: number,
+    d: number,
+    e: number,
+    f: number,
+  ) => void;
+
+  // Text object creation
+  _FPDFText_LoadStandardFont: (document: DocumentHandle, font: WASMPointer) => number;
+  _FPDFText_LoadFont: (
+    document: DocumentHandle,
+    data: WASMPointer,
+    size: number,
+    fontType: number,
+    cid: number,
+  ) => number;
+  _FPDFPageObj_CreateTextObj: (document: DocumentHandle, font: number, fontSize: number) => PageObjectHandle;
+  _FPDFText_SetText: (textObj: PageObjectHandle, text: WASMPointer) => number;
+  _FPDFFont_Close: (font: number) => void;
+
+  // Progressive loading / availability operations
+  _FPDFAvail_Create: (fileAvail: WASMPointer, fileAccess: WASMPointer) => number;
+  _FPDFAvail_Destroy: (avail: number) => void;
+  _FPDFAvail_IsDocAvail: (avail: number, hints: WASMPointer) => number;
+  _FPDFAvail_GetDocument: (avail: number, password: WASMPointer) => DocumentHandle;
+  _FPDFAvail_GetFirstPageNum: (document: DocumentHandle) => number;
+  _FPDFAvail_IsPageAvail: (avail: number, pageIndex: number, hints: WASMPointer) => number;
+  _FPDFAvail_IsLinearized: (avail: number) => number;
+  _FPDFAvail_IsFormAvail: (avail: number, hints: WASMPointer) => number;
+  _FPDF_LoadCustomDocument: (fileAccess: WASMPointer, password: WASMPointer) => DocumentHandle;
+
+  // Save operations
+  _FPDF_SaveAsCopy: (document: DocumentHandle, fileWrite: WASMPointer, flags: number) => number;
+  _FPDF_SaveWithVersion: (
+    document: DocumentHandle,
+    fileWrite: WASMPointer,
+    flags: number,
+    fileVersion: number,
+  ) => number;
+
+  // Attachment operations
+  _FPDFDoc_GetAttachmentCount: (document: DocumentHandle) => number;
+  _FPDFDoc_GetAttachment: (document: DocumentHandle, index: number) => AttachmentHandle;
+  _FPDFAttachment_GetName: (attachment: AttachmentHandle, buffer: WASMPointer, bufferLen: number) => number;
+  _FPDFAttachment_GetFile: (
+    attachment: AttachmentHandle,
+    buffer: WASMPointer,
+    bufferLen: number,
+    outLen: WASMPointer,
+  ) => number;
+
   // Memory management
   wasmExports: {
     malloc: (size: number) => number;
     free: (ptr: number) => void;
   };
+
+  // Emscripten runtime callback management
+  addFunction: (func: (...args: number[]) => number, signature: string) => number;
+  removeFunction: (funcPtr: number) => void;
 
   // Heap views
   HEAPU8: Uint8Array;
@@ -116,6 +276,8 @@ export interface PDFiumWASM {
 export interface WASMLoadOptions {
   /** Pre-loaded WASM binary */
   wasmBinary?: ArrayBuffer;
+  /** URL to fetch the WASM binary from (browser environments) */
+  wasmUrl?: string;
   /** Custom locateFile function for finding WASM */
   locateFile?: (path: string) => string;
   /** Custom instantiateWasm function */

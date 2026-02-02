@@ -6,11 +6,13 @@
 
 import { Disposable } from './core/disposable.js';
 import { DocumentError, InitialisationError, PDFiumErrorCode } from './core/errors.js';
-import type { PDFiumInitOptions } from './core/types.js';
+import { DEFAULT_LIMITS, type DocumentHandle, type PDFiumInitOptions, type PDFiumLimits } from './core/types.js';
 import { WASMAllocation } from './wasm/allocation.js';
 import { loadWASM, type PDFiumWASM, PDFiumNativeErrorCode, type WASMLoadOptions } from './wasm/index.js';
-import { NULL_PTR, WASMMemoryManager } from './wasm/memory.js';
+import { asHandle, NULL_PTR, WASMMemoryManager } from './wasm/memory.js';
+import { PDFiumDocumentBuilder } from './document/builder.js';
 import { PDFiumDocument } from './document/document.js';
+import { ProgressivePDFLoader } from './document/progressive.js';
 
 /**
  * Main PDFium library class.
@@ -28,12 +30,24 @@ import { PDFiumDocument } from './document/document.js';
 export class PDFium extends Disposable {
   readonly #module: PDFiumWASM;
   readonly #memory: WASMMemoryManager;
+  readonly #limits: Readonly<Required<PDFiumLimits>>;
   #libraryInitialised = false;
 
-  private constructor(module: PDFiumWASM) {
+  private constructor(module: PDFiumWASM, limits?: PDFiumLimits) {
     super('PDFium');
     this.#module = module;
     this.#memory = new WASMMemoryManager(module);
+    this.#limits = {
+      maxDocumentSize: limits?.maxDocumentSize ?? DEFAULT_LIMITS.maxDocumentSize,
+      maxRenderDimension: limits?.maxRenderDimension ?? DEFAULT_LIMITS.maxRenderDimension,
+      maxTextCharCount: limits?.maxTextCharCount ?? DEFAULT_LIMITS.maxTextCharCount,
+    };
+    this.setFinalizerCleanup(() => {
+      if (this.#libraryInitialised) {
+        this.#module._FPDF_DestroyLibrary();
+      }
+      this.#memory.freeAll();
+    });
   }
 
   /**
@@ -50,7 +64,7 @@ export class PDFium extends Disposable {
     }
 
     const module = await loadWASM(loadOptions);
-    const pdfium = new PDFium(module);
+    const pdfium = new PDFium(module, options.limits);
 
     try {
       pdfium.#initialiseLibrary();
@@ -93,6 +107,14 @@ export class PDFium extends Disposable {
 
     const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : data;
 
+    if (bytes.length > this.#limits.maxDocumentSize) {
+      throw new DocumentError(
+        PDFiumErrorCode.DOC_FORMAT_INVALID,
+        `Document size ${bytes.length} exceeds maximum allowed size of ${this.#limits.maxDocumentSize} bytes`,
+        { documentSize: bytes.length, maxDocumentSize: this.#limits.maxDocumentSize },
+      );
+    }
+
     using dataAlloc = this.#allocDocumentData(bytes);
     using passwordAlloc = options.password !== undefined
       ? this.#allocPassword(options.password)
@@ -101,13 +123,13 @@ export class PDFium extends Disposable {
     const passwordPtr = passwordAlloc !== undefined ? passwordAlloc.ptr : NULL_PTR;
     const documentHandle = this.#module._FPDF_LoadMemDocument(dataAlloc.ptr, bytes.length, passwordPtr);
 
-    if (documentHandle === 0) {
+    if (documentHandle === asHandle<DocumentHandle>(0)) {
       throw this.#getDocumentError();
     }
 
     // Transfer data ownership to PDFiumDocument; password auto-freed at scope exit
     const dataPtr = dataAlloc.take();
-    return new PDFiumDocument(this.#module, this.#memory, documentHandle, dataPtr);
+    return new PDFiumDocument(this.#module, this.#memory, documentHandle, dataPtr, this.#limits);
   }
 
   #allocDocumentData(bytes: Uint8Array): WASMAllocation {
@@ -153,11 +175,40 @@ export class PDFium extends Disposable {
   }
 
   /**
+   * Create a new empty PDF document.
+   *
+   * @returns A document builder for adding pages and content
+   */
+  createDocument(): PDFiumDocumentBuilder {
+    this.ensureNotDisposed();
+    return new PDFiumDocumentBuilder(this.#module, this.#memory);
+  }
+
+  /**
+   * Create a progressive loader for linearisation detection and incremental loading.
+   *
+   * @param data - PDF file data
+   * @returns A progressive loader instance
+   */
+  createProgressiveLoader(data: Uint8Array | ArrayBuffer): ProgressivePDFLoader {
+    this.ensureNotDisposed();
+    const bytes = data instanceof ArrayBuffer ? new Uint8Array(data) : data;
+    return ProgressivePDFLoader.fromBuffer(bytes, this.#module, this.#memory, this.#limits);
+  }
+
+  /**
    * Get the WASM module for advanced usage.
    */
   get module(): PDFiumWASM {
     this.ensureNotDisposed();
     return this.#module;
+  }
+
+  /**
+   * Get the configured resource limits.
+   */
+  get limits(): Readonly<Required<PDFiumLimits>> {
+    return this.#limits;
   }
 
   /**

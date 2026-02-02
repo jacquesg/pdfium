@@ -12,7 +12,7 @@ import type { RenderOptions, SerialisedError } from '../core/types.js';
  * Request types sent from main thread to worker.
  */
 export type WorkerRequest =
-  | { type: 'INIT'; id: string; payload: { wasmBinary: ArrayBuffer } }
+  | { type: 'INIT'; id: string; payload: { wasmBinary: ArrayBuffer; maxDocuments?: number; maxPages?: number } }
   | { type: 'OPEN_DOCUMENT'; id: string; payload: { data: ArrayBuffer; password?: string } }
   | { type: 'CLOSE_DOCUMENT'; id: string; payload: { documentId: number } }
   | { type: 'GET_PAGE_COUNT'; id: string; payload: { documentId: number } }
