@@ -5,8 +5,9 @@
  */
 
 import { Disposable } from '../core/disposable.js';
-import { PDFiumErrorCode, RenderError, TextError } from '../core/errors.js';
+import { PageError, PDFiumErrorCode, RenderError, TextError } from '../core/errors.js';
 import {
+  AnnotationType,
   DEFAULT_LIMITS,
   PageRotation,
   TextSearchFlags,
@@ -30,12 +31,18 @@ import {
 } from '../core/types.js';
 import { NativeHandle, WASMAllocation } from '../wasm/allocation.js';
 import { BitmapFormat, type PDFiumWASM, RenderFlags } from '../wasm/bindings.js';
-import { asHandle, type WASMMemoryManager } from '../wasm/memory.js';
+import { asHandle, encodeUTF16LE, NULL_PTR, ptrOffset, type WASMMemoryManager } from '../wasm/memory.js';
 
 /**
  * Default background colour (white with full opacity).
  */
 const DEFAULT_BACKGROUND_COLOUR = 0xffffffff;
+
+/** Set of valid AnnotationType values for runtime validation. */
+const VALID_ANNOTATION_TYPES = new Set<number>(Object.values(AnnotationType).filter((v): v is number => typeof v === 'number'));
+
+/** Maximum recursion depth for structure tree traversal. */
+const MAX_STRUCT_TREE_DEPTH = 100;
 
 /** Null handle constants. */
 const NULL_FORM: FormHandle = asHandle<FormHandle>(0);
@@ -70,6 +77,7 @@ export class PDFiumPage extends Disposable {
   readonly #deregister: ((page: PDFiumPage) => void) | undefined;
   #textPageHandle: TextPageHandle = NULL_TEXT_PAGE;
 
+  /** @internal */
   constructor(
     module: PDFiumWASM,
     memory: WASMMemoryManager,
@@ -138,7 +146,11 @@ export class PDFiumPage extends Disposable {
    */
   get rotation(): PageRotation {
     this.ensureNotDisposed();
-    return this.#module._FPDFPage_GetRotation(this.#pageHandle) as PageRotation;
+    const raw = this.#module._FPDFPage_GetRotation(this.#pageHandle);
+    if (raw >= 0 && raw <= 3) {
+      return raw as PageRotation;
+    }
+    return PageRotation.None;
   }
 
   /**
@@ -173,7 +185,13 @@ export class PDFiumPage extends Disposable {
       renderHeight = Math.round(pageHeight * scale);
     }
 
-    // Validate render dimensions
+    // Validate render dimensions (NaN, Infinity, non-positive)
+    if (!Number.isFinite(renderWidth) || !Number.isFinite(renderHeight)) {
+      throw new RenderError(PDFiumErrorCode.RENDER_INVALID_DIMENSIONS, 'Render dimensions must be finite numbers', {
+        width: renderWidth,
+        height: renderHeight,
+      });
+    }
     if (renderWidth <= 0 || renderHeight <= 0) {
       throw new RenderError(PDFiumErrorCode.RENDER_INVALID_DIMENSIONS, 'Render dimensions must be positive', {
         width: renderWidth,
@@ -186,6 +204,14 @@ export class PDFiumPage extends Disposable {
         `Render dimensions ${renderWidth}x${renderHeight} exceed maximum of ${this.#limits.maxRenderDimension}`,
         { width: renderWidth, height: renderHeight, maxDimension: this.#limits.maxRenderDimension },
       );
+    }
+
+    // Guard against integer overflow in buffer size calculation
+    if (renderWidth > Number.MAX_SAFE_INTEGER / (renderHeight * 4)) {
+      throw new RenderError(PDFiumErrorCode.RENDER_INVALID_DIMENSIONS, 'Render dimensions would cause integer overflow', {
+        width: renderWidth,
+        height: renderHeight,
+      });
     }
 
     // Allocate bitmap buffer (BGRA format = 4 bytes per pixel)
@@ -220,7 +246,7 @@ export class PDFiumPage extends Disposable {
       });
     }
 
-    using _bitmap = new NativeHandle(bitmapHandle, (h) => this.#module._FPDFBitmap_Destroy(h as BitmapHandle));
+    using _bitmap = new NativeHandle<BitmapHandle>(bitmapHandle, (h) => this.#module._FPDFBitmap_Destroy(h));
 
     // Fill with background colour
     const bgColour = options.backgroundColour ?? DEFAULT_BACKGROUND_COLOUR;
@@ -359,14 +385,18 @@ export class PDFiumPage extends Disposable {
   getAnnotation(index: number): Annotation {
     this.ensureNotDisposed();
 
+    if (!Number.isSafeInteger(index)) {
+      throw new PageError(PDFiumErrorCode.PAGE_INDEX_OUT_OF_RANGE, `Annotation index must be a safe integer, got ${index}`);
+    }
+
     const count = this.#module._FPDFPage_GetAnnotCount(this.#pageHandle);
     if (index < 0 || index >= count) {
-      throw new RenderError(PDFiumErrorCode.RENDER_INVALID_DIMENSIONS, `Annotation index ${index} out of range [0, ${count})`);
+      throw new PageError(PDFiumErrorCode.ANNOT_INDEX_OUT_OF_RANGE, `Annotation index ${index} out of range [0, ${count})`);
     }
 
     const handle = this.#module._FPDFPage_GetAnnot(this.#pageHandle, index);
     if (handle === NULL_ANNOT) {
-      throw new RenderError(PDFiumErrorCode.RENDER_BITMAP_FAILED, `Failed to load annotation ${index}`);
+      throw new PageError(PDFiumErrorCode.ANNOT_LOAD_FAILED, `Failed to load annotation ${index}`);
     }
 
     try {
@@ -401,7 +431,8 @@ export class PDFiumPage extends Disposable {
   }
 
   #readAnnotation(handle: AnnotationHandle, index: number): Annotation {
-    const type = this.#module._FPDFAnnot_GetSubtype(handle);
+    const rawType = this.#module._FPDFAnnot_GetSubtype(handle);
+    const type: AnnotationType = VALID_ANNOTATION_TYPES.has(rawType) ? rawType : AnnotationType.Unknown;
     const bounds = this.#readAnnotationRect(handle);
     const colour = this.#readAnnotationColour(handle);
 
@@ -430,9 +461,9 @@ export class PDFiumPage extends Disposable {
     // Allocate 4 unsigned ints for RGBA
     using colourBuf = this.#memory.alloc(16);
     const rPtr = colourBuf.ptr;
-    const gPtr = (colourBuf.ptr + 4) as WASMPointer;
-    const bPtr = (colourBuf.ptr + 8) as WASMPointer;
-    const aPtr = (colourBuf.ptr + 12) as WASMPointer;
+    const gPtr = ptrOffset(colourBuf.ptr, 4);
+    const bPtr = ptrOffset(colourBuf.ptr, 8);
+    const aPtr = ptrOffset(colourBuf.ptr, 12);
 
     // colour type 0 = FPDFANNOT_COLORTYPE_Color (fill/stroke colour)
     const success = this.#module._FPDFAnnot_GetColor(handle, 0, rPtr, gPtr, bPtr, aPtr);
@@ -462,7 +493,7 @@ export class PDFiumPage extends Disposable {
     this.#ensureTextPage();
 
     // Encode query as UTF-16LE (PDFium expects this)
-    const queryBytes = this.#encodeUTF16LE(query);
+    const queryBytes = encodeUTF16LE(query);
     using queryAlloc = this.#memory.allocFrom(queryBytes);
 
     const searchHandle = this.#module._FPDFText_FindStart(this.#textPageHandle, queryAlloc.ptr, flags, 0);
@@ -491,18 +522,6 @@ export class PDFiumPage extends Disposable {
     }
   }
 
-  #encodeUTF16LE(str: string): Uint8Array {
-    // Encode string as UTF-16LE with null terminator
-    const result = new Uint8Array((str.length + 1) * 2);
-    for (let i = 0; i < str.length; i++) {
-      const code = str.charCodeAt(i);
-      result[i * 2] = code & 0xff;
-      result[i * 2 + 1] = (code >> 8) & 0xff;
-    }
-    // Null terminator (already zeroed by Uint8Array constructor)
-    return result;
-  }
-
   #getTextRects(charIndex: number, charCount: number): TextRect[] {
     const rectCount = this.#module._FPDFText_CountRects(this.#textPageHandle, charIndex, charCount);
     if (rectCount <= 0) {
@@ -513,9 +532,9 @@ export class PDFiumPage extends Disposable {
     // 4 doubles: left, top, right, bottom = 32 bytes
     using buf = this.#memory.alloc(32);
     const leftPtr = buf.ptr;
-    const topPtr = (buf.ptr + 8) as WASMPointer;
-    const rightPtr = (buf.ptr + 16) as WASMPointer;
-    const bottomPtr = (buf.ptr + 24) as WASMPointer;
+    const topPtr = ptrOffset(buf.ptr, 8);
+    const rightPtr = ptrOffset(buf.ptr, 16);
+    const bottomPtr = ptrOffset(buf.ptr, 24);
 
     for (let i = 0; i < rectCount; i++) {
       const success = this.#module._FPDFText_GetRect(this.#textPageHandle, i, leftPtr, topPtr, rightPtr, bottomPtr);
@@ -566,7 +585,14 @@ export class PDFiumPage extends Disposable {
     }
   }
 
-  #readStructElement(element: StructElementHandle): StructureElement {
+  #readStructElement(element: StructElementHandle, depth = 0): StructureElement {
+    if (depth > MAX_STRUCT_TREE_DEPTH) {
+      throw new PageError(
+        PDFiumErrorCode.PAGE_LOAD_FAILED,
+        `Structure tree depth exceeds maximum of ${MAX_STRUCT_TREE_DEPTH}`,
+      );
+    }
+
     const type = this.#readStructString(
       (buf, len) => this.#module._FPDF_StructElement_GetType(element, buf, len),
     );
@@ -582,7 +608,7 @@ export class PDFiumPage extends Disposable {
     for (let i = 0; i < childCount; i++) {
       const child = this.#module._FPDF_StructElement_GetChildAtIndex(element, i);
       if (child !== NULL_STRUCT_ELEMENT) {
-        children.push(this.#readStructElement(child));
+        children.push(this.#readStructElement(child, depth + 1));
       }
     }
 
@@ -597,7 +623,7 @@ export class PDFiumPage extends Disposable {
   }
 
   #readStructString(getter: (buf: WASMPointer, len: number) => number): string {
-    const requiredBytes = getter(0 as WASMPointer, 0);
+    const requiredBytes = getter(NULL_PTR, 0);
     if (requiredBytes <= 2) {
       return '';
     }

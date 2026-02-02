@@ -47,6 +47,12 @@ export type StructTreeHandle = number & { readonly __brand: 'StructTreeHandle' }
 /** Branded handle for a structure element. */
 export type StructElementHandle = number & { readonly __brand: 'StructElementHandle' };
 
+/** Branded handle for a loaded font. */
+export type FontHandle = number & { readonly __brand: 'FontHandle' };
+
+/** Branded handle for a document availability provider. */
+export type AvailabilityHandle = number & { readonly __brand: 'AvailabilityHandle' };
+
 /**
  * Page dimensions in points (1/72 inch).
  */
@@ -230,6 +236,8 @@ export type AnnotationHandle = number & { readonly __brand: 'AnnotationHandle' }
 
 /**
  * PDF annotation subtype values.
+ *
+ * Note: Values are non-contiguous per the PDF specification (e.g. 12 and 19 are unused).
  */
 export enum AnnotationType {
   Unknown = 0,
@@ -273,6 +281,8 @@ export interface AnnotationBounds {
 
 /**
  * RGBA colour value.
+ *
+ * Each channel is an integer in the range 0–255.
  */
 export interface Colour {
   r: number;
@@ -311,6 +321,7 @@ export interface Bookmark {
  * Flags for text search behaviour.
  */
 export enum TextSearchFlags {
+  /** No flags. This value is 0 and therefore falsy by design. */
   None = 0x0000,
   MatchCase = 0x0001,
   MatchWholeWord = 0x0002,
@@ -399,6 +410,10 @@ export enum FontType {
 
 /**
  * Flags for FPDF_SaveAsCopy / FPDF_SaveWithVersion.
+ *
+ * These flags control how the document is serialised. `Incremental` preserves
+ * the original data and appends changes; `NoIncremental` rewrites the file
+ * without encryption; `RemoveSecurity` removes all security handlers.
  */
 export enum SaveFlags {
   /** No special flags. */
@@ -432,20 +447,29 @@ export enum DocumentAvailability {
   /** Required data is available. */
   DataAvailable = 1,
   /** Linearisation status is unknown. */
-  LinearizationUnknown = 2,
+  LinearisationUnknown = 2,
 }
 
 /**
  * Linearisation status from FPDFAvail_IsLinearized.
+ *
+ * @see {@link LinearizationStatus} for the deprecated alias.
  */
-export enum LinearizationStatus {
+export enum LinearisationStatus {
   /** Not linearised. */
-  NotLinearized = 0,
+  NotLinearised = 0,
   /** Linearised. */
-  Linearized = 1,
+  Linearised = 1,
   /** Unknown (not enough data). */
   Unknown = -1,
 }
+
+/**
+ * @deprecated Use {@link LinearisationStatus} instead (British English spelling).
+ */
+export const LinearizationStatus = LinearisationStatus;
+/** @deprecated Use {@link LinearisationStatus} instead. */
+export type LinearizationStatus = LinearisationStatus;
 
 /**
  * Progress callback for long-running operations.

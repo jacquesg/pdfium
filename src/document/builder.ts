@@ -8,32 +8,19 @@ import { Disposable } from '../core/disposable.js';
 import { DocumentError, PDFiumErrorCode } from '../core/errors.js';
 import {
   type DocumentHandle,
+  type FontHandle,
   type PageHandle,
   type PageObjectHandle,
-  SaveFlags,
   type SaveOptions,
   type ShapeStyle,
 } from '../core/types.js';
 import type { PDFiumWASM } from '../wasm/bindings.js';
-import { asHandle, asPointer, type WASMMemoryManager } from '../wasm/memory.js';
+import { asHandle, encodeUTF16LE, type WASMMemoryManager } from '../wasm/memory.js';
+import { saveDocument } from './save-utils.js';
 
 /** Default page dimensions (US Letter in points). */
 const DEFAULT_PAGE_WIDTH = 612;
 const DEFAULT_PAGE_HEIGHT = 792;
-
-/**
- * Encodes a string as UTF-16LE with a null terminator for PDFium.
- */
-function encodeUTF16LE(str: string): Uint8Array {
-  const buffer = new Uint8Array((str.length + 1) * 2);
-  for (let i = 0; i < str.length; i++) {
-    const code = str.charCodeAt(i);
-    buffer[i * 2] = code & 0xff;
-    buffer[i * 2 + 1] = (code >> 8) & 0xff;
-  }
-  // Null terminator (already 0 from Uint8Array init)
-  return buffer;
-}
 
 /**
  * Builder for creating new PDF documents from scratch.
@@ -50,7 +37,7 @@ export class PDFiumDocumentBuilder extends Disposable {
   readonly #memory: WASMMemoryManager;
   readonly #documentHandle: DocumentHandle;
   readonly #pages: PageHandle[] = [];
-  readonly #fonts: number[] = [];
+  readonly #fonts: FontHandle[] = [];
 
   constructor(module: PDFiumWASM, memory: WASMMemoryManager) {
     super('PDFiumDocumentBuilder');
@@ -60,16 +47,16 @@ export class PDFiumDocumentBuilder extends Disposable {
 
     const handle = module._FPDF_CreateNewDocument();
     if (handle === asHandle<DocumentHandle>(0)) {
-      throw new DocumentError(PDFiumErrorCode.DOC_LOAD_UNKNOWN, 'Failed to create new document');
+      throw new DocumentError(PDFiumErrorCode.DOC_CREATE_FAILED, 'Failed to create new document');
     }
     this.#documentHandle = handle;
 
     this.setFinalizerCleanup(() => {
-      for (const font of this.#fonts) {
-        this.#module._FPDFFont_Close(font);
-      }
       for (const page of this.#pages) {
         this.#module._FPDF_ClosePage(page);
+      }
+      for (const font of this.#fonts) {
+        this.#module._FPDFFont_Close(font);
       }
       this.#module._FPDF_CloseDocument(this.#documentHandle);
     });
@@ -108,7 +95,7 @@ export class PDFiumDocumentBuilder extends Disposable {
 
     const pageHandle = this.#module._FPDFPage_New(this.#documentHandle, pageIndex, width, height);
     if (pageHandle === asHandle<PageHandle>(0)) {
-      throw new DocumentError(PDFiumErrorCode.DOC_LOAD_UNKNOWN, 'Failed to create new page');
+      throw new DocumentError(PDFiumErrorCode.DOC_CREATE_FAILED, 'Failed to create new page');
     }
 
     this.#pages.push(pageHandle);
@@ -146,13 +133,13 @@ export class PDFiumDocumentBuilder extends Disposable {
    * @param fontName - Standard font name
    * @returns A font handle for use with page builder's addText method
    */
-  loadStandardFont(fontName: string): number {
+  loadStandardFont(fontName: string): FontHandle {
     this.ensureNotDisposed();
 
     using nameAlloc = this.#memory.allocString(fontName);
     const font = this.#module._FPDFText_LoadStandardFont(this.#documentHandle, nameAlloc.ptr);
-    if (font === 0) {
-      throw new DocumentError(PDFiumErrorCode.DOC_LOAD_UNKNOWN, `Failed to load standard font: ${fontName}`);
+    if (font === asHandle<FontHandle>(0)) {
+      throw new DocumentError(PDFiumErrorCode.DOC_FORMAT_INVALID, `Failed to load standard font: ${fontName}`);
     }
 
     this.#fonts.push(font);
@@ -173,56 +160,20 @@ export class PDFiumDocumentBuilder extends Disposable {
       this.#module._FPDFPage_GenerateContent(page);
     }
 
-    const flags = options.flags ?? SaveFlags.None;
-    const chunks: Uint8Array[] = [];
-    let totalSize = 0;
-
-    const writeBlock = (_pThis: number, pData: number, size: number): number => {
-      if (size > 0 && pData > 0) {
-        const chunk = this.#module.HEAPU8.slice(pData, pData + size);
-        chunks.push(chunk);
-        totalSize += size;
-      }
-      return 1;
-    };
-
-    const funcPtr = this.#module.addFunction(writeBlock, 'iiii');
-
-    try {
-      using fileWrite = this.#memory.alloc(8);
-      this.#memory.writeInt32(fileWrite.ptr, 1);
-      this.#memory.writeInt32(asPointer(fileWrite.ptr + 4), funcPtr);
-
-      const success = options.version !== undefined
-        ? this.#module._FPDF_SaveWithVersion(this.#documentHandle, fileWrite.ptr, flags, options.version)
-        : this.#module._FPDF_SaveAsCopy(this.#documentHandle, fileWrite.ptr, flags);
-
-      if (!success) {
-        throw new DocumentError(PDFiumErrorCode.DOC_LOAD_UNKNOWN, 'Failed to save document');
-      }
-    } finally {
-      this.#module.removeFunction(funcPtr);
-    }
-
-    const result = new Uint8Array(totalSize);
-    let offset = 0;
-    for (const chunk of chunks) {
-      result.set(chunk, offset);
-      offset += chunk.length;
-    }
-    return result;
+    return saveDocument(this.#module, this.#memory, this.#documentHandle, options);
   }
 
   protected disposeInternal(): void {
-    for (const font of this.#fonts) {
-      this.#module._FPDFFont_Close(font);
-    }
-    this.#fonts.length = 0;
-
+    // Close pages first, then fonts, then the document
     for (const page of this.#pages) {
       this.#module._FPDF_ClosePage(page);
     }
     this.#pages.length = 0;
+
+    for (const font of this.#fonts) {
+      this.#module._FPDFFont_Close(font);
+    }
+    this.#fonts.length = 0;
 
     this.#module._FPDF_CloseDocument(this.#documentHandle);
   }
@@ -261,7 +212,7 @@ export class PDFiumPageBuilder {
   addRectangle(x: number, y: number, w: number, h: number, style?: ShapeStyle): void {
     const obj = this.#module._FPDFPageObj_CreateNewRect(x, y, w, h);
     if (obj === asHandle<PageObjectHandle>(0)) {
-      throw new DocumentError(PDFiumErrorCode.DOC_LOAD_UNKNOWN, 'Failed to create rectangle');
+      throw new DocumentError(PDFiumErrorCode.DOC_CREATE_FAILED, 'Failed to create rectangle');
     }
 
     this.#applyShapeStyle(obj, style);
@@ -277,10 +228,10 @@ export class PDFiumPageBuilder {
    * @param font - Font handle from builder.loadStandardFont()
    * @param fontSize - Font size in points
    */
-  addText(text: string, x: number, y: number, font: number, fontSize: number): void {
+  addText(text: string, x: number, y: number, font: FontHandle, fontSize: number): void {
     const textObj = this.#module._FPDFPageObj_CreateTextObj(this.#documentHandle, font, fontSize);
     if (textObj === asHandle<PageObjectHandle>(0)) {
-      throw new DocumentError(PDFiumErrorCode.DOC_LOAD_UNKNOWN, 'Failed to create text object');
+      throw new DocumentError(PDFiumErrorCode.DOC_CREATE_FAILED, 'Failed to create text object');
     }
 
     // Encode text as UTF-16LE for PDFium
@@ -304,11 +255,15 @@ export class PDFiumPageBuilder {
   #applyShapeStyle(obj: PageObjectHandle, style?: ShapeStyle): void {
     if (style?.fill) {
       const c = style.fill;
-      this.#module._FPDFPageObj_SetFillColor(obj, c.r, c.g, c.b, c.a);
+      if (!this.#module._FPDFPageObj_SetFillColor(obj, c.r, c.g, c.b, c.a)) {
+        throw new DocumentError(PDFiumErrorCode.DOC_CREATE_FAILED, 'Failed to set fill colour');
+      }
     }
     if (style?.stroke) {
       const c = style.stroke;
-      this.#module._FPDFPageObj_SetStrokeColor(obj, c.r, c.g, c.b, c.a);
+      if (!this.#module._FPDFPageObj_SetStrokeColor(obj, c.r, c.g, c.b, c.a)) {
+        throw new DocumentError(PDFiumErrorCode.DOC_CREATE_FAILED, 'Failed to set stroke colour');
+      }
     }
     if (style?.strokeWidth !== undefined) {
       this.#module._FPDFPageObj_SetStrokeWidth(obj, style.strokeWidth);

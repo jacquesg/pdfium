@@ -10,16 +10,20 @@
 import { Disposable } from '../core/disposable.js';
 import { DocumentError, PDFiumErrorCode } from '../core/errors.js';
 import {
+  type AvailabilityHandle,
   DEFAULT_LIMITS,
   DocumentAvailability,
   type DocumentHandle,
-  LinearizationStatus,
+  LinearisationStatus,
   type PDFiumLimits,
   type WASMPointer,
 } from '../core/types.js';
 import type { PDFiumWASM } from '../wasm/bindings.js';
 import { asHandle, asPointer, NULL_PTR, type WASMMemoryManager } from '../wasm/memory.js';
 import { PDFiumDocument } from './document.js';
+
+/** Null availability handle constant. */
+const NULL_AVAIL: AvailabilityHandle = asHandle<AvailabilityHandle>(0);
 
 /**
  * Size of the FX_FILEAVAIL struct: version (4) + IsDataAvail function pointer (4).
@@ -79,7 +83,7 @@ export class ProgressivePDFLoader extends Disposable {
   #addSegmentFuncPtr = 0;
 
   /** The availability handle from FPDFAvail_Create. */
-  #availHandle = 0;
+  #availHandle: AvailabilityHandle = NULL_AVAIL;
 
   /** Whether we've already extracted a document. */
   #documentExtracted = false;
@@ -118,6 +122,14 @@ export class ProgressivePDFLoader extends Disposable {
     memory: WASMMemoryManager,
     limits?: Readonly<Required<PDFiumLimits>>,
   ): ProgressivePDFLoader {
+    const effectiveLimits = limits ?? DEFAULT_LIMITS;
+    if (data.length > effectiveLimits.maxDocumentSize) {
+      throw new DocumentError(
+        PDFiumErrorCode.DOC_FORMAT_INVALID,
+        `Document size ${data.length} exceeds maximum allowed size of ${effectiveLimits.maxDocumentSize} bytes`,
+        { documentSize: data.length, maxDocumentSize: effectiveLimits.maxDocumentSize },
+      );
+    }
     return new ProgressivePDFLoader(module, memory, data, data.length, data.length, limits);
   }
 
@@ -126,19 +138,26 @@ export class ProgressivePDFLoader extends Disposable {
    *
    * @returns The linearisation status
    */
-  get linearizationStatus(): LinearizationStatus {
+  get linearisationStatus(): LinearisationStatus {
     this.ensureNotDisposed();
     const result = this.#module._FPDFAvail_IsLinearized(this.#availHandle);
-    if (result === 1) return LinearizationStatus.Linearized;
-    if (result === 0) return LinearizationStatus.NotLinearized;
-    return LinearizationStatus.Unknown;
+    if (result === 1) return LinearisationStatus.Linearised;
+    if (result === 0) return LinearisationStatus.NotLinearised;
+    return LinearisationStatus.Unknown;
+  }
+
+  /**
+   * @deprecated Use {@link linearisationStatus} instead.
+   */
+  get linearizationStatus(): LinearisationStatus {
+    return this.linearisationStatus;
   }
 
   /**
    * Convenience check for whether the document is linearised.
    */
   get isLinearised(): boolean {
-    return this.linearizationStatus === LinearizationStatus.Linearized;
+    return this.linearisationStatus === LinearisationStatus.Linearised;
   }
 
   /**
@@ -192,7 +211,7 @@ export class ProgressivePDFLoader extends Disposable {
     this.ensureNotDisposed();
 
     if (this.#documentExtracted) {
-      throw new DocumentError(PDFiumErrorCode.DOC_LOAD_UNKNOWN, 'Document already extracted from this loader');
+      throw new DocumentError(PDFiumErrorCode.DOC_ALREADY_CLOSED, 'Document already extracted from this loader');
     }
 
     using passwordAlloc = password !== undefined ? this.#memory.allocString(password) : undefined;
@@ -205,11 +224,13 @@ export class ProgressivePDFLoader extends Disposable {
 
     this.#documentExtracted = true;
 
-    // The document takes ownership of the data pointer — don't free it in our cleanup
+    // Create document first; only transfer data pointer ownership on success
     const dataPtr = this.#dataPtr;
+    const document = new PDFiumDocument(this.#module, this.#memory, docHandle, dataPtr, this.#limits);
+    // Transfer succeeded — stop our cleanup from freeing the data pointer
     this.#dataPtr = NULL_PTR;
 
-    return new PDFiumDocument(this.#module, this.#memory, docHandle, dataPtr, this.#limits);
+    return document;
   }
 
   #getTemporaryDocument(): { handle: DocumentHandle; [Symbol.dispose](): void } | undefined {
@@ -276,16 +297,16 @@ export class ProgressivePDFLoader extends Disposable {
 
     // Create the availability provider
     this.#availHandle = this.#module._FPDFAvail_Create(this.#fileAvailPtr, this.#fileAccessPtr);
-    if (this.#availHandle === 0) {
+    if (this.#availHandle === NULL_AVAIL) {
       this.#cleanup();
       throw new DocumentError(PDFiumErrorCode.DOC_LOAD_UNKNOWN, 'Failed to create availability provider');
     }
   }
 
   #cleanup(): void {
-    if (this.#availHandle !== 0) {
+    if (this.#availHandle !== NULL_AVAIL) {
       this.#module._FPDFAvail_Destroy(this.#availHandle);
-      this.#availHandle = 0;
+      this.#availHandle = NULL_AVAIL;
     }
 
     if (this.#isDataAvailFuncPtr !== 0) {

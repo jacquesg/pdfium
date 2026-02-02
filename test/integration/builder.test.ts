@@ -140,4 +140,47 @@ describe('PDFiumDocumentBuilder', () => {
     builder.dispose();
     expect(builder.disposed).toBe(true);
   });
+
+  test('should throw on save after dispose', () => {
+    const builder = pdfium.createDocument();
+    builder.addPage();
+    builder.dispose();
+    expect(() => builder.save()).toThrow();
+  });
+
+  test('should throw on addPage after dispose', () => {
+    const builder = pdfium.createDocument();
+    builder.dispose();
+    expect(() => builder.addPage()).toThrow();
+  });
+
+  test('should throw on loadStandardFont after dispose', () => {
+    const builder = pdfium.createDocument();
+    builder.dispose();
+    expect(() => builder.loadStandardFont('Helvetica')).toThrow();
+  });
+
+  test('should throw on pageCount after dispose', () => {
+    const builder = pdfium.createDocument();
+    builder.dispose();
+    expect(() => builder.pageCount).toThrow();
+  });
+
+  test('rectangle should produce a valid PDF that can be rendered', async () => {
+    using builder = pdfium.createDocument();
+    const page = builder.addPage({ width: 100, height: 100 });
+    page.addRectangle(10, 10, 80, 80, {
+      fill: { r: 255, g: 0, b: 0, a: 255 },
+    });
+    page.generateContent();
+    const bytes = builder.save();
+
+    // The saved PDF should re-open and render without errors
+    using doc = await pdfium.openDocument(bytes);
+    expect(doc.pageCount).toBe(1);
+    using p = doc.getPage(0);
+    const rendered = p.render({ width: 10, height: 10 });
+    expect(rendered.data).toBeInstanceOf(Uint8Array);
+    expect(rendered.data.length).toBe(10 * 10 * 4);
+  });
 });

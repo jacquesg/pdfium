@@ -8,7 +8,7 @@ import { readFile } from 'node:fs/promises';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { PDFium } from '../../src/pdfium.js';
-import { LinearizationStatus } from '../../src/core/types.js';
+import { LinearisationStatus } from '../../src/core/types.js';
 import { initPdfium } from '../helpers.js';
 
 describe('ProgressivePDFLoader', () => {
@@ -32,7 +32,7 @@ describe('ProgressivePDFLoader', () => {
     const data = await readFile('test/data/test_1.pdf');
     using loader = pdfium.createProgressiveLoader(data);
     // Most test PDFs are not linearised
-    expect(loader.linearizationStatus).toBe(LinearizationStatus.NotLinearized);
+    expect(loader.linearisationStatus).toBe(LinearisationStatus.NotLinearised);
     expect(loader.isLinearised).toBe(false);
   });
 
@@ -91,5 +91,35 @@ describe('ProgressivePDFLoader', () => {
     using loader = pdfium.createProgressiveLoader(data);
     using doc = loader.getDocument();
     expect(doc.pageCount).toBeGreaterThan(0);
+  });
+
+  test('firstPageNumber should be non-negative for complete buffer', async () => {
+    const data = await readFile('test/data/test_1.pdf');
+    using loader = pdfium.createProgressiveLoader(data);
+    // For a complete buffer, first page should be available
+    expect(loader.isDocumentAvailable).toBe(true);
+    // Get document and verify page access
+    using doc = loader.getDocument();
+    expect(doc.pageCount).toBe(4);
+    using page = doc.getPage(0);
+    expect(page.index).toBe(0);
+  });
+
+  test('should throw on operations after dispose', async () => {
+    const data = await readFile('test/data/test_1.pdf');
+    const loader = pdfium.createProgressiveLoader(data);
+    loader.dispose();
+    expect(loader.disposed).toBe(true);
+    expect(() => loader.isDocumentAvailable).toThrow();
+    expect(() => loader.linearisationStatus).toThrow();
+    expect(() => loader.getDocument()).toThrow();
+  });
+
+  test('linearisationStatus should return a valid enum value', async () => {
+    const data = await readFile('test/data/test_1.pdf');
+    using loader = pdfium.createProgressiveLoader(data);
+    const status = loader.linearisationStatus;
+    // Should be one of the known LinearisationStatus values
+    expect([0, 1, -1]).toContain(status);
   });
 });

@@ -56,9 +56,15 @@ interface PendingRequest<T> {
  */
 export class WorkerProxy extends Disposable {
   readonly #worker: Worker;
+  /**
+   * Map of pending requests keyed by request ID.
+   *
+   * The value type is `PendingRequest<unknown>` because the Map must store
+   * requests for different response types. The type parameter is erased at
+   * the Map boundary but preserved in the Promise returned to the caller.
+   */
   readonly #pending = new Map<string, PendingRequest<unknown>>();
   readonly #timeout: number;
-  #requestId = 0;
 
   private constructor(worker: Worker, timeout: number) {
     super('WorkerProxy');
@@ -229,8 +235,8 @@ export class WorkerProxy extends Disposable {
   ): Promise<T> {
     this.ensureNotDisposed();
 
-    const id = String(++this.#requestId);
-    const request = { type, id, payload } as WorkerRequest;
+    const id = crypto.randomUUID();
+    const request: WorkerRequest = { type, id, payload } as WorkerRequest;
     const effectiveTimeout = timeout ?? this.#timeout;
 
     return new Promise<T>((resolve, reject) => {
@@ -299,9 +305,16 @@ export class WorkerProxy extends Disposable {
 
   /**
    * Deserialise an error from the worker.
+   *
+   * Validates the error code is a known PDFiumErrorCode value.
+   * Falls back to WORKER_COMMUNICATION_FAILED for unrecognised codes.
    */
   #deserialiseError(serialised: SerialisedError): PDFiumError {
-    return new PDFiumError(serialised.code as PDFiumErrorCode, serialised.message, serialised.context);
+    const knownCodes = new Set<number>(Object.values(PDFiumErrorCode).filter((v): v is number => typeof v === 'number'));
+    const code = knownCodes.has(serialised.code)
+      ? (serialised.code as PDFiumErrorCode)
+      : PDFiumErrorCode.WORKER_COMMUNICATION_FAILED;
+    return new PDFiumError(code, serialised.message, serialised.context);
   }
 
   protected disposeInternal(): void {
@@ -311,7 +324,7 @@ export class WorkerProxy extends Disposable {
     }
 
     // Send destroy message to worker
-    const id = String(++this.#requestId);
+    const id = crypto.randomUUID();
     this.#worker.postMessage({ type: 'DESTROY', id });
 
     // Terminate the worker

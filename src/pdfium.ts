@@ -94,6 +94,10 @@ export class PDFium extends Disposable {
   /**
    * Open a PDF document from binary data.
    *
+   * Note: The `password` option accepts a JavaScript string. JS strings cannot
+   * be securely zeroed after use — they are immutable and garbage collected at
+   * an unpredictable time. For highly sensitive passwords, consider the trade-offs.
+   *
    * @param data - PDF file data
    * @param options - Document options (e.g., password)
    * @returns The loaded document

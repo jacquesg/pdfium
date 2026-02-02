@@ -7,7 +7,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { MemoryError } from '../../src/core/errors.js';
 import { PDFium } from '../../src/pdfium.js';
 import type { WASMMemoryManager } from '../../src/wasm/memory.js';
-import { asPointer, NULL_PTR } from '../../src/wasm/memory.js';
+import { asPointer, encodeUTF16LE, NULL_PTR, ptrOffset } from '../../src/wasm/memory.js';
 import { initPdfium } from '../helpers.js';
 
 describe('WASMMemoryManager', () => {
@@ -33,6 +33,59 @@ describe('WASMMemoryManager', () => {
   describe('NULL_PTR', () => {
     test('should be zero', () => {
       expect(NULL_PTR).toBe(0);
+    });
+  });
+
+  describe('ptrOffset', () => {
+    test('should offset a pointer by the given number of bytes', () => {
+      const base = asPointer(100);
+      expect(ptrOffset(base, 8)).toBe(108);
+    });
+
+    test('should return the base when offset is zero', () => {
+      const base = asPointer(256);
+      expect(ptrOffset(base, 0)).toBe(256);
+    });
+
+    test('should handle negative offsets', () => {
+      const base = asPointer(200);
+      expect(ptrOffset(base, -50)).toBe(150);
+    });
+  });
+
+  describe('encodeUTF16LE', () => {
+    test('should encode ASCII string to UTF-16LE with null terminator', () => {
+      const result = encodeUTF16LE('Hi');
+      // "Hi" = 0x48 0x00 0x69 0x00, plus null terminator 0x00 0x00
+      expect(result.length).toBe(6); // (2 + 1) * 2
+      expect(result[0]).toBe(0x48); // 'H' low byte
+      expect(result[1]).toBe(0x00); // 'H' high byte
+      expect(result[2]).toBe(0x69); // 'i' low byte
+      expect(result[3]).toBe(0x00); // 'i' high byte
+      expect(result[4]).toBe(0x00); // null low byte
+      expect(result[5]).toBe(0x00); // null high byte
+    });
+
+    test('should encode empty string with just null terminator', () => {
+      const result = encodeUTF16LE('');
+      expect(result.length).toBe(2); // (0 + 1) * 2
+      expect(result[0]).toBe(0x00);
+      expect(result[1]).toBe(0x00);
+    });
+
+    test('should encode non-ASCII characters', () => {
+      // '€' is U+20AC → 0xAC 0x20 in UTF-16LE
+      const result = encodeUTF16LE('€');
+      expect(result.length).toBe(4); // (1 + 1) * 2
+      expect(result[0]).toBe(0xac);
+      expect(result[1]).toBe(0x20);
+    });
+
+    test('should encode multi-character string', () => {
+      const result = encodeUTF16LE('AB');
+      expect(result.length).toBe(6);
+      expect(result[0]).toBe(0x41); // 'A'
+      expect(result[2]).toBe(0x42); // 'B'
     });
   });
 

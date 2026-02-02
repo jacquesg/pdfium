@@ -6,7 +6,7 @@
  * @module context/worker-script
  */
 
-import { PDFiumErrorCode } from '../core/errors.js';
+import { PDFiumError, PDFiumErrorCode } from '../core/errors.js';
 import type { SerialisedError } from '../core/types.js';
 import type { PDFiumDocument } from '../document/document.js';
 import type { PDFiumPage } from '../document/page.js';
@@ -50,16 +50,21 @@ function postSuccess(id: string, payload: unknown, transfer: Transferable[] = []
 function postError(id: string, error: Error | SerialisedError): void {
   let serialised: SerialisedError;
 
-  if (error instanceof Error) {
-    const errorWithCode = error as { code?: number; context?: Record<string, unknown> };
+  if (error instanceof PDFiumError) {
     serialised = {
       name: error.name,
       message: error.message,
-      code: errorWithCode.code ?? 0,
+      code: error.code,
     };
-    if (errorWithCode.context !== undefined) {
-      serialised.context = errorWithCode.context;
+    if (error.context !== undefined) {
+      serialised.context = error.context;
     }
+  } else if (error instanceof Error) {
+    serialised = {
+      name: error.name,
+      message: error.message,
+      code: 0,
+    };
   } else {
     serialised = error;
   }

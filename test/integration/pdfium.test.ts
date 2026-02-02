@@ -9,6 +9,7 @@ import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 
 import { PDFium } from '../../src/pdfium.js';
 import { DocumentError, PageError, PDFiumErrorCode } from '../../src/core/errors.js';
+import { SaveFlags } from '../../src/core/types.js';
 import type { PDFiumDocument } from '../../src/document/document.js';
 import { initPdfium, loadWasmBinary } from '../helpers.js';
 
@@ -306,6 +307,85 @@ describe('PDFiumDocument', () => {
       const originalText = originalPage.getText();
       const reopenedText = reopenedPage.getText();
       expect(reopenedText).toBe(originalText);
+    });
+  });
+
+  describe('post-dispose guards', () => {
+    test('should throw on pageCount after dispose', async () => {
+      const pdfData = await readFile('test/data/test_1.pdf');
+      const doc = await pdfium.openDocument(pdfData);
+      doc.dispose();
+      expect(() => doc.pageCount).toThrow();
+    });
+
+    test('should throw on getPage after dispose', async () => {
+      const pdfData = await readFile('test/data/test_1.pdf');
+      const doc = await pdfium.openDocument(pdfData);
+      doc.dispose();
+      expect(() => doc.getPage(0)).toThrow();
+    });
+
+    test('should throw on getBookmarks after dispose', async () => {
+      const pdfData = await readFile('test/data/test_1.pdf');
+      const doc = await pdfium.openDocument(pdfData);
+      doc.dispose();
+      expect(() => doc.getBookmarks()).toThrow();
+    });
+
+    test('should throw on save after dispose', async () => {
+      const pdfData = await readFile('test/data/test_1.pdf');
+      const doc = await pdfium.openDocument(pdfData);
+      doc.dispose();
+      expect(() => doc.save()).toThrow();
+    });
+
+    test('should throw on getAttachments after dispose', async () => {
+      const pdfData = await readFile('test/data/test_1.pdf');
+      const doc = await pdfium.openDocument(pdfData);
+      doc.dispose();
+      expect(() => doc.getAttachments()).toThrow();
+    });
+
+    test('should throw on attachmentCount after dispose', async () => {
+      const pdfData = await readFile('test/data/test_1.pdf');
+      const doc = await pdfium.openDocument(pdfData);
+      doc.dispose();
+      expect(() => doc.attachmentCount).toThrow();
+    });
+  });
+
+  describe('save with flags', () => {
+    test('should save with INCREMENTAL flag', () => {
+      const bytes = document.save({ flags: SaveFlags.Incremental });
+      expect(bytes).toBeInstanceOf(Uint8Array);
+      expect(bytes.length).toBeGreaterThan(0);
+    });
+
+    test('should save with NO_INCREMENTAL flag', () => {
+      const bytes = document.save({ flags: SaveFlags.NoIncremental });
+      expect(bytes).toBeInstanceOf(Uint8Array);
+      expect(bytes.length).toBeGreaterThan(0);
+    });
+
+    test('should save with REMOVE_SECURITY flag', () => {
+      const bytes = document.save({ flags: SaveFlags.RemoveSecurity });
+      expect(bytes).toBeInstanceOf(Uint8Array);
+      expect(bytes.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('wrong password', () => {
+    test('should throw for wrong password on encrypted document', async () => {
+      const pdfData = await readFile('test/data/test_1_pass_12345678.pdf');
+      try {
+        await pdfium.openDocument(pdfData, { password: 'wrong_password' });
+        expect.fail('Expected DocumentError');
+      } catch (error) {
+        expect(error).toBeInstanceOf(DocumentError);
+        if (error instanceof DocumentError) {
+          expect([PDFiumErrorCode.DOC_PASSWORD_REQUIRED, PDFiumErrorCode.DOC_PASSWORD_INCORRECT]).toContain(error.code);
+        }
+      }
     });
   });
 

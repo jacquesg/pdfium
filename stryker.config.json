@@ -24,7 +24,7 @@
   "thresholds": {
     "high": 70,
     "low": 55,
-    "break": 45
+    "break": 50
   },
   "vitest": {
     "configFile": "vitest.config.ts"

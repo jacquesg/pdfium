@@ -150,17 +150,15 @@ describe('PDFiumPage', () => {
   describe('findText', () => {
     test('should find text on page', () => {
       const text = page.getText();
-      if (text.length > 0) {
-        // Get a word from the page text to search for
-        const words = text.trim().split(/\s+/);
-        const searchWord = words[0]!;
-        if (searchWord.length >= 2) {
-          const results = [...page.findText(searchWord)];
-          expect(results.length).toBeGreaterThan(0);
-          expect(results[0]!.charCount).toBe(searchWord.length);
-          expect(results[0]!.charIndex).toBeGreaterThanOrEqual(0);
-        }
-      }
+      expect(text.length).toBeGreaterThan(0);
+      // Get a word from the page text to search for
+      const words = text.trim().split(/\s+/);
+      const searchWord = words[0]!;
+      expect(searchWord.length).toBeGreaterThanOrEqual(2);
+      const results = [...page.findText(searchWord)];
+      expect(results.length).toBeGreaterThan(0);
+      expect(results[0]!.charCount).toBe(searchWord.length);
+      expect(results[0]!.charIndex).toBeGreaterThanOrEqual(0);
     });
 
     test('should return empty for non-existent text', () => {
@@ -170,13 +168,12 @@ describe('PDFiumPage', () => {
 
     test('should support case-sensitive search', () => {
       const text = page.getText();
-      if (text.length > 0) {
-        // Search with case-sensitive flag — result count may differ
-        const resultsDefault = [...page.findText(text.substring(0, 3))];
-        const resultsCaseSensitive = [...page.findText(text.substring(0, 3), TextSearchFlags.MatchCase)];
-        // Both should return some results (same string, same case)
-        expect(resultsDefault.length).toBeGreaterThanOrEqual(resultsCaseSensitive.length);
-      }
+      expect(text.length).toBeGreaterThan(0);
+      // Search with case-sensitive flag — result count may differ
+      const resultsDefault = [...page.findText(text.substring(0, 3))];
+      const resultsCaseSensitive = [...page.findText(text.substring(0, 3), TextSearchFlags.MatchCase)];
+      // Both should return some results (same string, same case)
+      expect(resultsDefault.length).toBeGreaterThanOrEqual(resultsCaseSensitive.length);
     });
 
     test('should handle generator early exit (break)', () => {
@@ -192,16 +189,13 @@ describe('PDFiumPage', () => {
 
     test('should include rects in results', () => {
       const text = page.getText();
-      if (text.length > 0) {
-        const words = text.trim().split(/\s+/);
-        const searchWord = words[0]!;
-        if (searchWord.length >= 2) {
-          const results = [...page.findText(searchWord)];
-          if (results.length > 0) {
-            expect(Array.isArray(results[0]!.rects)).toBe(true);
-          }
-        }
-      }
+      expect(text.length).toBeGreaterThan(0);
+      const words = text.trim().split(/\s+/);
+      const searchWord = words[0]!;
+      expect(searchWord.length).toBeGreaterThanOrEqual(2);
+      const results = [...page.findText(searchWord)];
+      expect(results.length).toBeGreaterThan(0);
+      expect(Array.isArray(results[0]!.rects)).toBe(true);
     });
   });
 
@@ -209,13 +203,107 @@ describe('PDFiumPage', () => {
     test('should return number of objects on page', () => {
       const count = page.objectCount;
       expect(typeof count).toBe('number');
-      expect(count).toBeGreaterThanOrEqual(0);
+      expect(count).toBeGreaterThan(0);
     });
   });
 
   describe('handle', () => {
     test('should provide internal handle for advanced usage', () => {
       expect(page.handle).toBeGreaterThan(0);
+    });
+  });
+
+  describe('post-dispose guards', () => {
+    test('should throw on getText after dispose', async () => {
+      const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+      const p = doc.getPage(0);
+      p.dispose();
+      expect(() => p.getText()).toThrow();
+      doc.dispose();
+    });
+
+    test('should throw on render after dispose', async () => {
+      const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+      const p = doc.getPage(0);
+      p.dispose();
+      expect(() => p.render()).toThrow();
+      doc.dispose();
+    });
+
+    test('should throw on getAnnotations after dispose', async () => {
+      const doc = await loadTestDocument(pdfium, 'test_6_with_form.pdf');
+      const p = doc.getPage(0);
+      p.dispose();
+      expect(() => p.getAnnotations()).toThrow();
+      doc.dispose();
+    });
+
+    test('should throw on findText after dispose', async () => {
+      const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+      const p = doc.getPage(0);
+      p.dispose();
+      expect(() => [...p.findText('test')]).toThrow();
+      doc.dispose();
+    });
+
+    test('should throw on getStructureTree after dispose', async () => {
+      const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+      const p = doc.getPage(0);
+      p.dispose();
+      expect(() => p.getStructureTree()).toThrow();
+      doc.dispose();
+    });
+  });
+
+  describe('NaN and Infinity dimensions', () => {
+    test('should throw RenderError for NaN width', () => {
+      expect(() => page.render({ width: NaN })).toThrow(RenderError);
+    });
+
+    test('should throw RenderError for Infinity height', () => {
+      expect(() => page.render({ height: Infinity })).toThrow(RenderError);
+    });
+
+    test('should throw RenderError for NaN scale', () => {
+      expect(() => page.render({ scale: NaN })).toThrow(RenderError);
+    });
+
+    test('should throw RenderError for Infinity scale', () => {
+      expect(() => page.render({ scale: Infinity })).toThrow(RenderError);
+    });
+
+    test('should throw RenderError for negative Infinity width', () => {
+      expect(() => page.render({ width: -Infinity })).toThrow(RenderError);
+    });
+  });
+
+  describe('backgroundColour option', () => {
+    test('should render with custom background colour', () => {
+      // Render a tiny page with a red background (0xFFFF0000 = ARGB red)
+      const rendered = page.render({ width: 2, height: 2, backgroundColour: 0xffff0000 });
+      expect(rendered.data).toBeInstanceOf(Uint8Array);
+      expect(rendered.data.length).toBe(2 * 2 * 4);
+    });
+  });
+
+  describe('boundary dimensions', () => {
+    test('should render at minimum dimension (1x1)', () => {
+      const rendered = page.render({ width: 1, height: 1 });
+      expect(rendered.width).toBe(1);
+      expect(rendered.height).toBe(1);
+      expect(rendered.data.length).toBe(4);
+    });
+  });
+
+  describe('empty page getText', () => {
+    test('should return empty string for page with no text', async () => {
+      // Create a document with an empty page
+      using builder = pdfium.createDocument();
+      builder.addPage();
+      const bytes = builder.save();
+      using doc = await pdfium.openDocument(bytes);
+      using emptyPage = doc.getPage(0);
+      expect(emptyPage.getText()).toBe('');
     });
   });
 });
@@ -244,25 +332,22 @@ describe('PDFiumPage annotations', () => {
   test('should get annotations array', () => {
     const annotations = page.getAnnotations();
     expect(Array.isArray(annotations)).toBe(true);
-    if (annotations.length > 0) {
-      const annot = annotations[0]!;
-      expect(annot).toHaveProperty('index');
-      expect(annot).toHaveProperty('type');
-      expect(annot).toHaveProperty('bounds');
-      expect(annot.bounds).toHaveProperty('left');
-      expect(annot.bounds).toHaveProperty('top');
-      expect(annot.bounds).toHaveProperty('right');
-      expect(annot.bounds).toHaveProperty('bottom');
-    }
+    expect(annotations.length).toBeGreaterThan(0);
+    const annot = annotations[0]!;
+    expect(annot).toHaveProperty('index');
+    expect(annot).toHaveProperty('type');
+    expect(annot).toHaveProperty('bounds');
+    expect(annot.bounds).toHaveProperty('left');
+    expect(annot.bounds).toHaveProperty('top');
+    expect(annot.bounds).toHaveProperty('right');
+    expect(annot.bounds).toHaveProperty('bottom');
   });
 
   test('should get individual annotation by index', () => {
-    const count = page.annotationCount;
-    if (count > 0) {
-      const annot = page.getAnnotation(0);
-      expect(annot.index).toBe(0);
-      expect(typeof annot.type).toBe('number');
-    }
+    expect(page.annotationCount).toBeGreaterThan(0);
+    const annot = page.getAnnotation(0);
+    expect(annot.index).toBe(0);
+    expect(typeof annot.type).toBe('number');
   });
 
   test('should throw for out-of-range annotation index', () => {
@@ -299,6 +384,13 @@ describe('PDFiumPage structure tree', () => {
       expect(typeof element.type).toBe('string');
       expect(element.type.length).toBeGreaterThan(0);
       expect(Array.isArray(element.children)).toBe(true);
+      // altText and lang should be strings if present
+      if (element.altText !== undefined) {
+        expect(typeof element.altText).toBe('string');
+      }
+      if (element.lang !== undefined) {
+        expect(typeof element.lang).toBe('string');
+      }
     }
   });
 
@@ -390,6 +482,23 @@ describe('PDFiumPage with forms', () => {
     test('should render with form fields when requested', () => {
       const rendered = page.render({ scale: 0.5, renderFormFields: true });
       expect(rendered.data).toBeInstanceOf(Uint8Array);
+    });
+
+    test('should produce different output with and without form fields', () => {
+      const without = page.render({ scale: 0.25 });
+      const withFields = page.render({ scale: 0.25, renderFormFields: true });
+      // Both should have data
+      expect(without.data.length).toBeGreaterThan(0);
+      expect(withFields.data.length).toBeGreaterThan(0);
+      // Data should differ because form fields are rendered
+      let differs = false;
+      for (let i = 0; i < without.data.length; i++) {
+        if (without.data[i] !== withFields.data[i]) {
+          differs = true;
+          break;
+        }
+      }
+      expect(differs).toBe(true);
     });
   });
 });

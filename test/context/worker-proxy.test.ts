@@ -238,4 +238,64 @@ describe('WorkerProxy', () => {
 
     await expect(proxy.getText(1)).rejects.toThrow('disposed');
   });
+
+  test('error with unknown code should fallback to WORKER_COMMUNICATION_FAILED', async () => {
+    const { WorkerProxy } = await import('../../src/context/worker-proxy.js');
+
+    const createPromise = WorkerProxy.create('worker.js', new ArrayBuffer(8), { timeout: 5000 });
+    const initMsg = mockWorker.posted[0]!.data as { type: string; id: string };
+    mockWorker.respondSuccess(initMsg.id, undefined);
+    const proxy = await createPromise;
+
+    const textPromise = proxy.getText(1);
+    const textMsg = mockWorker.posted[1]!.data as { type: string; id: string };
+    mockWorker.respondError(textMsg.id, {
+      name: 'PDFiumError',
+      message: 'Unknown error',
+      code: 99999, // Not a known PDFiumErrorCode
+    });
+
+    await expect(textPromise).rejects.toMatchObject({
+      code: PDFiumErrorCode.WORKER_COMMUNICATION_FAILED,
+    });
+
+    proxy.dispose();
+  });
+
+  test('response for unknown request ID should be silently ignored', async () => {
+    const { WorkerProxy } = await import('../../src/context/worker-proxy.js');
+
+    const createPromise = WorkerProxy.create('worker.js', new ArrayBuffer(8), { timeout: 5000 });
+    const initMsg = mockWorker.posted[0]!.data as { type: string; id: string };
+    mockWorker.respondSuccess(initMsg.id, undefined);
+    const proxy = await createPromise;
+
+    // Send a response for a non-existent request ID — should not throw
+    expect(() => mockWorker.respondSuccess('non-existent-id', 'hello')).not.toThrow();
+
+    proxy.dispose();
+  });
+
+  test('multiple pending requests should all be rejected on worker error', async () => {
+    const { WorkerProxy } = await import('../../src/context/worker-proxy.js');
+
+    const createPromise = WorkerProxy.create('worker.js', new ArrayBuffer(8), { timeout: 5000 });
+    const initMsg = mockWorker.posted[0]!.data as { type: string; id: string };
+    mockWorker.respondSuccess(initMsg.id, undefined);
+    const proxy = await createPromise;
+
+    const promise1 = proxy.getText(1);
+    const promise2 = proxy.getText(2);
+
+    mockWorker.emitError('Worker crashed');
+
+    await expect(promise1).rejects.toMatchObject({
+      code: PDFiumErrorCode.WORKER_COMMUNICATION_FAILED,
+    });
+    await expect(promise2).rejects.toMatchObject({
+      code: PDFiumErrorCode.WORKER_COMMUNICATION_FAILED,
+    });
+
+    proxy.dispose();
+  });
 });

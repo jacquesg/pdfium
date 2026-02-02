@@ -91,6 +91,9 @@ export class WASMAllocation implements Disposable {
  * Accepts a handle value and a destroy callback. Implements `Symbol.dispose`
  * for automatic cleanup with the `using` keyword.
  *
+ * The generic parameter `T` defaults to `number` for backward compatibility
+ * but can be narrowed to a branded handle type for additional type safety.
+ *
  * @example
  * ```typescript
  * using bitmap = new NativeHandle(bitmapHandle, (h) => module._FPDFBitmap_Destroy(h));
@@ -98,11 +101,11 @@ export class WASMAllocation implements Disposable {
  * // bitmap is automatically destroyed when scope exits
  * ```
  */
-export class NativeHandle implements Disposable {
-  #handle: number;
-  readonly #destroy: (handle: number) => void;
+export class NativeHandle<T extends number = number> implements Disposable {
+  #handle: T | 0;
+  readonly #destroy: (handle: T) => void;
 
-  constructor(handle: number, destroy: (handle: number) => void) {
+  constructor(handle: T, destroy: (handle: T) => void) {
     this.#handle = handle;
     this.#destroy = destroy;
   }
@@ -112,7 +115,7 @@ export class NativeHandle implements Disposable {
    *
    * @throws {MemoryError} If the handle has been disposed.
    */
-  get handle(): number {
+  get handle(): T {
     if (this.#handle === 0) {
       throw new MemoryError(PDFiumErrorCode.MEMORY_INVALID_POINTER, 'Handle has been disposed');
     }

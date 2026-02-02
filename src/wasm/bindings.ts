@@ -7,10 +7,12 @@
 import type {
   AnnotationHandle,
   AttachmentHandle,
+  AvailabilityHandle,
   BitmapHandle,
   BookmarkHandle,
   DestinationHandle,
   DocumentHandle,
+  FontHandle,
   FormHandle,
   PageHandle,
   PageObjectHandle,
@@ -212,27 +214,27 @@ export interface PDFiumWASM {
   ) => void;
 
   // Text object creation
-  _FPDFText_LoadStandardFont: (document: DocumentHandle, font: WASMPointer) => number;
+  _FPDFText_LoadStandardFont: (document: DocumentHandle, font: WASMPointer) => FontHandle;
   _FPDFText_LoadFont: (
     document: DocumentHandle,
     data: WASMPointer,
     size: number,
     fontType: number,
     cid: number,
-  ) => number;
-  _FPDFPageObj_CreateTextObj: (document: DocumentHandle, font: number, fontSize: number) => PageObjectHandle;
+  ) => FontHandle;
+  _FPDFPageObj_CreateTextObj: (document: DocumentHandle, font: FontHandle, fontSize: number) => PageObjectHandle;
   _FPDFText_SetText: (textObj: PageObjectHandle, text: WASMPointer) => number;
-  _FPDFFont_Close: (font: number) => void;
+  _FPDFFont_Close: (font: FontHandle) => void;
 
   // Progressive loading / availability operations
-  _FPDFAvail_Create: (fileAvail: WASMPointer, fileAccess: WASMPointer) => number;
-  _FPDFAvail_Destroy: (avail: number) => void;
-  _FPDFAvail_IsDocAvail: (avail: number, hints: WASMPointer) => number;
-  _FPDFAvail_GetDocument: (avail: number, password: WASMPointer) => DocumentHandle;
+  _FPDFAvail_Create: (fileAvail: WASMPointer, fileAccess: WASMPointer) => AvailabilityHandle;
+  _FPDFAvail_Destroy: (avail: AvailabilityHandle) => void;
+  _FPDFAvail_IsDocAvail: (avail: AvailabilityHandle, hints: WASMPointer) => number;
+  _FPDFAvail_GetDocument: (avail: AvailabilityHandle, password: WASMPointer) => DocumentHandle;
   _FPDFAvail_GetFirstPageNum: (document: DocumentHandle) => number;
-  _FPDFAvail_IsPageAvail: (avail: number, pageIndex: number, hints: WASMPointer) => number;
-  _FPDFAvail_IsLinearized: (avail: number) => number;
-  _FPDFAvail_IsFormAvail: (avail: number, hints: WASMPointer) => number;
+  _FPDFAvail_IsPageAvail: (avail: AvailabilityHandle, pageIndex: number, hints: WASMPointer) => number;
+  _FPDFAvail_IsLinearized: (avail: AvailabilityHandle) => number;
+  _FPDFAvail_IsFormAvail: (avail: AvailabilityHandle, hints: WASMPointer) => number;
   _FPDF_LoadCustomDocument: (fileAccess: WASMPointer, password: WASMPointer) => DocumentHandle;
 
   // Save operations

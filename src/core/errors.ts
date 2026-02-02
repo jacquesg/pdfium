@@ -43,6 +43,10 @@ export enum PDFiumErrorCode {
   DOC_ALREADY_CLOSED = 205,
   /** Unknown error while loading document */
   DOC_LOAD_UNKNOWN = 206,
+  /** Failed to save document */
+  DOC_SAVE_FAILED = 207,
+  /** Failed to create a new document */
+  DOC_CREATE_FAILED = 208,
 
   // Page errors (3xx)
   /** The specified page index is out of bounds */
@@ -78,11 +82,15 @@ export enum PDFiumErrorCode {
   /** Failed to load text page for text extraction */
   TEXT_LOAD_FAILED = 602,
 
-  // Object errors (7xx)
+  // Annotation errors (7xx)
   /** Unknown or unsupported object type */
   OBJECT_TYPE_UNKNOWN = 700,
   /** Failed to access page object */
   OBJECT_ACCESS_FAILED = 701,
+  /** Annotation index is out of range */
+  ANNOT_INDEX_OUT_OF_RANGE = 750,
+  /** Failed to load annotation */
+  ANNOT_LOAD_FAILED = 751,
 
   // Worker errors (8xx)
   /** Failed to create worker */
@@ -113,6 +121,8 @@ const ERROR_MESSAGES: Record<PDFiumErrorCode, string> = {
   [PDFiumErrorCode.DOC_SECURITY_UNSUPPORTED]: 'The document uses unsupported security features',
   [PDFiumErrorCode.DOC_ALREADY_CLOSED]: 'Attempted to use a document that has been closed',
   [PDFiumErrorCode.DOC_LOAD_UNKNOWN]: 'Unknown error while loading document',
+  [PDFiumErrorCode.DOC_SAVE_FAILED]: 'Failed to save document',
+  [PDFiumErrorCode.DOC_CREATE_FAILED]: 'Failed to create a new document',
   [PDFiumErrorCode.PAGE_NOT_FOUND]: 'The specified page index is out of bounds',
   [PDFiumErrorCode.PAGE_LOAD_FAILED]: 'Failed to load the page',
   [PDFiumErrorCode.PAGE_ALREADY_CLOSED]: 'Attempted to use a page that has been closed',
@@ -128,6 +138,8 @@ const ERROR_MESSAGES: Record<PDFiumErrorCode, string> = {
   [PDFiumErrorCode.TEXT_LOAD_FAILED]: 'Failed to load text page for text extraction',
   [PDFiumErrorCode.OBJECT_TYPE_UNKNOWN]: 'Unknown or unsupported object type',
   [PDFiumErrorCode.OBJECT_ACCESS_FAILED]: 'Failed to access page object',
+  [PDFiumErrorCode.ANNOT_INDEX_OUT_OF_RANGE]: 'Annotation index is out of range',
+  [PDFiumErrorCode.ANNOT_LOAD_FAILED]: 'Failed to load annotation',
   [PDFiumErrorCode.WORKER_CREATE_FAILED]: 'Failed to create worker',
   [PDFiumErrorCode.WORKER_COMMUNICATION_FAILED]: 'Worker communication error',
   [PDFiumErrorCode.WORKER_TIMEOUT]: 'Worker operation timed out',
@@ -171,7 +183,7 @@ export class PDFiumError extends Error {
     this.name = 'PDFiumError';
     this.code = code;
     if (context !== undefined) {
-      this.context = context;
+      this.context = __DEV__ ? context : sanitiseContext(context);
     }
 
     // Maintains proper stack trace in V8 environments
@@ -294,3 +306,28 @@ export class WorkerError extends PDFiumError {
     this.name = 'WorkerError';
   }
 }
+
+/**
+ * Keys that may contain internal details (WASM pointers, heap addresses)
+ * and should be stripped from error context in production.
+ */
+const INTERNAL_CONTEXT_KEYS = new Set(['ptr', 'heapSize', 'alignment']);
+
+/**
+ * Strip internal implementation details from error context in production.
+ *
+ * Removes keys that expose WASM memory layout (pointers, heap sizes)
+ * which are not useful to library consumers and could leak internal state.
+ */
+function sanitiseContext(context: Record<string, unknown>): Record<string, unknown> {
+  const sanitised: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(context)) {
+    if (!INTERNAL_CONTEXT_KEYS.has(key)) {
+      sanitised[key] = value;
+    }
+  }
+  return sanitised;
+}
+
+// Declare the global __DEV__ variable
+declare const __DEV__: boolean;

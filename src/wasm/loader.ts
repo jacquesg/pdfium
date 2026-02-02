@@ -125,7 +125,16 @@ async function instantiateModule(wasmBinary: ArrayBuffer, options: WASMLoadOptio
   // Dynamically import the vendor module
   const vendorModule = await import('../vendor/pdfium.esm.js');
 
-  // The vendor module returns a slightly different type, but it's compatible
+  // The vendor module's default export must be a factory function.
+  // The runtime check guards against invalid vendor bundles; the type assertion
+  // is unavoidable because the vendor JS has no TypeScript declarations.
+  if (typeof vendorModule.default !== 'function') {
+    throw new InitialisationError(
+      PDFiumErrorCode.INIT_WASM_LOAD_FAILED,
+      'Vendor module does not export a valid factory function',
+    );
+  }
+  // The vendor JS module has no TS declarations, so we must cast after the runtime guard.
   const loadPdfium = vendorModule.default as unknown as (options: VendorLoadOptions) => Promise<PDFiumWASM>;
 
   const loadOptions: VendorLoadOptions = { wasmBinary };

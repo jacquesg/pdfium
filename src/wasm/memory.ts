@@ -23,6 +23,32 @@ export function asPointer(value: number): WASMPointer {
 }
 
 /**
+ * Offset a WASM pointer by a number of bytes, returning a branded pointer.
+ *
+ * Replaces unsafe `(ptr + N) as WASMPointer` casts.
+ */
+export function ptrOffset(base: WASMPointer, offset: number): WASMPointer {
+  return (base + offset) as WASMPointer;
+}
+
+/**
+ * Encode a JavaScript string as UTF-16LE with a null terminator.
+ *
+ * PDFium uses UTF-16LE for text operations. This utility provides
+ * a single shared implementation used by both page and builder code.
+ */
+export function encodeUTF16LE(str: string): Uint8Array {
+  const result = new Uint8Array((str.length + 1) * 2);
+  for (let i = 0; i < str.length; i++) {
+    const code = str.charCodeAt(i);
+    result[i * 2] = code & 0xff;
+    result[i * 2 + 1] = (code >> 8) & 0xff;
+  }
+  // Null terminator (already zeroed by Uint8Array constructor)
+  return result;
+}
+
+/**
  * Creates a branded handle from a number.
  *
  * @internal
@@ -79,6 +105,10 @@ export class WASMMemoryManager {
   /**
    * Free a previously allocated block.
    *
+   * This method is defensive: freeing NULL_PTR is a no-op, and freeing an
+   * untracked pointer logs a warning in development mode but does not throw.
+   * This avoids double-free crashes in safety-net finaliser paths.
+   *
    * @param ptr - Pointer to free
    */
   free(ptr: WASMPointer): void {
@@ -111,12 +141,18 @@ export class WASMMemoryManager {
   /**
    * Copy ArrayBuffer to WASM memory.
    *
+   * If the buffer is backed by a `SharedArrayBuffer`, it is defensively
+   * copied first to avoid race conditions from concurrent mutation.
+   *
    * @param buffer - Buffer to copy
    * @returns The allocated pointer
    * @throws {MemoryError} If allocation fails
    */
   copyBufferToWASM(buffer: ArrayBuffer): WASMPointer {
-    return this.copyToWASM(new Uint8Array(buffer));
+    const view = new Uint8Array(buffer);
+    // Defensively copy SharedArrayBuffer-backed data to avoid races
+    const data = buffer instanceof SharedArrayBuffer ? view.slice() : view;
+    return this.copyToWASM(data);
   }
 
   /**
@@ -199,7 +235,8 @@ export class WASMMemoryManager {
   /**
    * Read UTF-16LE text from WASM memory.
    *
-   * PDFium returns text in UTF-16LE format.
+   * PDFium returns text in UTF-16LE format. Surrogate pairs (characters
+   * outside the BMP) are handled correctly by the underlying TextDecoder.
    *
    * @param ptr - Pointer to the text buffer
    * @param charCount - Number of characters (not bytes)
