@@ -1,0 +1,31 @@
+name: Check for new PDFium releases
+
+on:
+  workflow_dispatch:
+  schedule:
+    # This will run at 10:00 every Saturday
+    - cron: '0 10 * * 6'
+
+jobs:
+  check-for-updates:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout the repository
+        uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check for updates and create PR
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm check:pdfium-updates

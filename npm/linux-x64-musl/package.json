@@ -1,0 +1,27 @@
+{
+  "name": "@scaryterry/pdfium-linux-x64-musl",
+  "version": "0.0.0",
+  "description": "Native PDFium binding for Linux x64 (musl)",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "x64"
+  ],
+  "libc": [
+    "musl"
+  ],
+  "main": "pdfium.linux-x64-musl.node",
+  "license": "MIT",
+  "engines": {
+    "node": ">= 22"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jacquesg/pdfium.git"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  }
+}

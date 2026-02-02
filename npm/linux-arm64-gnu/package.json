@@ -1,0 +1,27 @@
+{
+  "name": "@scaryterry/pdfium-linux-arm64-gnu",
+  "version": "0.0.0",
+  "description": "Native PDFium binding for Linux arm64 (glibc)",
+  "os": [
+    "linux"
+  ],
+  "cpu": [
+    "arm64"
+  ],
+  "libc": [
+    "glibc"
+  ],
+  "main": "pdfium.linux-arm64-gnu.node",
+  "license": "MIT",
+  "engines": {
+    "node": ">= 22"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jacquesg/pdfium.git"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  }
+}

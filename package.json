@@ -1,0 +1,141 @@
+{
+  "name": "@scaryterry/pdfium",
+  "version": "0.0.0",
+  "description": "Universal PDFium WASM wrapper for Browser and Node.js with modern TypeScript patterns",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./browser": {
+      "types": "./dist/browser.d.ts",
+      "import": "./dist/browser.js"
+    },
+    "./node": {
+      "types": "./dist/node.d.ts",
+      "import": "./dist/node.js"
+    },
+    "./worker": {
+      "types": "./dist/worker.d.ts",
+      "import": "./dist/worker.js"
+    },
+    "./internal": {
+      "types": "./dist/internal/index.d.ts",
+      "import": "./dist/internal/index.js"
+    },
+    "./types": {
+      "types": "./dist/core/types.d.ts"
+    },
+    "./pdfium.wasm": {
+      "default": "./dist/vendor/pdfium.wasm"
+    },
+    "./package.json": "./package.json"
+  },
+  "typesVersions": {
+    "*": {
+      "browser": [
+        "./dist/browser.d.ts"
+      ],
+      "node": [
+        "./dist/node.d.ts"
+      ],
+      "worker": [
+        "./dist/worker.d.ts"
+      ],
+      "internal": [
+        "./dist/internal/index.d.ts"
+      ]
+    }
+  },
+  "sideEffects": false,
+  "files": [
+    "dist/**/*",
+    "!dist/**/*.map"
+  ],
+  "napi": {
+    "binaryName": "pdfium",
+    "targets": [
+      "x86_64-apple-darwin",
+      "aarch64-apple-darwin",
+      "x86_64-unknown-linux-gnu",
+      "x86_64-unknown-linux-musl",
+      "aarch64-unknown-linux-gnu",
+      "x86_64-pc-windows-msvc"
+    ],
+    "packageName": "@scaryterry/pdfium"
+  },
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js",
+    "build": "tsup",
+    "build:watch": "tsup --watch",
+    "build:native": "napi build --features napi --platform --release",
+    "download:pdfium": "tsx scripts/download-pdfium.ts",
+    "check:pdfium-updates": "tsx scripts/check-pdfium-updates.ts",
+    "clean": "rm -rf dist coverage",
+    "artifacts": "napi artifacts --npm-dir npm",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "test:mutation": "stryker run",
+    "test:bench": "vitest bench --config vitest.bench.config.ts",
+    "test:visual": "vitest run test/visual",
+    "test:browser": "playwright test",
+    "serve:test": "vite --config vite.test.config.ts",
+    "lint": "biome check --error-on-warnings .",
+    "lint:fix": "biome check --error-on-warnings --write .",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json",
+    "prepare": "husky",
+    "check": "pnpm lint && pnpm typecheck && pnpm test",
+    "release": "semantic-release"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jacquesg/pdfium.git"
+  },
+  "author": "Jacques Germishuys",
+  "license": "MIT",
+  "keywords": [
+    "pdf",
+    "pdfium",
+    "wasm",
+    "webassembly",
+    "render",
+    "typescript",
+    "browser",
+    "nodejs"
+  ],
+  "devDependencies": {
+    "@biomejs/biome": "^2.3.14",
+    "@commitlint/cli": "^20.4.1",
+    "@commitlint/config-conventional": "^20.4.1",
+    "@napi-rs/cli": "^3",
+    "@octokit/rest": "^22.0.0",
+    "@playwright/test": "^1.58.1",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/exec": "^7.0.3",
+    "@semantic-release/git": "^10.0.1",
+    "@stryker-mutator/core": "^8.7.1",
+    "@stryker-mutator/vitest-runner": "^8.7.1",
+    "@types/node": "^25.2.0",
+    "@types/tar": "^6.1.13",
+    "@vitest/coverage-v8": "^4.0.18",
+    "conventional-changelog-conventionalcommits": "^9.0.0",
+    "husky": "^9.1.7",
+    "semantic-release": "^25.0.0",
+    "tar": "^7.4.3",
+    "tsup": "^8.5.0",
+    "tsx": "^4.19.4",
+    "typescript": "^5.8.3",
+    "vite": "^7.3.1",
+    "vitest": "^4.0.18"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  }
+}

@@ -1,0 +1,27 @@
+[package]
+name = "pdfium"
+version = "0.0.0"
+edition = "2021"
+license = "MIT"
+description = "Native PDFium bindings for Node.js via napi-rs"
+repository = "https://github.com/jacquesg/pdfium"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+path = "crate/lib.rs"
+
+[dependencies]
+libloading = "0.8"
+napi = { version = "2", features = ["napi8"], optional = true }
+napi-derive = { version = "2", optional = true }
+
+[build-dependencies]
+napi-build = { version = "2", optional = true }
+
+[features]
+default = []
+napi = ["dep:napi", "dep:napi-derive", "dep:napi-build"]
+
+[profile.release]
+lto = true
+opt-level = 3
