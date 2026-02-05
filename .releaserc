@@ -24,7 +24,7 @@
     "@semantic-release/npm",
     ["@semantic-release/exec", {
       "prepareCmd": "sed -i 's/^version = \".*\"/version = \"${nextRelease.version}\"/' Cargo.toml && pnpm napi version",
-      "publishCmd": "set -e; for dir in npm/*/; do echo \"Publishing $dir\"; pnpm publish \"$dir\" --provenance --access public --no-git-checks; done"
+      "publishCmd": "set -e; for dir in npm/*/; do echo \"Publishing $dir\"; pnpm publish \"$dir\" --provenance --access public --no-git-checks; sleep 5; done"
     }],
     ["@semantic-release/git", {
       "assets": ["CHANGELOG.md", "package.json", "Cargo.toml", "npm/*/package.json"],
