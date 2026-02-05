@@ -1,16 +1,16 @@
 {
   "name": "pdfium-vite-demo",
+  "version": "1.0.0",
   "private": true,
-  "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "setup": "tsx ../scripts/setup.ts"
+    "postinstall": "node setup.mjs"
   },
   "dependencies": {
-    "@scaryterry/pdfium": "file:../..",
+    "@scaryterry/pdfium": "^0.0.0",
     "@tanstack/react-query": "^5.90.12",
     "react": "^19.2.4",
     "react-dom": "^19.2.4"
@@ -22,5 +22,8 @@
     "globals": "^17.3.0",
     "typescript": "^5.7.3",
     "vite": "^7.3.1"
+  },
+  "engines": {
+    "node": ">=22"
   }
 }

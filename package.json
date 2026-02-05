@@ -55,7 +55,8 @@
   "sideEffects": false,
   "files": [
     "dist/**/*",
-    "!dist/**/*.map"
+    "!dist/**/*.map",
+    "scripts/postinstall.js"
   ],
   "napi": {
     "binaryName": "pdfium",

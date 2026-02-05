@@ -3,11 +3,11 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>PDFium Plain Demo</title>
+    <title>PDFium Plain Demo (Standalone)</title>
     <script type="importmap">
       {
         "imports": {
-          "@scaryterry/pdfium/browser": "../../dist/browser.js"
+          "@scaryterry/pdfium/browser": "./browser.js"
         }
       }
     </script>
@@ -19,11 +19,11 @@
         status.textContent = 'Initialising PDFium…';
 
         using pdfium = await PDFium.init({
-          wasmBinary: await fetch('../../dist/vendor/pdfium.wasm').then((r) => r.arrayBuffer()),
+          wasmBinary: await fetch('./pdfium.wasm').then((r) => r.arrayBuffer()),
         });
         status.textContent = 'Loading PDF…';
 
-        const pdf = await fetch('../node/sample.pdf').then((r) => r.arrayBuffer());
+        const pdf = await fetch('./sample.pdf').then((r) => r.arrayBuffer());
         using doc = await pdfium.openDocument(new Uint8Array(pdf));
 
         document.getElementById('info').textContent =

@@ -1,11 +1,11 @@
 import { PDFium } from '@scaryterry/pdfium';
-import { readFile } from 'fs/promises';
-import { dirname, join } from 'path';
-import { fileURLToPath } from 'url';
+import { readFile } from 'node:fs/promises';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-async function main() {
+async function main(): Promise<void> {
   using pdfium = await PDFium.init();
   console.log('=> library initialised');
 

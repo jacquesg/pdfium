@@ -6,5 +6,10 @@ export default defineConfig({
   optimizeDeps: {
     exclude: ["@scaryterry/pdfium"],
   },
+  build: {
+    rollupOptions: {
+      external: ["module", "path", "url", "fs", "fs/promises"],
+    },
+  },
   plugins: [react()],
 });

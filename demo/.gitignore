@@ -1,0 +1,8 @@
+# Generated files
+node/sample.pdf
+plain/sample.pdf
+vite/public/sample.pdf
+vite/public/pdfium.cjs
+
+# Standalone output
+standalone/

@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PDFium Plain Demo</title>
+    <script type="importmap">
+      {
+        "imports": {
+          "@scaryterry/pdfium/browser": "../../dist/browser.js"
+        }
+      }
+    </script>
+    <script type="module">
+      import { PDFium } from '@scaryterry/pdfium/browser';
+
+      async function main() {
+        const status = document.getElementById('status');
+        status.textContent = 'Initialising PDFium…';
+
+        using pdfium = await PDFium.init({
+          wasmBinary: await fetch('../../dist/vendor/pdfium.wasm').then((r) => r.arrayBuffer()),
+        });
+        status.textContent = 'Loading PDF…';
+
+        const pdf = await fetch('../shared/sample.pdf').then((r) => r.arrayBuffer());
+        using doc = await pdfium.openDocument(new Uint8Array(pdf));
+
+        document.getElementById('info').textContent =
+          `Pages: ${doc.pageCount}`;
+
+        using page = doc.getPage(0);
+        const { width, height } = page.size;
+        document.getElementById('info').textContent +=
+          ` — Page 1 size: ${width} × ${height} pt`;
+
+        const result = page.render({ scale: 2 });
+        const canvas = document.getElementById('canvas');
+        canvas.width = result.width;
+        canvas.height = result.height;
+
+        const ctx = canvas.getContext('2d');
+        const imageData = new ImageData(
+          new Uint8ClampedArray(result.data),
+          result.width,
+          result.height,
+        );
+        ctx.putImageData(imageData, 0, 0);
+
+        status.textContent = 'Done';
+      }
+
+      main().catch((err) => {
+        console.error(err);
+        document.getElementById('status').textContent = `Error: ${err.message}`;
+      });
+    </script>
+  </head>
+  <body>
+    <h1>PDFium Plain HTML Demo</h1>
+    <p id="status">Loading…</p>
+    <p id="info"></p>
+    <canvas id="canvas" style="border: 1px solid #ccc; max-width: 100%"></canvas>
+  </body>
+</html>
