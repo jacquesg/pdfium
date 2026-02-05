@@ -1,6 +1,6 @@
 {
   "name": "@scaryterry/pdfium-darwin-arm64",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Native PDFium binding for macOS arm64",
   "os": [
     "darwin"

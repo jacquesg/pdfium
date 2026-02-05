@@ -1,3 +1,9 @@
+## [0.0.3](https://github.com/jacquesg/pdfium/compare/v0.0.2...v0.0.3) (2026-02-05)
+
+### Bug Fixes
+
+* ci release process ([bfc2dcb](https://github.com/jacquesg/pdfium/commit/bfc2dcb49663a09dbad84848372dcf5e397653b6))
+
 ## [0.0.2](https://github.com/jacquesg/pdfium/compare/v0.0.1...v0.0.2) (2026-02-05)
 
 ### Bug Fixes

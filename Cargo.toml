@@ -1,6 +1,6 @@
 [package]
 name = "pdfium"
-version = "0.0.2"
+version = "0.0.3"
 edition = "2021"
 license = "MIT"
 description = "Native PDFium bindings for Node.js via napi-rs"
