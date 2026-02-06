@@ -14,13 +14,13 @@
  *   pnpm tsx demo/scripts/setup.ts
  */
 
-import { copyFileSync, existsSync, mkdirSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { copyFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const DEMO_ROOT = resolve(__dirname, '..');
-const REPO_ROOT = resolve(DEMO_ROOT, '..');
+const DEMO_ROOT = resolve(__dirname, "..");
+const REPO_ROOT = resolve(DEMO_ROOT, "..");
 
 interface SetupResult {
   success: boolean;
@@ -36,9 +36,9 @@ function error(message: string): void {
 }
 
 function checkPrerequisites(): SetupResult {
-  const distDir = join(REPO_ROOT, 'dist');
-  const wasmFile = join(distDir, 'vendor', 'pdfium.wasm');
-  const cjsFile = join(REPO_ROOT, 'src', 'vendor', 'pdfium.cjs');
+  const distDir = join(REPO_ROOT, "dist");
+  const wasmFile = join(distDir, "vendor", "pdfium.wasm");
+  const cjsFile = join(REPO_ROOT, "src", "vendor", "pdfium.cjs");
 
   if (!existsSync(distDir)) {
     return {
@@ -50,63 +50,68 @@ function checkPrerequisites(): SetupResult {
   if (!existsSync(wasmFile)) {
     return {
       success: false,
-      message: 'pdfium.wasm not found. Run "pnpm download:pdfium --target wasm" first.',
+      message:
+        'pdfium.wasm not found. Run "pnpm download:pdfium --target wasm" first.',
     };
   }
 
   if (!existsSync(cjsFile)) {
     return {
       success: false,
-      message: 'pdfium.cjs not found in src/vendor/. The WASM binary may not have been downloaded correctly.',
+      message:
+        "pdfium.cjs not found in src/vendor/. The WASM binary may not have been downloaded correctly.",
     };
   }
 
-  return { success: true, message: 'Prerequisites satisfied' };
+  return { success: true, message: "Prerequisites satisfied" };
 }
 
 function setupSharedAssets(): void {
-  const sharedDir = join(DEMO_ROOT, 'shared');
-  const samplePdf = join(sharedDir, 'sample.pdf');
+  const sharedDir = join(DEMO_ROOT, "shared");
+  const samplePdf = join(sharedDir, "sample.pdf");
 
   if (!existsSync(samplePdf)) {
-    error('shared/sample.pdf not found. This file should exist in the repository.');
+    error(
+      "shared/sample.pdf not found. This file should exist in the repository.",
+    );
     process.exit(1);
   }
 
-  log('Shared assets verified');
+  log("Shared assets verified");
 }
 
 function setupNodeDemo(): void {
-  const nodeDir = join(DEMO_ROOT, 'node');
-  const sourcePdf = join(DEMO_ROOT, 'shared', 'sample.pdf');
-  const targetPdf = join(nodeDir, 'sample.pdf');
+  const nodeDir = join(DEMO_ROOT, "node");
+  const sourcePdf = join(DEMO_ROOT, "shared", "sample.pdf");
+  const targetPdf = join(nodeDir, "sample.pdf");
 
   if (!existsSync(targetPdf)) {
     copyFileSync(sourcePdf, targetPdf);
-    log('Copied sample.pdf to demo/node/');
+    log("Copied sample.pdf to demo/node/");
   } else {
-    log('demo/node/sample.pdf already exists');
+    log("demo/node/sample.pdf already exists");
   }
 }
 
 function setupPlainDemo(): void {
-  const sourceCjs = join(REPO_ROOT, 'src', 'vendor', 'pdfium.cjs');
-  const targetCjs = join(REPO_ROOT, 'pdfium.cjs');
+  const sourceCjs = join(REPO_ROOT, "src", "vendor", "pdfium.cjs");
+  const targetCjs = join(REPO_ROOT, "pdfium.cjs");
 
   if (!existsSync(targetCjs)) {
     copyFileSync(sourceCjs, targetCjs);
-    log('Copied pdfium.cjs to repository root (for plain demo)');
+    log("Copied pdfium.cjs to repository root (for plain demo)");
   } else {
-    log('pdfium.cjs already exists in repository root');
+    log("pdfium.cjs already exists in repository root");
   }
 }
 
 function setupViteDemo(): void {
-  const vitePublicDir = join(DEMO_ROOT, 'vite', 'public');
-  const sourceCjs = join(REPO_ROOT, 'src', 'vendor', 'pdfium.cjs');
-  const sourcePdf = join(DEMO_ROOT, 'shared', 'sample.pdf');
-  const targetCjs = join(vitePublicDir, 'pdfium.cjs');
-  const targetPdf = join(vitePublicDir, 'sample.pdf');
+  const vitePublicDir = join(DEMO_ROOT, "vite", "public");
+  const distDir = join(REPO_ROOT, "dist");
+  const sourceCjs = join(REPO_ROOT, "src", "vendor", "pdfium.cjs");
+  const sourcePdf = join(DEMO_ROOT, "shared", "sample.pdf");
+  const targetCjs = join(vitePublicDir, "pdfium.cjs");
+  const targetPdf = join(vitePublicDir, "sample.pdf");
 
   if (!existsSync(vitePublicDir)) {
     mkdirSync(vitePublicDir, { recursive: true });
@@ -114,22 +119,34 @@ function setupViteDemo(): void {
 
   if (!existsSync(targetCjs)) {
     copyFileSync(sourceCjs, targetCjs);
-    log('Copied pdfium.cjs to demo/vite/public/');
+    log("Copied pdfium.cjs to demo/vite/public/");
   } else {
-    log('demo/vite/public/pdfium.cjs already exists');
+    log("demo/vite/public/pdfium.cjs already exists");
   }
 
   if (!existsSync(targetPdf)) {
     copyFileSync(sourcePdf, targetPdf);
-    log('Copied sample.pdf to demo/vite/public/');
+    log("Copied sample.pdf to demo/vite/public/");
   } else {
-    log('demo/vite/public/sample.pdf already exists');
+    log("demo/vite/public/sample.pdf already exists");
   }
+
+  // Copy all JS chunks from dist to public
+  // This ensures the worker can load its dependencies (split chunks)
+  const files = readdirSync(distDir);
+  let chunkCount = 0;
+  for (const file of files) {
+    if (file.endsWith(".js") || file.endsWith(".js.map")) {
+      copyFileSync(join(distDir, file), join(vitePublicDir, file));
+      chunkCount++;
+    }
+  }
+  log(`Copied ${chunkCount} JS/Map files from dist/ to demo/vite/public/`);
 }
 
 function main(): void {
-  log('Setting up PDFium demos for development mode...');
-  log('');
+  log("Setting up PDFium demos for development mode...");
+  log("");
 
   const prereq = checkPrerequisites();
   if (!prereq.success) {
@@ -143,19 +160,19 @@ function main(): void {
   setupPlainDemo();
   setupViteDemo();
 
-  log('');
-  log('Setup complete! You can now run the demos:');
-  log('');
-  log('  Node demo:');
-  log('    pnpm tsx demo/node/index.ts');
-  log('');
-  log('  Plain demo:');
-  log('    python3 -m http.server 8080');
-  log('    open http://localhost:8080/demo/plain/index.html');
-  log('');
-  log('  Vite demo:');
-  log('    pnpm --dir demo/vite install');
-  log('    pnpm --dir demo/vite dev');
+  log("");
+  log("Setup complete! You can now run the demos:");
+  log("");
+  log("  Node demo:");
+  log("    pnpm tsx demo/node/index.ts");
+  log("");
+  log("  Plain demo:");
+  log("    python3 -m http.server 8080");
+  log("    open http://localhost:8080/demo/plain/index.html");
+  log("");
+  log("  Vite demo:");
+  log("    pnpm --dir demo/vite install");
+  log("    pnpm --dir demo/vite dev");
 }
 
 main();

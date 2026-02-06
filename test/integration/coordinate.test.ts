@@ -4,12 +4,9 @@
  * These tests verify device-to-page and page-to-device coordinate transformations.
  */
 
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import type { CoordinateTransformContext } from '../../src/core/types.js';
 import { PageRotation } from '../../src/core/types.js';
-import type { PDFiumDocument } from '../../src/document/document.js';
-import type { PDFiumPage } from '../../src/document/page.js';
-import type { PDFium } from '../../src/pdfium.js';
 import { initPdfium, loadTestDocument } from '../utils/helpers.js';
 
 // A4 page dimensions in points (72 DPI)
@@ -17,24 +14,12 @@ const A4_WIDTH = 595;
 const A4_HEIGHT = 842;
 
 describe('Coordinate Conversion', () => {
-  let pdfium: PDFium;
-  let document: PDFiumDocument;
-  let page: PDFiumPage;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-    document = await loadTestDocument(pdfium, 'test_1.pdf');
-    page = document.getPage(0);
-  });
-
-  afterAll(() => {
-    page?.dispose();
-    document?.dispose();
-    pdfium?.dispose();
-  });
-
   describe('deviceToPage', () => {
-    test('should convert device origin to page origin', () => {
+    test('should convert device origin to page origin', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+
       const context: CoordinateTransformContext = {
         startX: 0,
         startY: 0,
@@ -50,7 +35,11 @@ describe('Coordinate Conversion', () => {
       expect(result.y).toBeCloseTo(A4_HEIGHT, 0);
     });
 
-    test('should convert device bottom-right to page bottom-right', () => {
+    test('should convert device bottom-right to page bottom-right', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+
       const context: CoordinateTransformContext = {
         startX: 0,
         startY: 0,
@@ -66,7 +55,11 @@ describe('Coordinate Conversion', () => {
       expect(result.y).toBeCloseTo(0, 0);
     });
 
-    test('should convert device centre to page centre', () => {
+    test('should convert device centre to page centre', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+
       const context: CoordinateTransformContext = {
         startX: 0,
         startY: 0,
@@ -81,7 +74,11 @@ describe('Coordinate Conversion', () => {
       expect(result.y).toBeCloseTo(A4_HEIGHT / 2, 0);
     });
 
-    test('should handle scaled viewport', () => {
+    test('should handle scaled viewport', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+
       const scale = 2;
       const context: CoordinateTransformContext = {
         startX: 0,
@@ -99,7 +96,11 @@ describe('Coordinate Conversion', () => {
       expect(result.y).toBeCloseTo(A4_HEIGHT / 2, 0);
     });
 
-    test('should handle viewport offset', () => {
+    test('should handle viewport offset', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+
       const context: CoordinateTransformContext = {
         startX: 100,
         startY: 50,
@@ -116,7 +117,11 @@ describe('Coordinate Conversion', () => {
       expect(result.y).toBeCloseTo(A4_HEIGHT, 0);
     });
 
-    test('should handle 90 degree rotation', () => {
+    test('should handle 90 degree rotation', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+
       const context: CoordinateTransformContext = {
         startX: 0,
         startY: 0,
@@ -136,7 +141,11 @@ describe('Coordinate Conversion', () => {
   });
 
   describe('pageToDevice', () => {
-    test('should convert page origin to device coordinates', () => {
+    test('should convert page origin to device coordinates', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+
       const context: CoordinateTransformContext = {
         startX: 0,
         startY: 0,
@@ -153,7 +162,11 @@ describe('Coordinate Conversion', () => {
       expect(result.y).toBeCloseTo(A4_HEIGHT, 0);
     });
 
-    test('should convert page top-left to device origin', () => {
+    test('should convert page top-left to device origin', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+
       const context: CoordinateTransformContext = {
         startX: 0,
         startY: 0,
@@ -170,7 +183,11 @@ describe('Coordinate Conversion', () => {
       expect(result.y).toBe(0);
     });
 
-    test('should convert page centre to device centre', () => {
+    test('should convert page centre to device centre', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+
       const context: CoordinateTransformContext = {
         startX: 0,
         startY: 0,
@@ -186,7 +203,11 @@ describe('Coordinate Conversion', () => {
       expect(Math.abs(result.y - A4_HEIGHT / 2)).toBeLessThanOrEqual(1);
     });
 
-    test('should handle scaled viewport', () => {
+    test('should handle scaled viewport', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+
       const scale = 2;
       const context: CoordinateTransformContext = {
         startX: 0,
@@ -204,7 +225,11 @@ describe('Coordinate Conversion', () => {
       expect(result.y).toBeCloseTo(A4_HEIGHT, 0);
     });
 
-    test('should handle viewport offset', () => {
+    test('should handle viewport offset', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+
       const offsetX = 100;
       const offsetY = 50;
       const context: CoordinateTransformContext = {
@@ -225,7 +250,11 @@ describe('Coordinate Conversion', () => {
   });
 
   describe('round-trip conversion', () => {
-    test('should return to original device coordinates after round-trip', () => {
+    test('should return to original device coordinates after round-trip', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+
       const context: CoordinateTransformContext = {
         startX: 0,
         startY: 0,
@@ -245,7 +274,11 @@ describe('Coordinate Conversion', () => {
       expect(backToDevice.y).toBeCloseTo(deviceY, 0);
     });
 
-    test('should return to original page coordinates after round-trip', () => {
+    test('should return to original page coordinates after round-trip', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+
       const context: CoordinateTransformContext = {
         startX: 0,
         startY: 0,

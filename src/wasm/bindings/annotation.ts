@@ -135,7 +135,6 @@ export interface AnnotationBindings {
   _FPDFAnnot_IsSupportedSubtype: (subtype: number) => number;
   _FPDFAnnot_IsObjectSupportedSubtype: (subtype: number) => number;
   _FPDFAnnot_AddInkStroke: (annotation: AnnotationHandle, points: WASMPointer, pointCount: number) => number;
-  _FPDFAnnot_SetVertices: (annotation: AnnotationHandle, points: WASMPointer, pointCount: number) => number;
   _FPDFAnnot_GetLink: (annotation: AnnotationHandle) => LinkHandle;
   _FPDFAnnot_SetURI: (annotation: AnnotationHandle, uri: WASMPointer) => number;
   _FPDFAnnot_GetFontSize: (form: FormHandle, annotation: AnnotationHandle, value: WASMPointer) => number;

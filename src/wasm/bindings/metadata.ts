@@ -71,7 +71,7 @@ export interface MetadataBindings {
   _FPDFPage_SetBleedBox: (page: PageHandle, left: number, bottom: number, right: number, top: number) => void;
   _FPDFPage_SetTrimBox: (page: PageHandle, left: number, bottom: number, right: number, top: number) => void;
   _FPDFPage_SetArtBox: (page: PageHandle, left: number, bottom: number, right: number, top: number) => void;
-  _FPDFPage_GetPageBoundingBox: (page: PageHandle, rect: WASMPointer) => number;
+  _FPDF_GetPageBoundingBox: (page: PageHandle, rect: WASMPointer) => number;
 
   // Viewer preferences operations
   _FPDF_VIEWERREF_GetPrintScaling: (document: DocumentHandle) => number;
@@ -95,7 +95,7 @@ export interface MetadataBindings {
   _FPDFDoc_GetJavaScriptAction: (document: DocumentHandle, index: number) => JavaScriptActionHandle;
   _FPDFJavaScriptAction_GetName: (javascript: JavaScriptActionHandle, buffer: WASMPointer, buflen: number) => number;
   _FPDFJavaScriptAction_GetScript: (javascript: JavaScriptActionHandle, buffer: WASMPointer, buflen: number) => number;
-  _FPDFJavaScriptAction_Close: (javascript: JavaScriptActionHandle) => void;
+  _FPDFDoc_CloseJavaScriptAction: (javascript: JavaScriptActionHandle) => void;
 
   // Structure tree operations
   _FPDF_StructTree_GetForPage: (page: PageHandle) => StructTreeHandle;

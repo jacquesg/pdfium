@@ -13,7 +13,9 @@ All errors extend the base `PDFiumError` class:
 import {
   PDFiumError,
   InitialisationError,
+  NetworkError,        // extends InitialisationError
   DocumentError,
+  PermissionsError,    // extends DocumentError
   PageError,
   RenderError,
   MemoryError,
@@ -64,6 +66,24 @@ try {
 
 ---
 
+### NetworkError
+
+Thrown when a network fetch fails during initialisation (e.g. WASM URL unreachable). Extends `InitialisationError`.
+
+**Error Code:** 103
+
+```typescript
+try {
+  using pdfium = await PDFium.init({ wasmUrl: 'https://cdn.example.com/pdfium.wasm' });
+} catch (error) {
+  if (error instanceof NetworkError) {
+    console.error('Failed to fetch WASM binary:', error.message);
+  }
+}
+```
+
+---
+
 ### DocumentError
 
 Thrown for document loading, access, and save operations.
@@ -86,6 +106,25 @@ try {
         console.error('Invalid PDF');
         break;
     }
+  }
+}
+```
+
+---
+
+### PermissionsError
+
+Thrown when a document operation is denied by the PDF's permission flags (e.g. printing or editing restricted). Extends `DocumentError`.
+
+**Error Code:** 209
+
+```typescript
+try {
+  // Attempt an operation on a permissions-restricted document
+  const bytes = document.save();
+} catch (error) {
+  if (error instanceof PermissionsError) {
+    console.error('Permission denied:', error.message);
   }
 }
 ```
@@ -215,6 +254,7 @@ try {
 | 100 | `INIT_WASM_LOAD_FAILED` | Failed to load WASM binary | Check WASM URL/path; verify file exists |
 | 101 | `INIT_LIBRARY_FAILED` | PDFium library init failed | Check WASM binary integrity |
 | 102 | `INIT_INVALID_OPTIONS` | Invalid initialisation options | Validate options against `PDFiumInitOptions` |
+| 103 | `INIT_NETWORK_ERROR` | Network error while fetching resources | Check URL accessibility and CORS headers |
 
 ---
 
@@ -231,6 +271,7 @@ try {
 | 206 | `DOC_LOAD_UNKNOWN` | Unknown load error | Check PDF validity |
 | 207 | `DOC_SAVE_FAILED` | Failed to save document | Check save options; verify disk space |
 | 208 | `DOC_CREATE_FAILED` | Failed to create document | Check memory availability |
+| 209 | `DOC_PERMISSION_DENIED` | Operation not permitted by document permissions | Check document permission flags |
 
 ---
 

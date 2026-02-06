@@ -5,42 +5,25 @@
  * accessing font metadata and metrics from text objects.
  */
 
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { FontFlags, PageObjectType } from '../../src/core/types.js';
-import type { PDFiumDocument } from '../../src/document/document.js';
+import { describe, expect, test } from 'vitest';
+import { FontFlags } from '../../src/core/types.js';
 import type { PDFiumFont } from '../../src/document/font.js';
 import type { PDFiumPage } from '../../src/document/page.js';
-import type { PDFium } from '../../src/pdfium.js';
+import { PDFiumTextObject } from '../../src/document/page-object.js';
 import { initPdfium, loadTestDocument } from '../utils/helpers.js';
 
-describe('Font Introspection', () => {
-  let pdfium: PDFium;
-  let document: PDFiumDocument;
-  let page: PDFiumPage;
-  let textFont: PDFiumFont | null = null;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-    document = await loadTestDocument(pdfium, 'test_1.pdf');
-    page = document.getPage(0);
-
-    // Get a font from the first text object for testing
-    const objects = page.getObjects();
-    for (const obj of objects) {
-      if (obj.type === PageObjectType.Text) {
-        textFont = page.getTextObjectFont(obj.handle);
-        if (textFont !== null) break;
-      }
+async function getFirstTextFont(page: PDFiumPage): Promise<PDFiumFont | null> {
+  const objects = page.getObjects();
+  for (const obj of objects) {
+    if (obj instanceof PDFiumTextObject) {
+      const font = obj.getFont();
+      if (font !== null) return font;
     }
-  });
+  }
+  return null;
+}
 
-  afterAll(() => {
-    textFont?.dispose();
-    page?.dispose();
-    document?.dispose();
-    pdfium?.dispose();
-  });
-
+describe('Font Introspection', () => {
   describe('FontFlags enum values', () => {
     test('should have correct flag values per PDF specification', () => {
       expect(FontFlags.FixedPitch).toBe(1 << 0);
@@ -56,14 +39,18 @@ describe('Font Introspection', () => {
   });
 
   describe('getTextObjectFont', () => {
-    test('should return PDFiumFont for text objects', () => {
+    test('should return PDFiumFont for text objects', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+
       const objects = page.getObjects();
-      const textObjects = objects.filter((obj) => obj.type === PageObjectType.Text);
+      const textObjects = objects.filter((o): o is PDFiumTextObject => o instanceof PDFiumTextObject);
 
       expect(textObjects.length).toBeGreaterThan(0);
 
       for (const textObj of textObjects) {
-        using font = page.getTextObjectFont(textObj.handle);
+        using font = textObj.getFont();
         // Font can be null if the WASM function isn't available
         if (font !== null) {
           expect(font).toBeDefined();
@@ -72,19 +59,26 @@ describe('Font Introspection', () => {
       }
     });
 
-    test('should return null for non-text objects', () => {
+    test('non-text objects should not be PDFiumTextObject instances', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+
       const objects = page.getObjects();
-      const nonTextObj = objects.find((obj) => obj.type !== PageObjectType.Text);
+      const nonTextObj = objects.find((obj) => !(obj instanceof PDFiumTextObject));
 
       if (nonTextObj) {
-        const font = page.getTextObjectFont(nonTextObj.handle);
-        expect(font).toBeNull();
+        expect(nonTextObj).not.toBeInstanceOf(PDFiumTextObject);
       }
     });
   });
 
   describe('PDFiumFont.familyName', () => {
-    test('should return font family name', () => {
+    test('should return font family name', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+      using textFont = await getFirstTextFont(page);
       if (textFont === null) return;
 
       expect(typeof textFont.familyName).toBe('string');
@@ -93,7 +87,11 @@ describe('Font Introspection', () => {
   });
 
   describe('PDFiumFont.fontName', () => {
-    test('should return full font name', () => {
+    test('should return full font name', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+      using textFont = await getFirstTextFont(page);
       if (textFont === null) return;
 
       expect(typeof textFont.fontName).toBe('string');
@@ -101,7 +99,11 @@ describe('Font Introspection', () => {
   });
 
   describe('PDFiumFont.flags', () => {
-    test('should return font descriptor flags', () => {
+    test('should return font descriptor flags', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+      using textFont = await getFirstTextFont(page);
       if (textFont === null) return;
 
       expect(typeof textFont.flags).toBe('number');
@@ -110,7 +112,11 @@ describe('Font Introspection', () => {
   });
 
   describe('PDFiumFont.weight', () => {
-    test('should return font weight in valid range or zero', () => {
+    test('should return font weight in valid range or zero', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+      using textFont = await getFirstTextFont(page);
       if (textFont === null) return;
 
       expect(typeof textFont.weight).toBe('number');
@@ -123,7 +129,11 @@ describe('Font Introspection', () => {
   });
 
   describe('PDFiumFont.italicAngle', () => {
-    test('should return italic angle in degrees', () => {
+    test('should return italic angle in degrees', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+      using textFont = await getFirstTextFont(page);
       if (textFont === null) return;
 
       expect(typeof textFont.italicAngle).toBe('number');
@@ -132,7 +142,11 @@ describe('Font Introspection', () => {
   });
 
   describe('PDFiumFont.isEmbedded', () => {
-    test('should return boolean indicating if font is embedded', () => {
+    test('should return boolean indicating if font is embedded', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+      using textFont = await getFirstTextFont(page);
       if (textFont === null) return;
 
       expect(typeof textFont.isEmbedded).toBe('boolean');
@@ -140,7 +154,11 @@ describe('Font Introspection', () => {
   });
 
   describe('PDFiumFont.getInfo()', () => {
-    test('should return FontInfo object with all properties', () => {
+    test('should return FontInfo object with all properties', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+      using textFont = await getFirstTextFont(page);
       if (textFont === null) return;
 
       const info = textFont.getInfo();
@@ -153,7 +171,11 @@ describe('Font Introspection', () => {
       expect(typeof info.isEmbedded).toBe('boolean');
     });
 
-    test('should return consistent values with individual properties', () => {
+    test('should return consistent values with individual properties', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+      using textFont = await getFirstTextFont(page);
       if (textFont === null) return;
 
       const info = textFont.getInfo();
@@ -168,7 +190,11 @@ describe('Font Introspection', () => {
   });
 
   describe('PDFiumFont.getMetrics()', () => {
-    test('should return font metrics at a given size', () => {
+    test('should return font metrics at a given size', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+      using textFont = await getFirstTextFont(page);
       if (textFont === null) return;
 
       const metrics = textFont.getMetrics(12);
@@ -177,7 +203,11 @@ describe('Font Introspection', () => {
       expect(typeof metrics.descent).toBe('number');
     });
 
-    test('should scale metrics proportionally with font size', () => {
+    test('should scale metrics proportionally with font size', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+      using textFont = await getFirstTextFont(page);
       if (textFont === null) return;
 
       const metrics12 = textFont.getMetrics(12);
@@ -196,7 +226,11 @@ describe('Font Introspection', () => {
       }
     });
 
-    test('should return positive ascent for most fonts', () => {
+    test('should return positive ascent for most fonts', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+      using textFont = await getFirstTextFont(page);
       if (textFont === null) return;
 
       const metrics = textFont.getMetrics(12);
@@ -209,7 +243,11 @@ describe('Font Introspection', () => {
   });
 
   describe('PDFiumFont.getGlyphWidth()', () => {
-    test('should return glyph width as a number', () => {
+    test('should return glyph width as a number', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+      using textFont = await getFirstTextFont(page);
       if (textFont === null) return;
 
       const width = textFont.getGlyphWidth(0, 12);
@@ -217,7 +255,11 @@ describe('Font Introspection', () => {
       expect(Number.isFinite(width)).toBe(true);
     });
 
-    test('should scale glyph width with font size', () => {
+    test('should scale glyph width with font size', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+      using textFont = await getFirstTextFont(page);
       if (textFont === null) return;
 
       const width12 = textFont.getGlyphWidth(1, 12);
@@ -232,7 +274,11 @@ describe('Font Introspection', () => {
   });
 
   describe('PDFiumFont.getFontData()', () => {
-    test('should return Uint8Array or undefined', () => {
+    test('should return Uint8Array or undefined', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+      using textFont = await getFirstTextFont(page);
       if (textFont === null) return;
 
       const data = textFont.getFontData();
@@ -243,7 +289,11 @@ describe('Font Introspection', () => {
       }
     });
 
-    test('should return data for embedded fonts', () => {
+    test('should return data for embedded fonts', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+      using textFont = await getFirstTextFont(page);
       if (textFont === null) return;
 
       const data = textFont.getFontData();
@@ -251,37 +301,49 @@ describe('Font Introspection', () => {
       // Embedded fonts should have data
       if (textFont.isEmbedded && data !== undefined) {
         expect(data.length).toBeGreaterThan(0);
-        // Font files typically start with specific magic bytes
-        // TrueType: 0x00010000 or 'true' or 'typ1'
-        // OpenType: 'OTTO'
-        // But we won't check this as PDFium may return processed data
       }
     });
   });
 
   describe('PDFiumFont helper properties', () => {
-    test('isFixedPitch should check FixedPitch flag', () => {
+    test('isFixedPitch should check FixedPitch flag', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+      using textFont = await getFirstTextFont(page);
       if (textFont === null) return;
 
       expect(typeof textFont.isFixedPitch).toBe('boolean');
       expect(textFont.isFixedPitch).toBe((textFont.flags & FontFlags.FixedPitch) !== 0);
     });
 
-    test('isSerif should check Serif flag', () => {
+    test('isSerif should check Serif flag', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+      using textFont = await getFirstTextFont(page);
       if (textFont === null) return;
 
       expect(typeof textFont.isSerif).toBe('boolean');
       expect(textFont.isSerif).toBe((textFont.flags & FontFlags.Serif) !== 0);
     });
 
-    test('isItalic should check Italic flag', () => {
+    test('isItalic should check Italic flag', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+      using textFont = await getFirstTextFont(page);
       if (textFont === null) return;
 
       expect(typeof textFont.isItalic).toBe('boolean');
       expect(textFont.isItalic).toBe((textFont.flags & FontFlags.Italic) !== 0);
     });
 
-    test('isBold should check weight or ForceBold flag', () => {
+    test('isBold should check weight or ForceBold flag', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+      using textFont = await getFirstTextFont(page);
       if (textFont === null) return;
 
       expect(typeof textFont.isBold).toBe('boolean');
@@ -292,28 +354,19 @@ describe('Font Introspection', () => {
 });
 
 describe('Font Introspection with multiple text objects', () => {
-  let pdfium: PDFium;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-  });
-
-  afterAll(() => {
-    pdfium?.dispose();
-  });
-
   test('should get fonts from all text objects on a page', async () => {
+    using pdfium = await initPdfium();
     using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = doc.getPage(0);
 
     const objects = page.getObjects();
-    const textObjects = objects.filter((obj) => obj.type === PageObjectType.Text);
+    const textObjects = objects.filter((o): o is PDFiumTextObject => o instanceof PDFiumTextObject);
 
     expect(textObjects.length).toBeGreaterThan(0);
 
     let fontsFound = 0;
     for (const textObj of textObjects) {
-      using font = page.getTextObjectFont(textObj.handle);
+      using font = textObj.getFont();
       if (font !== null) {
         fontsFound++;
         // Verify font is valid
@@ -327,14 +380,15 @@ describe('Font Introspection with multiple text objects', () => {
   });
 
   test('should work with images PDF', async () => {
+    using pdfium = await initPdfium();
     using doc = await loadTestDocument(pdfium, 'test_3_with_images.pdf');
     using page = doc.getPage(0);
 
     const objects = page.getObjects();
-    const textObjects = objects.filter((obj) => obj.type === PageObjectType.Text);
+    const textObjects = objects.filter((o): o is PDFiumTextObject => o instanceof PDFiumTextObject);
 
     for (const textObj of textObjects) {
-      using font = page.getTextObjectFont(textObj.handle);
+      using font = textObj.getFont();
       if (font !== null) {
         expect(typeof font.familyName).toBe('string');
       }
@@ -343,40 +397,30 @@ describe('Font Introspection with multiple text objects', () => {
 });
 
 describe('Font lifetime management', () => {
-  let pdfium: PDFium;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-  });
-
-  afterAll(() => {
-    pdfium?.dispose();
-  });
-
-  test('should throw on getTextObjectFont after page dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+  test('should throw on getFont after page dispose', async () => {
+    using pdfium = await initPdfium();
+    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     const page = doc.getPage(0);
     const objects = page.getObjects();
-    const textObj = objects.find((obj) => obj.type === PageObjectType.Text);
+    const textObj = objects.find((o): o is PDFiumTextObject => o instanceof PDFiumTextObject);
 
     page.dispose();
 
     if (textObj) {
-      expect(() => page.getTextObjectFont(textObj.handle)).toThrow();
+      expect(() => textObj.getFont()).toThrow();
     }
-
-    doc.dispose();
   });
 
   test('font should remain usable after page dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+    using pdfium = await initPdfium();
+    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     const page = doc.getPage(0);
     const objects = page.getObjects();
     let font: PDFiumFont | null = null;
 
     for (const obj of objects) {
-      if (obj.type === PageObjectType.Text) {
-        font = page.getTextObjectFont(obj.handle);
+      if (obj instanceof PDFiumTextObject) {
+        font = obj.getFont();
         if (font !== null) break;
       }
     }
@@ -399,19 +443,18 @@ describe('Font lifetime management', () => {
       // Release the font's borrow
       font.dispose();
     }
-
-    doc.dispose();
   });
 
   test('should throw when using font after font dispose', async () => {
+    using pdfium = await initPdfium();
     using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = doc.getPage(0);
     const objects = page.getObjects();
     let font: PDFiumFont | null = null;
 
     for (const obj of objects) {
-      if (obj.type === PageObjectType.Text) {
-        font = page.getTextObjectFont(obj.handle);
+      if (obj instanceof PDFiumTextObject) {
+        font = obj.getFont();
         if (font !== null) break;
       }
     }
@@ -427,13 +470,14 @@ describe('Font lifetime management', () => {
   });
 
   test('dispose should be idempotent', async () => {
+    using pdfium = await initPdfium();
     using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = doc.getPage(0);
     const objects = page.getObjects();
 
     for (const obj of objects) {
-      if (obj.type === PageObjectType.Text) {
-        const font = page.getTextObjectFont(obj.handle);
+      if (obj instanceof PDFiumTextObject) {
+        const font = obj.getFont();
         if (font !== null) {
           font.dispose();
           expect(() => font.dispose()).not.toThrow();

@@ -385,7 +385,7 @@ createInvoice();
 
 ## See Also
 
-- [PDFiumDocumentBuilder](/pdfium/api/classes/pdfium-document-builder/) — API reference
-- [PDFiumPageBuilder](/pdfium/api/classes/pdfium-page-builder/) — Page content API
+- [PDFiumDocumentBuilder](/pdfium/api/classes/pdfiumdocumentbuilder/) — API reference
+- [PDFiumPageBuilder](/pdfium/api/classes/pdfiumpagebuilder/) — Page content API
 - [Add Text Guide](/pdfium/guides/add-text/) — Text positioning details
 - [Add Shapes Guide](/pdfium/guides/add-shapes/) — Shape styling guide

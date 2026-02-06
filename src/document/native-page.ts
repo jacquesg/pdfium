@@ -8,18 +8,17 @@ import type { BackendAnnotation, BackendLink, PDFiumBackend } from '../backend/t
 import { Disposable } from '../core/disposable.js';
 import { PageError, PDFiumErrorCode, RenderError, TextError } from '../core/errors.js';
 import {
-  type ActionType,
+  ActionType,
   type Annotation,
-  type AnnotationBounds,
   AnnotationType,
   type CharBox,
   type Colour,
   type CoordinateTransformContext,
   DEFAULT_LIMITS,
-  type DestinationFitType,
+  DestinationFitType,
   type DeviceCoordinate,
   FlattenFlags,
-  type FlattenResult,
+  FlattenResult,
   type PageBox,
   PageBoxType,
   type PageCoordinate,
@@ -29,13 +28,26 @@ import {
   type PDFiumLimits,
   type PDFLink,
   type QuadPoints,
+  type Rect,
   type RenderOptions,
   type RenderResult,
-  type TextRect,
   TextRenderMode,
-  type TextSearchFlags,
+  TextSearchFlags,
   type TextSearchResult,
+  type TransformMatrix,
 } from '../core/types.js';
+import {
+  actionTypeMap,
+  annotationTypeMap,
+  destinationFitTypeMap,
+  flattenFlagsMap,
+  flattenResultMap,
+  fromNative,
+  pageBoxTypeMap,
+  pageRotationMap,
+  textRenderModeMap,
+  toNative,
+} from '../internal/enum-maps.js';
 
 /** Default background colour (white with full opacity). */
 const DEFAULT_BACKGROUND_COLOUR = 0xffffffff;
@@ -148,7 +160,14 @@ export class NativePDFiumPage extends Disposable {
     const rotation = options.rotation ?? PageRotation.None;
     const flags = RENDER_FLAG_ANNOT;
 
-    const data = this.#backend.renderPage(this.#pageHandle, renderWidth, renderHeight, rotation, flags, bgColour);
+    const data = this.#backend.renderPage(
+      this.#pageHandle,
+      renderWidth,
+      renderHeight,
+      toNative(pageRotationMap.toNative, rotation),
+      flags,
+      bgColour,
+    );
 
     return {
       width: renderWidth,
@@ -212,7 +231,7 @@ export class NativePDFiumPage extends Disposable {
     }
 
     const mode = this.#backend.getCharRenderMode(this.#textPageHandle, charIndex);
-    return mode >= 0 && mode <= 7 ? mode : TextRenderMode.Fill;
+    return fromNative(textRenderModeMap.fromNative, mode, TextRenderMode.Fill);
   }
 
   // ── Text Character Extended Operations ─────────────────────────────────
@@ -295,7 +314,7 @@ export class NativePDFiumPage extends Disposable {
   }
 
   /** Get the loose bounding box of a character. */
-  getCharLooseBox(charIndex: number): TextRect | undefined {
+  getCharLooseBox(charIndex: number): Rect | undefined {
     this.ensureNotDisposed();
     this.#ensureTextPage();
     const count = this.#backend.countTextChars(this.#textPageHandle);
@@ -339,21 +358,32 @@ export class NativePDFiumPage extends Disposable {
     return this.#backend.getCharStrokeColour(this.#textPageHandle, charIndex) ?? undefined;
   }
 
-  /** Get the transformation matrix [a, b, c, d, e, f] of a character. */
-  getCharMatrix(charIndex: number): number[] | undefined {
+  /** Get the transformation matrix of a character. */
+  getCharMatrix(charIndex: number): TransformMatrix | undefined {
     this.ensureNotDisposed();
     this.#ensureTextPage();
     const count = this.#backend.countTextChars(this.#textPageHandle);
     if (charIndex < 0 || charIndex >= count) {
       return undefined;
     }
-    return this.#backend.getCharMatrix(this.#textPageHandle, charIndex) ?? undefined;
+    const arr = this.#backend.getCharMatrix(this.#textPageHandle, charIndex);
+    if (!arr || arr.length < 6) {
+      return undefined;
+    }
+    return {
+      a: arr[0] ?? 0,
+      b: arr[1] ?? 0,
+      c: arr[2] ?? 0,
+      d: arr[3] ?? 0,
+      e: arr[4] ?? 0,
+      f: arr[5] ?? 0,
+    };
   }
 
   // ── Text Search ──────────────────────────────────────────────────────
 
   /** Find all occurrences of a string on the page. */
-  *findText(query: string, flags: TextSearchFlags = 0 as TextSearchFlags): Generator<TextSearchResult> {
+  *findText(query: string, flags: TextSearchFlags = TextSearchFlags.None): IterableIterator<TextSearchResult> {
     this.ensureNotDisposed();
     if (query.length === 0) {
       return;
@@ -379,7 +409,7 @@ export class NativePDFiumPage extends Disposable {
   /** Get the page rotation (0=0deg, 1=90deg, 2=180deg, 3=270deg). */
   get rotation(): PageRotation {
     this.ensureNotDisposed();
-    return this.#backend.getPageRotation(this.#pageHandle) as PageRotation;
+    return fromNative(pageRotationMap.fromNative, this.#backend.getPageRotation(this.#pageHandle), PageRotation.None);
   }
 
   /** Check if this page contains transparency. */
@@ -391,7 +421,11 @@ export class NativePDFiumPage extends Disposable {
   /** Flatten annotations and form fields into page content. */
   flatten(flags: FlattenFlags = FlattenFlags.NormalDisplay): FlattenResult {
     this.ensureNotDisposed();
-    return this.#backend.flattenPage(this.#pageHandle, flags) as FlattenResult;
+    return fromNative(
+      flattenResultMap.fromNative,
+      this.#backend.flattenPage(this.#pageHandle, toNative(flattenFlagsMap.toNative, flags)),
+      FlattenResult.Fail,
+    );
   }
 
   /** Generate the page content stream after modifications. */
@@ -414,7 +448,7 @@ export class NativePDFiumPage extends Disposable {
       context.startY,
       context.sizeX,
       context.sizeY,
-      context.rotate,
+      toNative(pageRotationMap.toNative, context.rotate),
       deviceX,
       deviceY,
     );
@@ -432,7 +466,7 @@ export class NativePDFiumPage extends Disposable {
       context.startY,
       context.sizeX,
       context.sizeY,
-      context.rotate,
+      toNative(pageRotationMap.toNative, context.rotate),
       pageX,
       pageY,
     );
@@ -443,7 +477,7 @@ export class NativePDFiumPage extends Disposable {
   /** Get a specific page box by type. */
   getPageBox(boxType: PageBoxType): PageBox | undefined {
     this.ensureNotDisposed();
-    const result = this.#backend.getPageBox(this.#pageHandle, boxType);
+    const result = this.#backend.getPageBox(this.#pageHandle, toNative(pageBoxTypeMap.toNative, boxType));
     if (result === null) {
       return undefined;
     }
@@ -453,7 +487,14 @@ export class NativePDFiumPage extends Disposable {
   /** Set a specific page box by type. */
   setPageBox(boxType: PageBoxType, box: PageBox): void {
     this.ensureNotDisposed();
-    this.#backend.setPageBox(this.#pageHandle, boxType, box.left, box.bottom, box.right, box.top);
+    this.#backend.setPageBox(
+      this.#pageHandle,
+      toNative(pageBoxTypeMap.toNative, boxType),
+      box.left,
+      box.bottom,
+      box.right,
+      box.top,
+    );
   }
 
   /** Get the media box (physical page boundaries). */
@@ -504,7 +545,7 @@ export class NativePDFiumPage extends Disposable {
    */
   createAnnotation(subtype: AnnotationType): number {
     this.ensureNotDisposed();
-    return this.#backend.createAnnotation(this.#pageHandle, subtype);
+    return this.#backend.createAnnotation(this.#pageHandle, toNative(annotationTypeMap.toNative, subtype));
   }
 
   /**
@@ -522,7 +563,7 @@ export class NativePDFiumPage extends Disposable {
    *
    * @returns `true` if the rect was set.
    */
-  setAnnotationRect(index: number, bounds: AnnotationBounds): boolean {
+  setAnnotationRect(index: number, bounds: PageBox): boolean {
     this.ensureNotDisposed();
     return this.#backend.setAnnotationRect(
       this.#pageHandle,
@@ -656,11 +697,11 @@ export class NativePDFiumPage extends Disposable {
   }
 
   #toLink(raw: BackendLink): PDFLink {
-    const bounds: TextRect = { left: raw.left, bottom: raw.bottom, right: raw.right, top: raw.top };
+    const bounds: Rect = { left: raw.left, bottom: raw.bottom, right: raw.right, top: raw.top };
     const link: PDFLink = { index: raw.index, bounds };
 
     if (raw.hasAction) {
-      const type = raw.actionType >= 0 && raw.actionType <= 5 ? (raw.actionType as ActionType) : (0 as ActionType);
+      const type = fromNative(actionTypeMap.fromNative, raw.actionType, ActionType.Unsupported);
       const action: PDFAction = { type };
       if (raw.uri !== null) {
         action.uri = raw.uri;
@@ -672,10 +713,7 @@ export class NativePDFiumPage extends Disposable {
     }
 
     if (raw.hasDest) {
-      const fitType =
-        raw.destFitType >= 0 && raw.destFitType <= 8
-          ? (raw.destFitType as DestinationFitType)
-          : (0 as DestinationFitType);
+      const fitType = fromNative(destinationFitTypeMap.fromNative, raw.destFitType, DestinationFitType.Unknown);
       const destination: PDFDestination = { pageIndex: raw.destPageIndex, fitType };
       if (raw.hasX) {
         destination.x = raw.x;
@@ -693,26 +731,20 @@ export class NativePDFiumPage extends Disposable {
   }
 
   #toAnnotation(raw: BackendAnnotation): Annotation {
-    const type = raw.subtype >= 0 && raw.subtype <= 28 ? (raw.subtype as AnnotationType) : AnnotationType.Unknown;
-    const bounds: AnnotationBounds = { left: raw.left, top: raw.top, right: raw.right, bottom: raw.bottom };
+    const type = fromNative(annotationTypeMap.fromNative, raw.subtype, AnnotationType.Unknown);
+    const bounds: Rect = { left: raw.left, top: raw.top, right: raw.right, bottom: raw.bottom };
 
-    const annotation: Annotation = { index: raw.index, type, bounds };
-
-    if (raw.hasColour) {
-      const colour: Colour = { r: raw.r, g: raw.g, b: raw.b, a: raw.a };
-      return { ...annotation, colour };
-    }
-
-    return annotation;
+    const colour: Colour | null = raw.hasColour ? { r: raw.r, g: raw.g, b: raw.b, a: raw.a } : null;
+    return { index: raw.index, type, bounds, colour };
   }
 
-  #getTextRects(charIndex: number, charCount: number): TextRect[] {
+  #getTextRects(charIndex: number, charCount: number): Rect[] {
     const rectCount = this.#backend.countTextRects(this.#textPageHandle, charIndex, charCount);
     if (rectCount <= 0) {
       return [];
     }
 
-    const rects: TextRect[] = [];
+    const rects: Rect[] = [];
     for (let i = 0; i < rectCount; i++) {
       const rect = this.#backend.getTextRect(this.#textPageHandle, i);
       if (rect !== null) {

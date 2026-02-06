@@ -29,10 +29,10 @@ import type {
 } from './handles.js';
 
 /** Bytes per character in UTF-16LE encoding. */
-export const UTF16LE_BYTES_PER_CHAR = 2;
+export const UTF16LE_BYTES_PER_CHAR = 2 as const;
 
 /** Bytes for UTF-16LE null terminator. */
-export const UTF16LE_NULL_TERMINATOR_BYTES = 2;
+export const UTF16LE_NULL_TERMINATOR_BYTES = 2 as const;
 
 // Null handle constants
 export const NULL_FORM = 0 as FormHandle;
@@ -55,3 +55,11 @@ export const NULL_CLIP_PATH = 0 as ClipPathHandle;
 export const NULL_PATH_SEGMENT = 0 as PathSegmentHandle;
 export const NULL_FONT = 0 as FontHandle;
 export const NULL_MARK = 0 as PageObjectMarkHandle;
+
+// C structure sizes (in bytes)
+export const SIZEOF_INT = 4 as const;
+export const SIZEOF_FLOAT = 4 as const;
+export const SIZEOF_FS_POINTF = 8 as const; // 2 floats
+export const SIZEOF_FS_RECTF = 16 as const; // 4 floats
+export const SIZEOF_FS_MATRIX = 24 as const; // 6 floats
+export const SIZEOF_FS_QUADPOINTSF = 32 as const; // 8 floats

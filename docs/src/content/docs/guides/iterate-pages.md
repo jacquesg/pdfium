@@ -335,6 +335,6 @@ processPDF('document.pdf', './output');
 
 ## See Also
 
-- [PDFiumDocument](/pdfium/api/classes/pdfium-document/) — pages() method
+- [PDFiumDocument](/pdfium/api/classes/pdfiumdocument/) — pages() method
 - [Resource Management](/pdfium/concepts/resource-management/) — Disposal patterns
 - [Performance](/pdfium/concepts/performance/) — Optimisation tips

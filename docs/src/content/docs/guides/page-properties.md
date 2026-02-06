@@ -240,7 +240,7 @@ analyseDocument('document.pdf');
 
 ## See Also
 
-- [PDFiumPage](/pdfium/api/classes/pdfium-page/) — Page API reference
-- [PageRotation](/pdfium/api/enums/page-rotation/) — Rotation values
+- [PDFiumPage](/pdfium/api/classes/pdfiumpage/) — Page API reference
+- [PageRotation](/pdfium/api/enumerations/pagerotation/) — Rotation values
 - [Render PDF Guide](/pdfium/guides/render-pdf/) — Rendering pages
 - [Coordinates](/pdfium/concepts/coordinates/) — Coordinate system

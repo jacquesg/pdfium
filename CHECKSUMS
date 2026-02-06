@@ -1,8 +1,0 @@
-# @scaryterry/pdfium WASM Binary Checksums
-#
-# Vendor: PDFium (Chromium)
-# Release: 7623
-# Source: https://github.com/nicbarker/pdfium-binaries
-
-# SHA-256
-14ca2adbe23b45dea57da28ae2746e376f1cddfb8e2d0b01b71dcc5cf227734e  src/vendor/pdfium.wasm

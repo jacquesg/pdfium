@@ -27,6 +27,8 @@ export enum PDFiumErrorCode {
   INIT_LIBRARY_FAILED = 101,
   /** Invalid initialisation options provided */
   INIT_INVALID_OPTIONS = 102,
+  /** Network error while fetching resources */
+  INIT_NETWORK_ERROR = 103,
 
   // Document errors (2xx)
   /** The specified file was not found */
@@ -47,6 +49,8 @@ export enum PDFiumErrorCode {
   DOC_SAVE_FAILED = 207,
   /** Failed to create a new document */
   DOC_CREATE_FAILED = 208,
+  /** Operation not permitted by document permissions */
+  DOC_PERMISSION_DENIED = 209,
 
   // Page errors (3xx)
   /** The specified page index is out of bounds */
@@ -114,6 +118,7 @@ const ERROR_MESSAGES: Record<PDFiumErrorCode, string> = {
   [PDFiumErrorCode.INIT_WASM_LOAD_FAILED]: 'Failed to load the PDFium WASM module',
   [PDFiumErrorCode.INIT_LIBRARY_FAILED]: 'Failed to initialise the PDFium library',
   [PDFiumErrorCode.INIT_INVALID_OPTIONS]: 'Invalid initialisation options provided',
+  [PDFiumErrorCode.INIT_NETWORK_ERROR]: 'Network error while fetching resources',
   [PDFiumErrorCode.DOC_FILE_NOT_FOUND]: 'The specified file was not found',
   [PDFiumErrorCode.DOC_FORMAT_INVALID]: 'The document format is invalid or unsupported',
   [PDFiumErrorCode.DOC_PASSWORD_REQUIRED]: 'The document requires a password to open',
@@ -123,6 +128,7 @@ const ERROR_MESSAGES: Record<PDFiumErrorCode, string> = {
   [PDFiumErrorCode.DOC_LOAD_UNKNOWN]: 'Unknown error while loading document',
   [PDFiumErrorCode.DOC_SAVE_FAILED]: 'Failed to save document',
   [PDFiumErrorCode.DOC_CREATE_FAILED]: 'Failed to create a new document',
+  [PDFiumErrorCode.DOC_PERMISSION_DENIED]: 'Operation not permitted by document permissions',
   [PDFiumErrorCode.PAGE_NOT_FOUND]: 'The specified page index is out of bounds',
   [PDFiumErrorCode.PAGE_LOAD_FAILED]: 'Failed to load the page',
   [PDFiumErrorCode.PAGE_ALREADY_CLOSED]: 'Attempted to use a page that has been closed',
@@ -223,6 +229,18 @@ export class InitialisationError extends PDFiumError {
 }
 
 /**
+ * Error during network operations.
+ *
+ * Thrown when fetching WASM resources fails.
+ */
+export class NetworkError extends InitialisationError {
+  constructor(message?: string, context?: Record<string, unknown>) {
+    super(PDFiumErrorCode.INIT_NETWORK_ERROR, message, context);
+    this.name = 'NetworkError';
+  }
+}
+
+/**
  * Error loading or accessing a document.
  *
  * Thrown when a PDF document cannot be opened or accessed, such as when
@@ -232,6 +250,18 @@ export class DocumentError extends PDFiumError {
   constructor(code: PDFiumErrorCode, message?: string, context?: Record<string, unknown>) {
     super(code, message, context);
     this.name = 'DocumentError';
+  }
+}
+
+/**
+ * Error due to insufficient permissions.
+ *
+ * Thrown when an operation is blocked by the document's security settings.
+ */
+export class PermissionsError extends DocumentError {
+  constructor(message?: string, context?: Record<string, unknown>) {
+    super(PDFiumErrorCode.DOC_PERMISSION_DENIED, message, context);
+    this.name = 'PermissionsError';
   }
 }
 

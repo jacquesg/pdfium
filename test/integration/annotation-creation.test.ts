@@ -5,7 +5,13 @@
  */
 
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import { AnnotationFlags, AnnotationType, type Point, type QuadPoints } from '../../src/core/types.js';
+import {
+  AnnotationAppearanceMode,
+  AnnotationFlags,
+  AnnotationType,
+  type Point,
+  type QuadPoints,
+} from '../../src/core/types.js';
 import type { PDFiumDocument } from '../../src/document/document.js';
 import type { PDFiumPage } from '../../src/document/page.js';
 import type { PDFium } from '../../src/pdfium.js';
@@ -30,61 +36,50 @@ describe('Annotation Creation API - Basic Creation', () => {
 
   describe('createAnnotation', () => {
     test('should create a text annotation', () => {
-      const handle = page.createAnnotation(AnnotationType.Text);
-      expect(handle).not.toBeNull();
-      if (handle !== null) {
-        page.closeAnnotation(handle);
-      }
+      using annot = page.createAnnotation(AnnotationType.Text);
+      expect(annot).not.toBeNull();
+      expect(annot!.type).toBe(AnnotationType.Text);
     });
 
     test('should create a highlight annotation', () => {
-      const handle = page.createAnnotation(AnnotationType.Highlight);
-      // May return null if not supported by this PDFium build
-      if (handle !== null) {
-        expect(typeof handle).toBe('number');
-        page.closeAnnotation(handle);
+      using annot = page.createAnnotation(AnnotationType.Highlight);
+      // May return undefined if not supported by this PDFium build
+      if (annot) {
+        expect(annot.type).toBe(AnnotationType.Highlight);
       }
     });
 
     test('should create an ink annotation', () => {
-      const handle = page.createAnnotation(AnnotationType.Ink);
-      expect(handle).not.toBeNull();
-      if (handle !== null) {
-        page.closeAnnotation(handle);
-      }
+      using annot = page.createAnnotation(AnnotationType.Ink);
+      expect(annot).not.toBeNull();
+      expect(annot!.type).toBe(AnnotationType.Ink);
     });
 
     test('should create a stamp annotation', () => {
-      const handle = page.createAnnotation(AnnotationType.Stamp);
-      expect(handle).not.toBeNull();
-      if (handle !== null) {
-        page.closeAnnotation(handle);
-      }
+      using annot = page.createAnnotation(AnnotationType.Stamp);
+      expect(annot).not.toBeNull();
+      expect(annot!.type).toBe(AnnotationType.Stamp);
     });
 
     test('should create a link annotation', () => {
-      const handle = page.createAnnotation(AnnotationType.Link);
-      expect(handle).not.toBeNull();
-      if (handle !== null) {
-        page.closeAnnotation(handle);
-      }
+      using annot = page.createAnnotation(AnnotationType.Link);
+      expect(annot).not.toBeNull();
+      expect(annot!.type).toBe(AnnotationType.Link);
     });
 
     test('should create a line annotation', () => {
-      const handle = page.createAnnotation(AnnotationType.Line);
-      // May return null if not supported by this PDFium build
-      if (handle !== null) {
-        expect(typeof handle).toBe('number');
-        page.closeAnnotation(handle);
+      using annot = page.createAnnotation(AnnotationType.Line);
+      // May return undefined if not supported by this PDFium build
+      if (annot) {
+        expect(annot.type).toBe(AnnotationType.Line);
       }
     });
 
     test('should create a polygon annotation', () => {
-      const handle = page.createAnnotation(AnnotationType.Polygon);
-      // May return null if not supported by this PDFium build
-      if (handle !== null) {
-        expect(typeof handle).toBe('number');
-        page.closeAnnotation(handle);
+      using annot = page.createAnnotation(AnnotationType.Polygon);
+      // May return undefined if not supported by this PDFium build
+      if (annot) {
+        expect(annot.type).toBe(AnnotationType.Polygon);
       }
     });
   });
@@ -93,15 +88,6 @@ describe('Annotation Creation API - Basic Creation', () => {
     test('should return boolean', () => {
       const result = page.removeAnnotation(9999);
       expect(typeof result).toBe('boolean');
-    });
-  });
-
-  describe('closeAnnotation', () => {
-    test('should close annotation handle', () => {
-      const handle = page.createAnnotation(AnnotationType.Text);
-      if (handle !== null) {
-        expect(() => page.closeAnnotation(handle)).not.toThrow();
-      }
     });
   });
 });
@@ -175,81 +161,28 @@ describe('Annotation Creation API - Ink Annotation', () => {
     pdfium?.dispose();
   });
 
-  describe('annotationAddInkStroke', () => {
+  describe('addInkStroke via PDFiumAnnotation', () => {
     test('should add ink stroke to ink annotation', () => {
-      const handle = page.createAnnotation(AnnotationType.Ink);
-      if (handle !== null) {
+      using annot = page.createAnnotation(AnnotationType.Ink);
+      expect(annot).not.toBeNull();
+      if (annot) {
         const points: Point[] = [
           { x: 100, y: 100 },
           { x: 150, y: 150 },
           { x: 200, y: 100 },
         ];
-        const result = page.annotationAddInkStroke(handle, points);
+        const result = annot.addInkStroke(points);
         expect(typeof result).toBe('number');
-        page.closeAnnotation(handle);
       }
     });
 
     test('should return -1 for empty points array', () => {
-      const handle = page.createAnnotation(AnnotationType.Ink);
-      if (handle !== null) {
-        const result = page.annotationAddInkStroke(handle, []);
+      using annot = page.createAnnotation(AnnotationType.Ink);
+      expect(annot).not.toBeNull();
+      if (annot) {
+        const result = annot.addInkStroke([]);
         expect(result).toBe(-1);
-        page.closeAnnotation(handle);
       }
-    });
-
-    test('should return number for invalid handle', () => {
-      const result = page.annotationAddInkStroke(0 as never, [{ x: 100, y: 100 }]);
-      expect(typeof result).toBe('number');
-    });
-  });
-});
-
-describe('Annotation Creation API - Polygon/Polyline Vertices', () => {
-  let pdfium: PDFium;
-  let document: PDFiumDocument;
-  let page: PDFiumPage;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-    document = await loadTestDocument(pdfium, 'test_1.pdf');
-    page = document.getPage(0);
-  });
-
-  afterAll(() => {
-    page?.dispose();
-    document?.dispose();
-    pdfium?.dispose();
-  });
-
-  describe('annotationSetVertices', () => {
-    test('should set vertices on polygon annotation', () => {
-      const handle = page.createAnnotation(AnnotationType.Polygon);
-      if (handle !== null) {
-        const vertices: Point[] = [
-          { x: 100, y: 100 },
-          { x: 200, y: 100 },
-          { x: 150, y: 200 },
-        ];
-        const result = page.annotationSetVertices(handle, vertices);
-        expect(typeof result).toBe('boolean');
-        page.closeAnnotation(handle);
-      }
-    });
-
-    test('should return false for empty vertices', () => {
-      const handle = page.createAnnotation(AnnotationType.Polygon);
-      if (handle !== null) {
-        const result = page.annotationSetVertices(handle, []);
-        expect(result).toBe(false);
-        page.closeAnnotation(handle);
-      }
-    });
-
-    test('should return boolean for invalid handle', () => {
-      const result = page.annotationSetVertices(0 as never, [{ x: 100, y: 100 }]);
-      expect(typeof result).toBe('boolean');
     });
   });
 });
@@ -271,39 +204,39 @@ describe('Annotation Creation API - Link Annotation', () => {
     pdfium?.dispose();
   });
 
-  describe('annotationGetLink', () => {
-    test('should return link handle or null', () => {
-      const handle = page.createAnnotation(AnnotationType.Link);
-      if (handle !== null) {
-        const link = page.annotationGetLink(handle);
+  describe('getLink via PDFiumAnnotation', () => {
+    test('should return link object or null', () => {
+      using annot = page.createAnnotation(AnnotationType.Link);
+      expect(annot).not.toBeNull();
+      if (annot) {
+        const link = annot.getLink();
         // May or may not have a link depending on setup
-        expect(link === null || typeof link === 'number').toBe(true);
-        page.closeAnnotation(handle);
+        expect(link === null || typeof link === 'object').toBe(true);
       }
     });
   });
 
-  describe('annotationSetURI', () => {
+  describe('setURI via PDFiumAnnotation', () => {
     test('should set URI on link annotation', () => {
-      const handle = page.createAnnotation(AnnotationType.Link);
-      if (handle !== null) {
-        const result = page.annotationSetURI(handle, 'https://example.com');
+      using annot = page.createAnnotation(AnnotationType.Link);
+      expect(annot).not.toBeNull();
+      if (annot) {
+        const result = annot.setURI('https://example.com');
         expect(typeof result).toBe('boolean');
-        page.closeAnnotation(handle);
       }
     });
 
     test('should handle empty URI', () => {
-      const handle = page.createAnnotation(AnnotationType.Link);
-      if (handle !== null) {
-        expect(() => page.annotationSetURI(handle, '')).not.toThrow();
-        page.closeAnnotation(handle);
+      using annot = page.createAnnotation(AnnotationType.Link);
+      expect(annot).not.toBeNull();
+      if (annot) {
+        expect(() => annot.setURI('')).not.toThrow();
       }
     });
   });
 });
 
-describe('Annotation Creation API - Handle-Based Modification', () => {
+describe('Annotation Creation API - Wrapper Modification', () => {
   let pdfium: PDFium;
   let document: PDFiumDocument;
   let page: PDFiumPage;
@@ -320,108 +253,106 @@ describe('Annotation Creation API - Handle-Based Modification', () => {
     pdfium?.dispose();
   });
 
-  describe('annotationSetColour', () => {
+  describe('setColour via PDFiumAnnotation', () => {
     test('should set colour on annotation', () => {
-      const handle = page.createAnnotation(AnnotationType.Highlight);
-      if (handle !== null) {
-        const result = page.annotationSetColour(handle, { r: 255, g: 255, b: 0, a: 255 });
+      using annot = page.createAnnotation(AnnotationType.Highlight);
+      if (annot) {
+        const result = annot.setColour({ r: 255, g: 255, b: 0, a: 255 });
         expect(typeof result).toBe('boolean');
-        page.closeAnnotation(handle);
       }
     });
 
     test('should handle colourType parameter', () => {
-      const handle = page.createAnnotation(AnnotationType.Square);
-      if (handle !== null) {
-        const result = page.annotationSetColour(handle, { r: 255, g: 0, b: 0, a: 255 }, 1);
+      using annot = page.createAnnotation(AnnotationType.Square);
+      if (annot) {
+        const result = annot.setColour({ r: 255, g: 0, b: 0, a: 255 }, 'interior');
         expect(typeof result).toBe('boolean');
-        page.closeAnnotation(handle);
       }
     });
   });
 
-  describe('annotationSetRect', () => {
+  describe('setRect via PDFiumAnnotation', () => {
     test('should set rectangle on annotation', () => {
-      const handle = page.createAnnotation(AnnotationType.Text);
-      if (handle !== null) {
-        const result = page.annotationSetRect(handle, { left: 100, bottom: 100, right: 200, top: 200 });
+      using annot = page.createAnnotation(AnnotationType.Text);
+      expect(annot).not.toBeNull();
+      if (annot) {
+        const result = annot.setRect({ left: 100, bottom: 100, right: 200, top: 200 });
         expect(typeof result).toBe('boolean');
-        page.closeAnnotation(handle);
       }
     });
   });
 
-  describe('annotationSetFlags', () => {
+  describe('setFlags via PDFiumAnnotation', () => {
     test('should set flags on annotation', () => {
-      const handle = page.createAnnotation(AnnotationType.Text);
-      if (handle !== null) {
-        const result = page.annotationSetFlags(handle, AnnotationFlags.Print);
+      using annot = page.createAnnotation(AnnotationType.Text);
+      expect(annot).not.toBeNull();
+      if (annot) {
+        const result = annot.setFlags(AnnotationFlags.Print);
         expect(typeof result).toBe('boolean');
-        page.closeAnnotation(handle);
       }
     });
 
     test('should handle combined flags', () => {
-      const handle = page.createAnnotation(AnnotationType.Text);
-      if (handle !== null) {
-        const result = page.annotationSetFlags(handle, AnnotationFlags.Print | AnnotationFlags.NoZoom);
+      using annot = page.createAnnotation(AnnotationType.Text);
+      expect(annot).not.toBeNull();
+      if (annot) {
+        const result = annot.setFlags(AnnotationFlags.Print | AnnotationFlags.NoZoom);
         expect(typeof result).toBe('boolean');
-        page.closeAnnotation(handle);
       }
     });
   });
 
-  describe('annotationSetStringValue', () => {
+  describe('setStringValue via PDFiumAnnotation', () => {
     test('should set string value on annotation', () => {
-      const handle = page.createAnnotation(AnnotationType.Text);
-      if (handle !== null) {
-        const result = page.annotationSetStringValue(handle, 'Contents', 'Test comment');
+      using annot = page.createAnnotation(AnnotationType.Text);
+      expect(annot).not.toBeNull();
+      if (annot) {
+        const result = annot.setStringValue('Contents', 'Test comment');
         expect(typeof result).toBe('boolean');
-        page.closeAnnotation(handle);
       }
     });
 
     test('should handle unicode value', () => {
-      const handle = page.createAnnotation(AnnotationType.Text);
-      if (handle !== null) {
-        const result = page.annotationSetStringValue(handle, 'Contents', '日本語テスト');
+      using annot = page.createAnnotation(AnnotationType.Text);
+      expect(annot).not.toBeNull();
+      if (annot) {
+        const result = annot.setStringValue('Contents', '日本語テスト');
         expect(typeof result).toBe('boolean');
-        page.closeAnnotation(handle);
       }
     });
   });
 
-  describe('annotationSetBorder', () => {
+  describe('setBorder via PDFiumAnnotation', () => {
     test('should set border on annotation', () => {
-      const handle = page.createAnnotation(AnnotationType.Square);
-      if (handle !== null) {
-        const result = page.annotationSetBorder(handle, {
+      using annot = page.createAnnotation(AnnotationType.Text);
+      expect(annot).not.toBeNull();
+      if (annot) {
+        const result = annot.setBorder({
           horizontalRadius: 5,
           verticalRadius: 5,
           borderWidth: 2,
         });
         expect(typeof result).toBe('boolean');
-        page.closeAnnotation(handle);
       }
     });
   });
 
-  describe('annotationSetAppearance', () => {
+  describe('setAppearance via PDFiumAnnotation', () => {
     test('should set appearance on annotation', () => {
-      const handle = page.createAnnotation(AnnotationType.Text);
-      if (handle !== null) {
-        const result = page.annotationSetAppearance(handle, 0, 'test appearance');
+      using annot = page.createAnnotation(AnnotationType.Text);
+      expect(annot).not.toBeNull();
+      if (annot) {
+        const result = annot.setAppearance(AnnotationAppearanceMode.Normal, 'test appearance');
         expect(typeof result).toBe('boolean');
-        page.closeAnnotation(handle);
       }
     });
 
     test('should remove appearance when undefined', () => {
-      const handle = page.createAnnotation(AnnotationType.Text);
-      if (handle !== null) {
-        const result = page.annotationSetAppearance(handle, 0, undefined);
+      using annot = page.createAnnotation(AnnotationType.Text);
+      expect(annot).not.toBeNull();
+      if (annot) {
+        const result = annot.setAppearance(AnnotationAppearanceMode.Normal, undefined);
         expect(typeof result).toBe('boolean');
-        page.closeAnnotation(handle);
       }
     });
   });
@@ -444,10 +375,10 @@ describe('Annotation Creation API - Attachment Points', () => {
     pdfium?.dispose();
   });
 
-  describe('annotationSetAttachmentPoints', () => {
+  describe('setAttachmentPoints via PDFiumAnnotation', () => {
     test('should set attachment points on highlight annotation', () => {
-      const handle = page.createAnnotation(AnnotationType.Highlight);
-      if (handle !== null) {
+      using annot = page.createAnnotation(AnnotationType.Highlight);
+      if (annot) {
         const quadPoints: QuadPoints = {
           x1: 100,
           y1: 100,
@@ -458,17 +389,16 @@ describe('Annotation Creation API - Attachment Points', () => {
           x4: 200,
           y4: 120,
         };
-        const result = page.annotationSetAttachmentPoints(handle, 0, quadPoints);
+        const result = annot.setAttachmentPoints(0, quadPoints);
         expect(typeof result).toBe('boolean');
-        page.closeAnnotation(handle);
       }
     });
   });
 
-  describe('annotationAppendAttachmentPoints', () => {
+  describe('appendAttachmentPoints via PDFiumAnnotation', () => {
     test('should append attachment points to highlight annotation', () => {
-      const handle = page.createAnnotation(AnnotationType.Highlight);
-      if (handle !== null) {
+      using annot = page.createAnnotation(AnnotationType.Highlight);
+      if (annot) {
         const quadPoints: QuadPoints = {
           x1: 100,
           y1: 150,
@@ -479,9 +409,8 @@ describe('Annotation Creation API - Attachment Points', () => {
           x4: 200,
           y4: 170,
         };
-        const result = page.annotationAppendAttachmentPoints(handle, quadPoints);
+        const result = annot.appendAttachmentPoints(quadPoints);
         expect(typeof result).toBe('boolean');
-        page.closeAnnotation(handle);
       }
     });
   });
@@ -504,35 +433,43 @@ describe('Annotation Creation API - Object Manipulation', () => {
     pdfium?.dispose();
   });
 
-  describe('annotationAppendObject', () => {
-    test('should return boolean for invalid object', () => {
-      const handle = page.createAnnotation(AnnotationType.Stamp);
-      if (handle !== null) {
-        const result = page.annotationAppendObject(handle, 0 as never);
-        expect(typeof result).toBe('boolean');
-        page.closeAnnotation(handle);
+  describe('appendObject via PDFiumAnnotation', () => {
+    test('should return boolean for page object', () => {
+      using annot = page.createAnnotation(AnnotationType.Stamp);
+      expect(annot).not.toBeNull();
+      if (annot) {
+        const imageObj = page.createImageObject();
+        expect(imageObj).not.toBeNull();
+        if (imageObj) {
+          const result = annot.appendObject(imageObj);
+          expect(typeof result).toBe('boolean');
+        }
       }
     });
   });
 
-  describe('annotationUpdateObject', () => {
-    test('should return boolean for invalid object', () => {
-      const handle = page.createAnnotation(AnnotationType.Stamp);
-      if (handle !== null) {
-        const result = page.annotationUpdateObject(handle, 0 as never);
-        expect(typeof result).toBe('boolean');
-        page.closeAnnotation(handle);
+  describe('updateObject via PDFiumAnnotation', () => {
+    test('should return boolean for page object', () => {
+      using annot = page.createAnnotation(AnnotationType.Stamp);
+      expect(annot).not.toBeNull();
+      if (annot) {
+        const imageObj = page.createImageObject();
+        expect(imageObj).not.toBeNull();
+        if (imageObj) {
+          const result = annot.updateObject(imageObj);
+          expect(typeof result).toBe('boolean');
+        }
       }
     });
   });
 
-  describe('annotationRemoveObject', () => {
+  describe('removeObject via PDFiumAnnotation', () => {
     test('should return boolean for invalid index', () => {
-      const handle = page.createAnnotation(AnnotationType.Stamp);
-      if (handle !== null) {
-        const result = page.annotationRemoveObject(handle, 9999);
+      using annot = page.createAnnotation(AnnotationType.Stamp);
+      expect(annot).not.toBeNull();
+      if (annot) {
+        const result = annot.removeObject(9999);
         expect(typeof result).toBe('boolean');
-        page.closeAnnotation(handle);
       }
     });
   });
@@ -555,31 +492,36 @@ describe('Annotation Creation API - Form Field Operations', () => {
     pdfium?.dispose();
   });
 
-  describe('annotationGetFontSize', () => {
-    test('should return undefined for invalid handle', () => {
-      const result = page.annotationGetFontSize(0 as never);
-      expect(result).toBeUndefined();
+  describe('getFormControlCount via PDFiumAnnotation', () => {
+    test('should return number', () => {
+      const count = page.annotationCount;
+      if (count > 0) {
+        using annot = page.getAnnotation(0);
+        const result = annot.getFormControlCount();
+        expect(typeof result).toBe('number');
+      }
     });
   });
 
-  describe('annotationGetFormControlCount', () => {
-    test('should return number for invalid handle', () => {
-      const result = page.annotationGetFormControlCount(0 as never);
-      expect(typeof result).toBe('number');
+  describe('getFormControlIndex via PDFiumAnnotation', () => {
+    test('should return number', () => {
+      const count = page.annotationCount;
+      if (count > 0) {
+        using annot = page.getAnnotation(0);
+        const result = annot.getFormControlIndex();
+        expect(typeof result).toBe('number');
+      }
     });
   });
 
-  describe('annotationGetFormControlIndex', () => {
-    test('should return number for invalid handle', () => {
-      const result = page.annotationGetFormControlIndex(0 as never);
-      expect(typeof result).toBe('number');
-    });
-  });
-
-  describe('annotationGetFormFieldExportValue', () => {
-    test('should return undefined for invalid handle', () => {
-      const result = page.annotationGetFormFieldExportValue(0 as never);
-      expect(result).toBeUndefined();
+  describe('getFormFieldExportValue via PDFiumAnnotation', () => {
+    test('should return string or undefined', () => {
+      const count = page.annotationCount;
+      if (count > 0) {
+        using annot = page.getAnnotation(0);
+        const result = annot.getFormFieldExportValue();
+        expect(result === undefined || typeof result === 'string').toBe(true);
+      }
     });
   });
 });
@@ -621,14 +563,14 @@ describe('Annotation Creation API - Focusable Subtypes', () => {
       expect(typeof result).toBe('boolean');
     });
 
-    test('should return false for empty array', () => {
+    test('should return true for empty array (clearing subtypes)', () => {
       const result = page.setFocusableSubtypes([]);
-      expect(result).toBe(false);
+      expect(result).toBe(true);
     });
   });
 });
 
-describe('Annotation Creation API - Index Lookup', () => {
+describe('Annotation Creation API - Annotation Index', () => {
   let pdfium: PDFium;
   let document: PDFiumDocument;
   let page: PDFiumPage;
@@ -645,19 +587,11 @@ describe('Annotation Creation API - Index Lookup', () => {
     pdfium?.dispose();
   });
 
-  describe('getAnnotationIndex', () => {
-    test('should return -1 for invalid handle', () => {
-      const result = page.getAnnotationIndex(0 as never);
-      expect(result).toBe(-1);
-    });
-
-    test('should return number for valid handle', () => {
-      const handle = page.createAnnotation(AnnotationType.Text);
-      if (handle !== null) {
-        const result = page.getAnnotationIndex(handle);
-        expect(typeof result).toBe('number');
-        page.closeAnnotation(handle);
-      }
+  describe('annotation index', () => {
+    test('should have valid index for newly created annotation', () => {
+      using annot = page.createAnnotation(AnnotationType.Text);
+      expect(annot).not.toBeNull();
+      expect(annot!.index).toBeGreaterThanOrEqual(0);
     });
   });
 });
@@ -677,11 +611,9 @@ describe('Annotation Creation with different PDFs', () => {
     using doc = await loadTestDocument(pdfium, 'test_3_with_images.pdf');
     using page = doc.getPage(0);
 
-    const handle = page.createAnnotation(AnnotationType.Highlight);
-    expect(handle !== null || handle === null).toBe(true);
-    if (handle !== null) {
-      page.closeAnnotation(handle);
-    }
+    using annot = page.createAnnotation(AnnotationType.Highlight);
+    // May return null if not supported
+    expect(annot === null || annot.type === AnnotationType.Highlight).toBe(true);
   });
 });
 
@@ -697,58 +629,30 @@ describe('Annotation Creation post-dispose guards', () => {
   });
 
   test('should throw on createAnnotation after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = doc.getPage(0);
     page.dispose();
     expect(() => page.createAnnotation(AnnotationType.Text)).toThrow();
-    doc.dispose();
   });
 
   test('should throw on isAnnotationSubtypeSupported after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = doc.getPage(0);
     page.dispose();
     expect(() => page.isAnnotationSubtypeSupported(AnnotationType.Ink)).toThrow();
-    doc.dispose();
   });
 
-  test('should throw on annotationSetColour after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+  test('should throw on getAnnotation after dispose', async () => {
+    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = doc.getPage(0);
     page.dispose();
-    expect(() => page.annotationSetColour(0 as never, { r: 255, g: 0, b: 0, a: 255 })).toThrow();
-    doc.dispose();
-  });
-
-  test('should throw on annotationAddInkStroke after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
-    using page = doc.getPage(0);
-    page.dispose();
-    expect(() => page.annotationAddInkStroke(0 as never, [{ x: 100, y: 100 }])).toThrow();
-    doc.dispose();
-  });
-
-  test('should throw on annotationSetVertices after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
-    using page = doc.getPage(0);
-    page.dispose();
-    expect(() => page.annotationSetVertices(0 as never, [{ x: 100, y: 100 }])).toThrow();
-    doc.dispose();
-  });
-
-  test('should throw on annotationSetURI after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
-    using page = doc.getPage(0);
-    page.dispose();
-    expect(() => page.annotationSetURI(0 as never, 'https://example.com')).toThrow();
-    doc.dispose();
+    expect(() => page.getAnnotation(0)).toThrow();
   });
 
   test('should throw on getFocusableSubtypes after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = doc.getPage(0);
     page.dispose();
     expect(() => page.getFocusableSubtypes()).toThrow();
-    doc.dispose();
   });
 });

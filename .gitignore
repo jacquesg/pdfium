@@ -162,3 +162,4 @@ demo/vite/public/pdfium.cjs
 npm/*/libpdfium.*
 npm/*/pdfium.dll
 npm/*/*.node
+docs/src/content/docs/api/

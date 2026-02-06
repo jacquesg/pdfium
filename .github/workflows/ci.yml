@@ -4,11 +4,11 @@ on:
   push:
     branches:
       - main
-      - "feat/**"
-      - "fix/**"
-      - "test/**"
-      - "refactor/**"
-      - "docs/**"
+      - 'feat/**'
+      - 'fix/**'
+      - 'test/**'
+      - 'refactor/**'
+      - 'docs/**'
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -18,9 +18,19 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 jobs:
+  actionlint:
+    name: Workflow Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: rhysd/actionlint@v1.7.9
+
   lint:
-    name: Lint
+    name: Lint + Typecheck
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,33 +41,12 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
-          cache: "pnpm"
+          node-version: '22'
+          cache: 'pnpm'
 
       - run: pnpm install --frozen-lockfile
-
       - run: pnpm lint
-
       - run: pnpm typecheck
-
-  build:
-    name: Build
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.0
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: "pnpm"
-
-      - run: pnpm install --frozen-lockfile
-
-      - run: pnpm build
 
   test:
     name: Test (Node ${{ matrix.node-version }})
@@ -65,7 +54,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        node-version: ["22", "24"]
+        node-version: ['22', '24']
     steps:
       - uses: actions/checkout@v4
 
@@ -76,7 +65,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: "pnpm"
+          cache: 'pnpm'
 
       - run: pnpm install --frozen-lockfile
 
@@ -88,16 +77,16 @@ jobs:
       - run: pnpm test:coverage
 
       - name: Upload coverage
-        if: matrix.node-version == 24 && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: matrix.node-version == '24' && github.event_name == 'push' && github.ref == 'refs/heads/main'
         uses: codecov/codecov-action@v5
         with:
           files: coverage/lcov.info
           fail_ci_if_error: false
 
-  visual-regression:
-    name: Visual Regression Tests
+  build:
+    name: Build
     runs-on: ubuntu-latest
-    needs: build
+    needs: [actionlint, lint, test]
     steps:
       - uses: actions/checkout@v4
 
@@ -107,8 +96,79 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
-          cache: "pnpm"
+          node-version: '22'
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+      - run: pnpm test:worker-runtime
+
+  docs:
+    name: Docs (Strict)
+    runs-on: ubuntu-latest
+    needs: [actionlint]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install root dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate API docs
+        run: pnpm docs:gen
+
+      - name: Install docs dependencies
+        working-directory: docs
+        run: pnpm install --frozen-lockfile
+
+      - name: Build docs (warnings are errors)
+        run: pnpm docs:build:strict
+
+  security:
+    name: Security + Compliance
+    runs-on: ubuntu-latest
+    needs: [actionlint]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit --prod
+      - run: pnpm check:licenses
+      - run: pnpm build
+      - run: pnpm check:size
+
+  visual-regression:
+    name: Visual Regression Tests
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
 
       - run: pnpm install --frozen-lockfile
 
@@ -129,7 +189,7 @@ jobs:
   browser-test:
     name: Browser Tests
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build]
     steps:
       - uses: actions/checkout@v4
 
@@ -139,8 +199,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
-          cache: "pnpm"
+          node-version: '22'
+          cache: 'pnpm'
 
       - run: pnpm install --frozen-lockfile
 
@@ -155,41 +215,10 @@ jobs:
       - name: Run browser tests
         run: pnpm test:browser --project=chromium --project=firefox
 
-  benchmark:
-    name: Benchmarks
-    runs-on: ubuntu-latest
-    needs: build
-    if: github.ref == 'refs/heads/main'
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 9.15.0
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "24"
-          cache: "pnpm"
-
-      - run: pnpm install --frozen-lockfile
-
-      - name: Download PDFium WASM
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: pnpm download:pdfium --target wasm
-
-      - run: pnpm test:bench
-
-      - name: Upload benchmark results
-        uses: actions/upload-artifact@v4
-        with:
-          name: benchmark-results
-          path: benchmark-results.json
-
   rust-test:
     name: Rust Tests
     runs-on: ubuntu-latest
+    needs: [build]
     steps:
       - uses: actions/checkout@v4
 
@@ -211,8 +240,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
-          cache: "pnpm"
+          node-version: '22'
+          cache: 'pnpm'
 
       - run: pnpm install --frozen-lockfile
 
@@ -229,6 +258,7 @@ jobs:
   build-native:
     name: Build Native (Linux x64)
     runs-on: ubuntu-latest
+    needs: [build]
     steps:
       - uses: actions/checkout@v4
 
@@ -238,8 +268,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
-          cache: "pnpm"
+          node-version: '22'
+          cache: 'pnpm'
 
       - uses: dtolnay/rust-toolchain@stable
 
@@ -267,12 +297,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: native-linux-x64-gnu
-          path: "*.node"
+          path: '*.node'
 
   native-test:
     name: Native Tests
     runs-on: ubuntu-latest
-    needs: build-native
+    needs: [build-native]
     steps:
       - uses: actions/checkout@v4
 
@@ -282,8 +312,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
-          cache: "pnpm"
+          node-version: '22'
+          cache: 'pnpm'
 
       - run: pnpm install --frozen-lockfile
 
@@ -307,7 +337,7 @@ jobs:
   demo-node:
     name: Demo (Node)
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build]
     steps:
       - uses: actions/checkout@v4
 
@@ -317,8 +347,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
-          cache: "pnpm"
+          node-version: '22'
+          cache: 'pnpm'
 
       - run: pnpm install --frozen-lockfile
 
@@ -348,7 +378,7 @@ jobs:
   demo-vite:
     name: Demo (Vite)
     runs-on: ubuntu-latest
-    needs: build
+    needs: [build]
     steps:
       - uses: actions/checkout@v4
 
@@ -358,8 +388,8 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: "24"
-          cache: "pnpm"
+          node-version: '22'
+          cache: 'pnpm'
 
       - run: pnpm install --frozen-lockfile
 
@@ -384,3 +414,35 @@ jobs:
         run: |
           test -d demo/vite/dist
           test -f demo/vite/dist/index.html
+
+  benchmark:
+    name: Benchmarks
+    runs-on: ubuntu-latest
+    needs: [build]
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Download PDFium WASM
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm download:pdfium --target wasm
+
+      - run: pnpm test:bench
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: benchmark-results.json

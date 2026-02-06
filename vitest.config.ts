@@ -1,4 +1,10 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vitest/config';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const packageVersion = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf8')).version as string;
 
 /**
  * Vitest configuration with workspace projects.
@@ -21,7 +27,7 @@ export default defineConfig({
           setupFiles: ['test/setup.ts'],
         },
         define: {
-          __PACKAGE_VERSION__: JSON.stringify('3.0.0-alpha.1'),
+          __PACKAGE_VERSION__: JSON.stringify(packageVersion),
           __WASM_HASH__: JSON.stringify('test'),
           __DEV__: JSON.stringify(true),
         },
@@ -35,7 +41,7 @@ export default defineConfig({
           testTimeout: 15000,
         },
         define: {
-          __PACKAGE_VERSION__: JSON.stringify('3.0.0-alpha.1'),
+          __PACKAGE_VERSION__: JSON.stringify(packageVersion),
           __WASM_HASH__: JSON.stringify('test'),
           __DEV__: JSON.stringify(true),
         },
@@ -50,7 +56,7 @@ export default defineConfig({
           pool: 'forks',
         },
         define: {
-          __PACKAGE_VERSION__: JSON.stringify('3.0.0-alpha.1'),
+          __PACKAGE_VERSION__: JSON.stringify(packageVersion),
           __WASM_HASH__: JSON.stringify('test'),
           __DEV__: JSON.stringify(true),
         },

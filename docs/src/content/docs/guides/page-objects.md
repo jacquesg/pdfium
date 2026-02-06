@@ -33,6 +33,16 @@ const objects = page.getObjects();
 console.log(`Page has ${objects.length} objects`);
 ```
 
+:::tip[Large Pages]
+For pages with many objects, use the `objects()` generator for lazy iteration:
+
+```typescript
+for (const obj of page.objects()) {
+  // Objects are yielded one at a time — no array allocation
+}
+```
+:::
+
 ## PageObject Types
 
 Each object has a `type` property from `PageObjectType`:
@@ -79,41 +89,74 @@ for (const obj of objects) {
 
 ### Common Properties (All Objects)
 
-All page objects have bounding box coordinates:
+All page objects extend `PDFiumPageObject`, which provides:
 
 ```typescript
-interface PageObjectBase {
-  type: PageObjectType;
-  bounds: {
-    left: number;    // Left edge in points
-    top: number;     // Top edge in points
-    right: number;   // Right edge in points
-    bottom: number;  // Bottom edge in points
-  };
-}
+import { PDFiumPageObject } from '@scaryterry/pdfium';
+
+obj.type;           // PageObjectType
+obj.bounds;         // { left, top, right, bottom } in points
+obj.fillColour;     // Colour | null
+obj.strokeColour;   // Colour | null
+obj.strokeWidth;    // number | null
+obj.matrix;         // TransformMatrix | null
+obj.lineCap;        // LineCapStyle
+obj.lineJoin;       // LineJoinStyle
+obj.dashPattern;    // DashPattern | null
+obj.hasTransparency; // boolean
+obj.rotatedBounds;  // QuadPoints | null
+obj.markCount;      // number — content marks
+obj.marks;          // PageObjectMark[]
 ```
 
-### Text Object Properties
+### PDFiumTextObject
+
+Text objects expose content, font size, render mode, and font access:
 
 ```typescript
-interface TextObject extends PageObjectBase {
-  type: PageObjectType.Text;
-  text: string;      // The text content
-  fontSize: number;  // Font size in points
-}
+import { PDFiumTextObject } from '@scaryterry/pdfium';
+
+// PDFiumTextObject extends PDFiumPageObject
+obj.text;           // The text content
+obj.fontSize;       // Font size in points
+obj.renderMode;     // TextRenderMode (Fill, Stroke, etc.)
+obj.getFont();      // PDFiumFont | null (dispose when done)
 ```
 
-### Image Object Properties
+### PDFiumImageObject
+
+Image objects expose dimensions, raw data, and metadata:
 
 ```typescript
-interface ImageObject extends PageObjectBase {
-  type: PageObjectType.Image;
-  width: number;   // Image width in pixels
-  height: number;  // Image height in pixels
-}
+import { PDFiumImageObject } from '@scaryterry/pdfium';
+
+// PDFiumImageObject extends PDFiumPageObject
+obj.width;           // Image width in pixels
+obj.height;          // Image height in pixels
+obj.getDecodedData(); // Uint8Array | null — decoded pixel data
+obj.getRawData();     // Uint8Array | null — raw compressed data
+obj.getMetadata();    // ImageMetadata | null — colour space, bpp, etc.
 ```
 
-### Path, Shading, Form Objects
+### PDFiumPathObject
+
+Path objects expose segments and drawing operations:
+
+```typescript
+import { PDFiumPathObject, PDFiumPathSegment } from '@scaryterry/pdfium';
+
+// PDFiumPathObject extends PDFiumPageObject
+obj.segmentCount;        // Number of segments
+obj.getSegment(0);       // PDFiumPathSegment | null
+obj.getDrawMode();       // { fillMode, stroke } | null
+
+// PDFiumPathSegment
+segment.point;    // { x, y } | null
+segment.type;     // PathSegmentType (MoveTo, LineTo, BezierTo)
+segment.isClosing; // Whether this segment closes the subpath
+```
+
+### Shading, Form Objects
 
 These only have the base properties (type and bounds).
 
@@ -122,18 +165,18 @@ These only have the base properties (type and bounds).
 ### Filter by Type
 
 ```typescript
-import { PageObjectType } from '@scaryterry/pdfium';
+import { PageObjectType, PDFiumTextObject, PDFiumImageObject } from '@scaryterry/pdfium';
 
 const objects = page.getObjects();
 
 // Get only text objects
 const textObjects = objects.filter(
-  (obj): obj is TextObject => obj.type === PageObjectType.Text
+  (obj): obj is PDFiumTextObject => obj.type === PageObjectType.Text
 );
 
 // Get only images
 const imageObjects = objects.filter(
-  (obj): obj is ImageObject => obj.type === PageObjectType.Image
+  (obj): obj is PDFiumImageObject => obj.type === PageObjectType.Image
 );
 ```
 
@@ -144,7 +187,7 @@ function getTextWithPositions(page: PDFiumPage) {
   const objects = page.getObjects();
 
   return objects
-    .filter((obj): obj is TextObject => obj.type === PageObjectType.Text)
+    .filter((obj): obj is PDFiumTextObject => obj.type === PageObjectType.Text)
     .map(obj => ({
       text: obj.text,
       x: obj.bounds.left,
@@ -202,9 +245,9 @@ console.log(counts);
 ### Find Largest Image
 
 ```typescript
-function findLargestImage(page: PDFiumPage): ImageObject | undefined {
+function findLargestImage(page: PDFiumPage): PDFiumImageObject | undefined {
   const images = page.getObjects().filter(
-    (obj): obj is ImageObject => obj.type === PageObjectType.Image
+    (obj): obj is PDFiumImageObject => obj.type === PageObjectType.Image
   );
 
   if (images.length === 0) return undefined;
@@ -221,6 +264,87 @@ if (largest) {
   console.log(`Largest image: ${largest.width}×${largest.height}`);
 }
 ```
+
+### Font Inspection
+
+Text objects provide access to their font via `getFont()`, which returns a `PDFiumFont` instance:
+
+```typescript
+import { PDFiumTextObject, PDFiumFont, PageObjectType } from '@scaryterry/pdfium';
+
+using page = document.getPage(0);
+
+for (const obj of page.objects()) {
+  if (obj.type === PageObjectType.Text) {
+    const textObj = obj as PDFiumTextObject;
+    using font = textObj.getFont();
+
+    if (font) {
+      console.log(`Family: ${font.familyName}`);
+      console.log(`PostScript name: ${font.fontName}`);
+      console.log(`Weight: ${font.weight}`);
+      console.log(`Italic angle: ${font.italicAngle}`);
+      console.log(`Embedded: ${font.isEmbedded}`);
+    }
+  }
+}
+```
+
+#### `PDFiumFont` Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `familyName` | `string` | Family name (e.g., 'Helvetica', 'Times New Roman') |
+| `fontName` | `string` | PostScript/base font name |
+| `weight` | `number` | Font weight (100–900; 400 = normal, 700 = bold) |
+| `italicAngle` | `number` | Italic angle in degrees (0 for upright) |
+| `isEmbedded` | `boolean` | Whether the font data is embedded in the PDF |
+| `isFixedPitch` | `boolean` | Whether the font is monospaced |
+| `isSerif` | `boolean` | Whether the font has serifs |
+| `isItalic` | `boolean` | Whether the font is italic |
+| `isBold` | `boolean` | Whether the font is bold (weight >= 700 or ForceBold flag) |
+
+#### `PDFiumFont` Methods
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `getInfo()` | `FontInfo` | All font properties in a single object (more efficient than individual reads) |
+| `getMetrics(fontSize)` | `FontMetrics` | Ascent and descent at a given font size in points |
+| `getGlyphWidth(glyphIndex, fontSize)` | `number` | Width of a specific glyph at a given size |
+| `getFontData()` | `Uint8Array \| undefined` | Raw embedded font data (returns `undefined` if not embedded) |
+
+#### Batch Font Analysis
+
+Collect unique fonts across an entire document:
+
+```typescript
+async function collectFonts(document: PDFiumDocument) {
+  const fonts = new Map<string, FontInfo>();
+
+  for (let i = 0; i < document.pageCount; i++) {
+    using page = document.getPage(i);
+
+    for (const obj of page.objects()) {
+      if (obj.type !== PageObjectType.Text) continue;
+
+      const textObj = obj as PDFiumTextObject;
+      using font = textObj.getFont();
+      if (!font) continue;
+
+      const info = font.getInfo();
+      if (!fonts.has(info.familyName)) {
+        fonts.set(info.familyName, info);
+      }
+    }
+  }
+
+  return [...fonts.values()];
+}
+```
+
+:::tip
+`PDFiumFont` holds a borrow on the parent page's native resources. Always dispose fonts (or use `using`) before disposing the page to avoid keeping page memory alive longer than necessary.
+:::
 
 ### Analyse Document Structure
 
@@ -268,7 +392,7 @@ async function analyseDocument(pdfData: Uint8Array) {
 ## Complete Example
 
 ```typescript
-import { PDFium, PageObjectType, type TextObject, type ImageObject } from '@scaryterry/pdfium';
+import { PDFium, PageObjectType, PDFiumTextObject, PDFiumImageObject } from '@scaryterry/pdfium';
 import { promises as fs } from 'fs';
 
 async function inspectPageObjects(filePath: string) {
@@ -296,7 +420,7 @@ async function inspectPageObjects(filePath: string) {
     }
 
     // Report text objects
-    const textObjs = byType.get(PageObjectType.Text) as TextObject[] | undefined;
+    const textObjs = byType.get(PageObjectType.Text) as PDFiumTextObject[] | undefined;
     if (textObjs?.length) {
       console.log(`\nText objects (${textObjs.length}):`);
       for (const text of textObjs.slice(0, 5)) {
@@ -309,7 +433,7 @@ async function inspectPageObjects(filePath: string) {
     }
 
     // Report image objects
-    const imageObjs = byType.get(PageObjectType.Image) as ImageObject[] | undefined;
+    const imageObjs = byType.get(PageObjectType.Image) as PDFiumImageObject[] | undefined;
     if (imageObjs?.length) {
       console.log(`\nImage objects (${imageObjs.length}):`);
       for (const img of imageObjs) {
@@ -339,20 +463,18 @@ inspectPageObjects('document.pdf').catch(console.error);
 
 ## Performance Considerations
 
-- `getObjects()` loads all objects into memory at once
-- For pages with many objects (1000+), consider processing in batches
+- `getObjects()` loads all objects into memory at once — use `objects()` generator for lazy iteration on large pages
+- The `objects()` generator yields objects one at a time without array allocation
 - Object bounds are computed on demand and cached
 
 ## Limitations
 
-- Object modification is not supported (read-only access)
-- Path geometry (control points) is not exposed
-- Font name and style information is not available
-- Image raw data is not accessible through `getObjects()` (use [Extract Images](/pdfium/guides/extract-images/) instead)
+- Shading and Form XObject content is not inspectable beyond bounds
+- Image raw data requires calling `getDecodedData()` or `getRawData()` on the `PDFiumImageObject` directly
 
 ## See Also
 
 - [Extract Images Guide](/pdfium/guides/extract-images/) — Extracting image data
 - [Extract Text Guide](/pdfium/guides/extract-text/) — Text extraction methods
-- [PageObjectType](/pdfium/api/enums/page-object-type/) — Object type enum
-- [PDFiumPage](/pdfium/api/classes/pdfium-page/) — Page API reference
+- [PageObjectType](/pdfium/api/enumerations/pageobjecttype/) — Object type enum
+- [PDFiumPage](/pdfium/api/classes/pdfiumpage/) — Page API reference

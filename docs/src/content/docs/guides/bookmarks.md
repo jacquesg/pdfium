@@ -374,6 +374,6 @@ Top-level entries: 3
 
 ## See Also
 
-- [PDFiumDocument](/pdfium/api/classes/pdfium-document/) — Document API reference
+- [PDFiumDocument](/pdfium/api/classes/pdfiumdocument/) — Document API reference
 - [Open Document Guide](/pdfium/guides/open-document/) — Loading documents
 - [Extract Text Guide](/pdfium/guides/extract-text/) — Text extraction

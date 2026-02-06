@@ -4,13 +4,17 @@
  * Tests the various loading paths: wasmBinary, wasmUrl, auto-detect.
  */
 
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 
 import { InitialisationError, PDFiumErrorCode } from '../../../src/core/errors.js';
 import { loadWASM } from '../../../src/wasm/loader.js';
 import { loadWasmBinary } from '../../utils/helpers.js';
 
 describe('loadWASM', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   test('should load with wasmBinary option', async () => {
     const wasmBinary = await loadWasmBinary();
     const module = await loadWASM({ wasmBinary });
@@ -45,12 +49,13 @@ describe('loadWASM', () => {
   });
 
   test('should throw for wasmUrl when fetch fails', async () => {
-    // Mock fetch to return a failure
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: false,
-      status: 404,
-    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: false,
+        status: 404,
+      }),
+    );
 
     try {
       await loadWASM({ wasmUrl: 'https://example.com/pdfium.wasm' });
@@ -58,16 +63,13 @@ describe('loadWASM', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(InitialisationError);
       if (error instanceof InitialisationError) {
-        expect(error.code).toBe(PDFiumErrorCode.INIT_WASM_LOAD_FAILED);
+        expect(error.code).toBe(PDFiumErrorCode.INIT_NETWORK_ERROR);
       }
-    } finally {
-      globalThis.fetch = originalFetch;
     }
   });
 
   test('should throw for wasmUrl when fetch throws', async () => {
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = vi.fn().mockRejectedValue(new Error('Network error'));
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('Network error')));
 
     try {
       await loadWASM({ wasmUrl: 'https://example.com/pdfium.wasm' });
@@ -75,28 +77,24 @@ describe('loadWASM', () => {
     } catch (error) {
       expect(error).toBeInstanceOf(InitialisationError);
       if (error instanceof InitialisationError) {
-        expect(error.code).toBe(PDFiumErrorCode.INIT_WASM_LOAD_FAILED);
+        expect(error.code).toBe(PDFiumErrorCode.INIT_NETWORK_ERROR);
       }
-    } finally {
-      globalThis.fetch = originalFetch;
     }
   });
 
   test('should load with wasmUrl when fetch succeeds', async () => {
     const wasmBinary = await loadWasmBinary();
-    const originalFetch = globalThis.fetch;
-    globalThis.fetch = vi.fn().mockResolvedValue({
-      ok: true,
-      arrayBuffer: () => Promise.resolve(wasmBinary),
-    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        ok: true,
+        arrayBuffer: () => Promise.resolve(wasmBinary),
+      }),
+    );
 
-    try {
-      const module = await loadWASM({ wasmUrl: 'https://example.com/pdfium.wasm' });
-      expect(module).toBeDefined();
-      expect(typeof module._FPDF_InitLibraryWithConfig).toBe('function');
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
+    const module = await loadWASM({ wasmUrl: 'https://example.com/pdfium.wasm' });
+    expect(module).toBeDefined();
+    expect(typeof module._FPDF_InitLibraryWithConfig).toBe('function');
   });
 
   test('should auto-detect Node.js and load from filesystem', async () => {

@@ -77,7 +77,7 @@ describe('worker-script', () => {
   /** Helper: import setupWorker and install the message handler. */
   async function setup(): Promise<(request: WorkerRequest) => Promise<void>> {
     const { setupWorker } = await import('../../../src/context/worker-script.js');
-    setupWorker();
+    await setupWorker();
 
     const handler = (self as unknown as { onmessage: (event: MessageEvent<WorkerRequest>) => Promise<void> }).onmessage;
     return async (request: WorkerRequest) => {

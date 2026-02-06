@@ -4,13 +4,10 @@
  * These tests require the actual WASM module and test PDF files.
  */
 
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { RenderError } from '../../src/core/errors.js';
 import { PageBoxType, PageRotation, TextSearchFlags } from '../../src/core/types.js';
-import type { PDFiumDocument } from '../../src/document/document.js';
-import type { PDFiumPage } from '../../src/document/page.js';
 import { INTERNAL } from '../../src/internal/symbols.js';
-import type { PDFium } from '../../src/pdfium.js';
 import { initPdfium, loadTestDocument } from '../utils/helpers.js';
 
 // A4 page dimensions in points (72 DPI)
@@ -18,52 +15,54 @@ const A4_WIDTH = 595;
 const A4_HEIGHT = 842;
 
 describe('PDFiumPage', () => {
-  let pdfium: PDFium;
-  let document: PDFiumDocument;
-  let page: PDFiumPage;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-    document = await loadTestDocument(pdfium, 'test_1.pdf');
-    page = document.getPage(0);
-  });
-
-  afterAll(() => {
-    page?.dispose();
-    document?.dispose();
-    pdfium?.dispose();
-  });
-
   describe('size', () => {
-    test('should return page dimensions', () => {
+    test('should return page dimensions', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       const size = page.size;
       expect(size.width).toBeCloseTo(A4_WIDTH, 0);
       expect(size.height).toBeCloseTo(A4_HEIGHT, 0);
     });
 
-    test('should have width property', () => {
+    test('should have width property', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       expect(page.width).toBeCloseTo(A4_WIDTH, 0);
     });
 
-    test('should have height property', () => {
+    test('should have height property', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       expect(page.height).toBeCloseTo(A4_HEIGHT, 0);
     });
   });
 
   describe('index', () => {
-    test('should return correct page index', () => {
+    test('should return correct page index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       expect(page.index).toBe(0);
     });
   });
 
   describe('rotation', () => {
-    test('should return rotation for a standard page', () => {
+    test('should return rotation for a standard page', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       expect(page.rotation).toBe(PageRotation.None);
     });
   });
 
   describe('render', () => {
-    test('should render page at default scale', () => {
+    test('should render page at default scale', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       const rendered = page.render();
       expect(rendered.width).toBeCloseTo(A4_WIDTH, 0);
       expect(rendered.height).toBeCloseTo(A4_HEIGHT, 0);
@@ -72,14 +71,20 @@ describe('PDFiumPage', () => {
       expect(rendered.data.length).toBe(rendered.width * rendered.height * 4);
     });
 
-    test('should render page at 2x scale', () => {
+    test('should render page at 2x scale', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       const rendered = page.render({ scale: 2 });
       // Allow 2 pixel tolerance due to rounding
       expect(Math.abs(rendered.width - A4_WIDTH * 2)).toBeLessThanOrEqual(2);
       expect(Math.abs(rendered.height - A4_HEIGHT * 2)).toBeLessThanOrEqual(2);
     });
 
-    test('should render page at specific width', () => {
+    test('should render page at specific width', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       const targetWidth = 300;
       const rendered = page.render({ width: targetWidth });
       expect(rendered.width).toBe(targetWidth);
@@ -88,7 +93,10 @@ describe('PDFiumPage', () => {
       expect(Math.abs(rendered.height - expectedHeight)).toBeLessThanOrEqual(2);
     });
 
-    test('should render page at specific height', () => {
+    test('should render page at specific height', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       const targetHeight = 400;
       const rendered = page.render({ height: targetHeight });
       expect(rendered.height).toBe(targetHeight);
@@ -97,47 +105,71 @@ describe('PDFiumPage', () => {
       expect(rendered.width).toBeCloseTo(expectedWidth, 0);
     });
 
-    test('should render page at specific dimensions', () => {
+    test('should render page at specific dimensions', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       const rendered = page.render({ width: 200, height: 300 });
       expect(rendered.width).toBe(200);
       expect(rendered.height).toBe(300);
     });
 
-    test('should include original dimensions in result', () => {
+    test('should include original dimensions in result', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       const rendered = page.render({ scale: 2 });
       expect(rendered.originalWidth).toBeCloseTo(A4_WIDTH, 0);
       expect(rendered.originalHeight).toBeCloseTo(A4_HEIGHT, 0);
     });
 
-    test('should render with white background by default', () => {
+    test('should render with white background by default', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       const rendered = page.render({ width: 10, height: 10 });
       // Check first pixel (RGBA white = 255, 255, 255, 255)
       // Note: Background might not be exactly white if content overlaps
       expect(rendered.data[3]).toBe(255); // Alpha should always be 255
     });
 
-    test('should throw RenderError for zero dimensions', () => {
+    test('should throw RenderError for zero dimensions', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       expect(() => page.render({ width: 0, height: 100 })).toThrow(RenderError);
       expect(() => page.render({ width: 100, height: 0 })).toThrow(RenderError);
     });
 
-    test('should throw RenderError for negative dimensions', () => {
+    test('should throw RenderError for negative dimensions', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       expect(() => page.render({ width: -1, height: 100 })).toThrow(RenderError);
     });
 
-    test('should throw RenderError for excessive dimensions', () => {
+    test('should throw RenderError for excessive dimensions', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       expect(() => page.render({ width: 40000, height: 100 })).toThrow(RenderError);
       expect(() => page.render({ width: 100, height: 40000 })).toThrow(RenderError);
     });
 
-    test('should render with rotation option', () => {
+    test('should render with rotation option', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       const rendered = page.render({ width: 200, height: 300, rotation: PageRotation.Clockwise90 });
       expect(rendered.width).toBe(200);
       expect(rendered.height).toBe(300);
       expect(rendered.data).toBeInstanceOf(Uint8Array);
     });
 
-    test('should render with clipRect for sub-region rendering', () => {
+    test('should render with clipRect for sub-region rendering', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       const rendered = page.render({
         width: 200,
         height: 200,
@@ -149,7 +181,10 @@ describe('PDFiumPage', () => {
       expect(rendered.data.byteLength).toBe(200 * 200 * 4);
     });
 
-    test('should render with clipRect and rotation combined', () => {
+    test('should render with clipRect and rotation combined', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       const rendered = page.render({
         width: 200,
         height: 200,
@@ -161,7 +196,10 @@ describe('PDFiumPage', () => {
       expect(rendered.data).toBeInstanceOf(Uint8Array);
     });
 
-    test('should reject clipRect with progressive rendering', () => {
+    test('should reject clipRect with progressive rendering', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       expect(() =>
         page.startProgressiveRender({
           width: 200,
@@ -171,7 +209,10 @@ describe('PDFiumPage', () => {
       ).toThrow(/clipRect is not supported with progressive rendering/);
     });
 
-    test('should call onProgress with values from 0 to 1', () => {
+    test('should call onProgress with values from 0 to 1', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       const progress: number[] = [];
       page.render({ width: 100, height: 100, onProgress: (p) => progress.push(p) });
 
@@ -184,13 +225,19 @@ describe('PDFiumPage', () => {
       }
     });
 
-    test('should not throw if onProgress is not provided', () => {
+    test('should not throw if onProgress is not provided', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       expect(() => page.render({ width: 100, height: 100 })).not.toThrow();
     });
   });
 
   describe('getText', () => {
-    test('should extract text from page', () => {
+    test('should extract text from page', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       const text = page.getText();
       expect(typeof text).toBe('string');
       // The test PDF should contain some text
@@ -199,7 +246,10 @@ describe('PDFiumPage', () => {
   });
 
   describe('findText', () => {
-    test('should find text on page', () => {
+    test('should find text on page', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       const text = page.getText();
       expect(text.length).toBeGreaterThan(0);
       // Get a word from the page text to search for
@@ -212,12 +262,18 @@ describe('PDFiumPage', () => {
       expect(results[0]!.charIndex).toBeGreaterThanOrEqual(0);
     });
 
-    test('should return empty for non-existent text', () => {
+    test('should return empty for non-existent text', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       const results = [...page.findText('xyznonexistent123')];
       expect(results).toEqual([]);
     });
 
-    test('should support case-sensitive search', () => {
+    test('should support case-sensitive search', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       const text = page.getText();
       expect(text.length).toBeGreaterThan(0);
       // Search with case-sensitive flag — result count may differ
@@ -227,18 +283,24 @@ describe('PDFiumPage', () => {
       expect(resultsDefault.length).toBeGreaterThanOrEqual(resultsCaseSensitive.length);
     });
 
-    test('should handle generator early exit (break)', () => {
+    test('should handle generator early exit (break)', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       const text = page.getText();
       if (text.length > 1) {
         const gen = page.findText(text.substring(0, 1));
         const first = gen.next();
         // Even if we break early, the generator should clean up
-        gen.return(undefined);
+        gen.return?.(undefined);
         expect(first.done === false || first.done === true).toBe(true);
       }
     });
 
-    test('should include rects in results', () => {
+    test('should include rects in results', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       const text = page.getText();
       expect(text.length).toBeGreaterThan(0);
       const words = text.trim().split(/\s+/);
@@ -251,7 +313,10 @@ describe('PDFiumPage', () => {
   });
 
   describe('objectCount', () => {
-    test('should return number of objects on page', () => {
+    test('should return number of objects on page', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       const count = page.objectCount;
       expect(typeof count).toBe('number');
       expect(count).toBeGreaterThan(0);
@@ -259,7 +324,10 @@ describe('PDFiumPage', () => {
   });
 
   describe('[INTERNAL]', () => {
-    test('provides internal handles via symbol', () => {
+    test('provides internal handles via symbol', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       const internal = page[INTERNAL];
       expect(internal.handle).toBeGreaterThan(0);
       expect(typeof internal.textPageHandle).toBe('number');
@@ -268,70 +336,88 @@ describe('PDFiumPage', () => {
 
   describe('post-dispose guards', () => {
     test('should throw on getText after dispose', async () => {
-      const doc = await loadTestDocument(pdfium, 'test_1.pdf');
-      const p = doc.getPage(0);
+      using pdfium = await initPdfium();
+      using doc = await loadTestDocument(pdfium, 'test_1.pdf');
+      using p = doc.getPage(0);
       p.dispose();
       expect(() => p.getText()).toThrow();
-      doc.dispose();
     });
 
     test('should throw on render after dispose', async () => {
-      const doc = await loadTestDocument(pdfium, 'test_1.pdf');
-      const p = doc.getPage(0);
+      using pdfium = await initPdfium();
+      using doc = await loadTestDocument(pdfium, 'test_1.pdf');
+      using p = doc.getPage(0);
       p.dispose();
       expect(() => p.render()).toThrow();
-      doc.dispose();
     });
 
     test('should throw on getAnnotations after dispose', async () => {
-      const doc = await loadTestDocument(pdfium, 'test_6_with_form.pdf');
-      const p = doc.getPage(0);
+      using pdfium = await initPdfium();
+      using doc = await loadTestDocument(pdfium, 'test_6_with_form.pdf');
+      using p = doc.getPage(0);
       p.dispose();
       expect(() => p.getAnnotations()).toThrow();
-      doc.dispose();
     });
 
     test('should throw on findText after dispose', async () => {
-      const doc = await loadTestDocument(pdfium, 'test_1.pdf');
-      const p = doc.getPage(0);
+      using pdfium = await initPdfium();
+      using doc = await loadTestDocument(pdfium, 'test_1.pdf');
+      using p = doc.getPage(0);
       p.dispose();
       expect(() => [...p.findText('test')]).toThrow();
-      doc.dispose();
     });
 
     test('should throw on getStructureTree after dispose', async () => {
-      const doc = await loadTestDocument(pdfium, 'test_1.pdf');
-      const p = doc.getPage(0);
+      using pdfium = await initPdfium();
+      using doc = await loadTestDocument(pdfium, 'test_1.pdf');
+      using p = doc.getPage(0);
       p.dispose();
       expect(() => p.getStructureTree()).toThrow();
-      doc.dispose();
     });
   });
 
   describe('NaN and Infinity dimensions', () => {
-    test('should throw RenderError for NaN width', () => {
+    test('should throw RenderError for NaN width', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       expect(() => page.render({ width: NaN })).toThrow(RenderError);
     });
 
-    test('should throw RenderError for Infinity height', () => {
+    test('should throw RenderError for Infinity height', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       expect(() => page.render({ height: Infinity })).toThrow(RenderError);
     });
 
-    test('should throw RenderError for NaN scale', () => {
+    test('should throw RenderError for NaN scale', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       expect(() => page.render({ scale: NaN })).toThrow(RenderError);
     });
 
-    test('should throw RenderError for Infinity scale', () => {
+    test('should throw RenderError for Infinity scale', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       expect(() => page.render({ scale: Infinity })).toThrow(RenderError);
     });
 
-    test('should throw RenderError for negative Infinity width', () => {
+    test('should throw RenderError for negative Infinity width', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       expect(() => page.render({ width: -Infinity })).toThrow(RenderError);
     });
   });
 
   describe('backgroundColour option', () => {
-    test('should render with custom background colour', () => {
+    test('should render with custom background colour', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       // Render a tiny page with a red background (0xFFFF0000 = ARGB red)
       const rendered = page.render({ width: 2, height: 2, backgroundColour: 0xffff0000 });
       expect(rendered.data).toBeInstanceOf(Uint8Array);
@@ -340,7 +426,10 @@ describe('PDFiumPage', () => {
   });
 
   describe('boundary dimensions', () => {
-    test('should render at minimum dimension (1x1)', () => {
+    test('should render at minimum dimension (1x1)', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       const rendered = page.render({ width: 1, height: 1 });
       expect(rendered.width).toBe(1);
       expect(rendered.height).toBe(1);
@@ -350,6 +439,7 @@ describe('PDFiumPage', () => {
 
   describe('empty page getText', () => {
     test('should return empty string for page with no text', async () => {
+      using pdfium = await initPdfium();
       // Create a document with an empty page
       using builder = pdfium.createDocument();
       builder.addPage();
@@ -362,85 +452,71 @@ describe('PDFiumPage', () => {
 });
 
 describe('PDFiumPage annotations', () => {
-  let pdfium: PDFium;
-  let document: PDFiumDocument;
-  let page: PDFiumPage;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-    document = await loadTestDocument(pdfium, 'test_6_with_form.pdf');
-    page = document.getPage(0);
-  });
-
-  afterAll(() => {
-    page?.dispose();
-    document?.dispose();
-    pdfium?.dispose();
-  });
-
-  test('should return annotation count', () => {
+  test('should return annotation count', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_6_with_form.pdf');
+    using page = document.getPage(0);
     expect(page.annotationCount).toBe(49);
   });
 
-  test('should get annotations array', () => {
+  test('should get annotations array', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_6_with_form.pdf');
+    using page = document.getPage(0);
+    const annotations = page.getAnnotations();
+    try {
+      expect(Array.isArray(annotations)).toBe(true);
+      expect(annotations.length).toBeGreaterThan(0);
+      const annot = annotations[0]!;
+      expect(annot).toHaveProperty('index');
+      expect(annot).toHaveProperty('type');
+      expect(annot).toHaveProperty('bounds');
+      expect(annot.bounds).toHaveProperty('left');
+      expect(annot.bounds).toHaveProperty('top');
+      expect(annot.bounds).toHaveProperty('right');
+      expect(annot.bounds).toHaveProperty('bottom');
+    } finally {
+      for (const annot of annotations) annot.dispose();
+    }
+  });
+
+  test('getAnnotations() returns an array of PDFiumAnnotation', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_6_with_form.pdf');
+    using page = document.getPage(0);
     const annotations = page.getAnnotations();
     expect(Array.isArray(annotations)).toBe(true);
-    expect(annotations.length).toBeGreaterThan(0);
-    const annot = annotations[0]!;
-    expect(annot).toHaveProperty('index');
-    expect(annot).toHaveProperty('type');
-    expect(annot).toHaveProperty('bounds');
-    expect(annot.bounds).toHaveProperty('left');
-    expect(annot.bounds).toHaveProperty('top');
-    expect(annot.bounds).toHaveProperty('right');
-    expect(annot.bounds).toHaveProperty('bottom');
+    if (annotations.length > 0) {
+      expect(annotations[0]!.bounds).toBeDefined();
+      expect(typeof annotations[0]!.type).toBe('string');
+    }
+    for (const annot of annotations) {
+      annot.dispose();
+    }
   });
 
-  test('annotations() returns a generator', () => {
-    const gen = page.annotations();
-    expect(gen[Symbol.iterator]).toBeDefined();
-    expect(typeof gen.next).toBe('function');
-  });
-
-  test('annotations() yields same annotations as getAnnotations()', () => {
-    const fromGenerator = [...page.annotations()];
-    const fromArray = page.getAnnotations();
-    expect(fromGenerator).toEqual(fromArray);
-  });
-
-  test('annotations() is lazy - can break early', () => {
-    const gen = page.annotations();
-    const first = gen.next();
-    expect(first.done).toBe(false);
-    expect(first.value).toHaveProperty('index');
-    // Don't exhaust the generator
-  });
-
-  test('should get individual annotation by index', () => {
+  test('should get individual annotation by index', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_6_with_form.pdf');
+    using page = document.getPage(0);
     expect(page.annotationCount).toBeGreaterThan(0);
-    const annot = page.getAnnotation(0);
+    using annot = page.getAnnotation(0);
     expect(annot.index).toBe(0);
-    expect(typeof annot.type).toBe('number');
+    expect(typeof annot.type).toBe('string');
   });
 
-  test('should throw for out-of-range annotation index', () => {
+  test('should throw for out-of-range annotation index', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_6_with_form.pdf');
+    using page = document.getPage(0);
     expect(() => page.getAnnotation(-1)).toThrow();
     expect(() => page.getAnnotation(9999)).toThrow();
   });
 });
 
 describe('PDFiumPage structure tree', () => {
-  let pdfium: PDFium;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-  });
-
-  afterAll(() => {
-    pdfium?.dispose();
-  });
-
   test('should return root elements from tagged PDF (test_3)', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_3_with_images.pdf');
     using page = document.getPage(0);
     const tree = page.getStructureTree();
@@ -449,6 +525,7 @@ describe('PDFiumPage structure tree', () => {
   });
 
   test('should return elements with type string and children array', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_3_with_images.pdf');
     using page = document.getPage(0);
     const tree = page.getStructureTree();
@@ -468,6 +545,7 @@ describe('PDFiumPage structure tree', () => {
   });
 
   test('should return structure tree from test_1.pdf', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = document.getPage(0);
     const tree = page.getStructureTree();
@@ -476,6 +554,7 @@ describe('PDFiumPage structure tree', () => {
   });
 
   test('should return undefined for non-tagged PDF', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_7_with_form.pdf');
     using page = document.getPage(0);
     const tree = page.getStructureTree();
@@ -483,6 +562,7 @@ describe('PDFiumPage structure tree', () => {
   });
 
   test('structureElements() generator should yield same results as getStructureTree()', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_3_with_images.pdf');
     using page = document.getPage(0);
     const eager = page.getStructureTree();
@@ -498,6 +578,7 @@ describe('PDFiumPage structure tree', () => {
   });
 
   test('structureElements() should return undefined for non-tagged PDF', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_7_with_form.pdf');
     using page = document.getPage(0);
     const elements = page.structureElements();
@@ -506,28 +587,18 @@ describe('PDFiumPage structure tree', () => {
 });
 
 describe('PDFiumPage text search with known results', () => {
-  let pdfium: PDFium;
-  let document: PDFiumDocument;
-  let page: PDFiumPage;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-    document = await loadTestDocument(pdfium, 'test_7_with_form.pdf');
-    page = document.getPage(0);
-  });
-
-  afterAll(() => {
-    page?.dispose();
-    document?.dispose();
-    pdfium?.dispose();
-  });
-
-  test('should find 9 occurrences of "the"', () => {
+  test('should find 9 occurrences of "the"', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_7_with_form.pdf');
+    using page = document.getPage(0);
     const results = [...page.findText('the')];
     expect(results.length).toBe(9);
   });
 
-  test('each result should have charIndex, charCount, and rects', () => {
+  test('each result should have charIndex, charCount, and rects', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_7_with_form.pdf');
+    using page = document.getPage(0);
     const results = [...page.findText('the')];
     for (const result of results) {
       expect(result.charIndex).toBeGreaterThanOrEqual(0);
@@ -537,14 +608,20 @@ describe('PDFiumPage text search with known results', () => {
     }
   });
 
-  test('rects should have valid coordinates', () => {
+  test('rects should have valid coordinates', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_7_with_form.pdf');
+    using page = document.getPage(0);
     const results = [...page.findText('the')];
     const firstRect = results[0]!.rects[0]!;
     expect(firstRect.left).toBeLessThan(firstRect.right);
     expect(firstRect.bottom).toBeLessThan(firstRect.top);
   });
 
-  test('case-sensitive search should find fewer or equal results', () => {
+  test('case-sensitive search should find fewer or equal results', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_7_with_form.pdf');
+    using page = document.getPage(0);
     const caseInsensitive = [...page.findText('the')];
     const caseSensitive = [...page.findText('the', TextSearchFlags.MatchCase)];
     expect(caseSensitive.length).toBeLessThanOrEqual(caseInsensitive.length);
@@ -552,34 +629,27 @@ describe('PDFiumPage text search with known results', () => {
 });
 
 describe('PDFiumPage with forms', () => {
-  let pdfium: PDFium;
-  let document: PDFiumDocument;
-  let page: PDFiumPage;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-    document = await loadTestDocument(pdfium, 'test_6_with_form.pdf');
-    page = document.getPage(0);
-  });
-
-  afterAll(() => {
-    page?.dispose();
-    document?.dispose();
-    pdfium?.dispose();
-  });
-
   describe('render with form fields', () => {
-    test('should render without form fields by default', () => {
+    test('should render without form fields by default', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_6_with_form.pdf');
+      using page = document.getPage(0);
       const rendered = page.render({ scale: 0.5 });
       expect(rendered.data).toBeInstanceOf(Uint8Array);
     });
 
-    test('should render with form fields when requested', () => {
+    test('should render with form fields when requested', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_6_with_form.pdf');
+      using page = document.getPage(0);
       const rendered = page.render({ scale: 0.5, renderFormFields: true });
       expect(rendered.data).toBeInstanceOf(Uint8Array);
     });
 
-    test('should produce different output with and without form fields', () => {
+    test('should produce different output with and without form fields', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_6_with_form.pdf');
+      using page = document.getPage(0);
       const without = page.render({ scale: 0.25 });
       const withFields = page.render({ scale: 0.25, renderFormFields: true });
       // Both should have data
@@ -599,31 +669,24 @@ describe('PDFiumPage with forms', () => {
 });
 
 describe('PDFiumPage disposed resource handling', () => {
-  let pdfium: PDFium;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-  });
-
-  afterAll(() => {
-    pdfium?.dispose();
-  });
-
-  test('annotations() throws on disposed page', async () => {
+  test('getAnnotations() throws on disposed page', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_6_with_form.pdf');
     const page = document.getPage(0);
     page.dispose();
-    expect(() => page.annotations()).toThrow();
+    expect(() => page.getAnnotations()).toThrow();
   });
 
-  test('pageObjects() throws on disposed page', async () => {
+  test('objects() throws on disposed page', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_1.pdf');
     const page = document.getPage(0);
     page.dispose();
-    expect(() => page.pageObjects()).toThrow();
+    expect(() => page.objects()).toThrow();
   });
 
   test('links() throws on disposed page', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_1.pdf');
     const page = document.getPage(0);
     page.dispose();
@@ -631,6 +694,7 @@ describe('PDFiumPage disposed resource handling', () => {
   });
 
   test('render() throws on disposed page', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_1.pdf');
     const page = document.getPage(0);
     page.dispose();
@@ -638,6 +702,7 @@ describe('PDFiumPage disposed resource handling', () => {
   });
 
   test('INTERNAL access throws on disposed page', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_1.pdf');
     const page = document.getPage(0);
     page.dispose();
@@ -646,17 +711,8 @@ describe('PDFiumPage disposed resource handling', () => {
 });
 
 describe('PDFiumPage empty collection generators', () => {
-  let pdfium: PDFium;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-  });
-
-  afterAll(() => {
-    pdfium?.dispose();
-  });
-
   test('annotations() yields nothing for page without annotations', async () => {
+    using pdfium = await initPdfium();
     // test_1.pdf page 0 may have no annotations - create a fresh document
     using builder = pdfium.createDocument();
     builder.addPage();
@@ -664,22 +720,24 @@ describe('PDFiumPage empty collection generators', () => {
     using document = await pdfium.openDocument(bytes);
     using page = document.getPage(0);
 
-    const annotations = [...page.annotations()];
+    const annotations = page.getAnnotations();
     expect(annotations).toEqual([]);
   });
 
-  test('pageObjects() yields nothing for empty page', async () => {
+  test('objects() yields nothing for empty page', async () => {
+    using pdfium = await initPdfium();
     using builder = pdfium.createDocument();
     builder.addPage();
     const bytes = builder.save();
     using document = await pdfium.openDocument(bytes);
     using page = document.getPage(0);
 
-    const objects = [...page.pageObjects()];
+    const objects = [...page.objects()];
     expect(objects).toEqual([]);
   });
 
   test('links() yields nothing for page without links', async () => {
+    using pdfium = await initPdfium();
     using builder = pdfium.createDocument();
     builder.addPage();
     const bytes = builder.save();
@@ -692,23 +750,10 @@ describe('PDFiumPage empty collection generators', () => {
 });
 
 describe('render() progress callback edge cases', () => {
-  let pdfium: PDFium;
-  let document: PDFiumDocument;
-  let page: PDFiumPage;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-    document = await loadTestDocument(pdfium, 'test_1.pdf');
-    page = document.getPage(0);
-  });
-
-  afterAll(() => {
-    page?.dispose();
-    document?.dispose();
-    pdfium?.dispose();
-  });
-
-  test('progress values are strictly monotonically non-decreasing', () => {
+  test('progress values are strictly monotonically non-decreasing', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_1.pdf');
+    using page = document.getPage(0);
     const progress: number[] = [];
     page.render({ width: 100, height: 100, onProgress: (p) => progress.push(p) });
 
@@ -720,7 +765,10 @@ describe('render() progress callback edge cases', () => {
     }
   });
 
-  test('progress starts at 0 and ends at 1', () => {
+  test('progress starts at 0 and ends at 1', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_1.pdf');
+    using page = document.getPage(0);
     const progress: number[] = [];
     page.render({ width: 100, height: 100, onProgress: (p) => progress.push(p) });
 
@@ -728,7 +776,10 @@ describe('render() progress callback edge cases', () => {
     expect(progress[progress.length - 1]).toBe(1);
   });
 
-  test('render completes even if callback throws', () => {
+  test('render completes even if callback throws', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_1.pdf');
+    using page = document.getPage(0);
     let callCount = 0;
     const throwingCallback = (_p: number) => {
       callCount++;
@@ -741,7 +792,10 @@ describe('render() progress callback edge cases', () => {
     expect(() => page.render({ width: 100, height: 100, onProgress: throwingCallback })).toThrow('Callback error');
   });
 
-  test('progress callback receives number type', () => {
+  test('progress callback receives number type', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_1.pdf');
+    using page = document.getPage(0);
     const progress: unknown[] = [];
     page.render({ width: 100, height: 100, onProgress: (p) => progress.push(p) });
 
@@ -750,17 +804,8 @@ describe('render() progress callback edge cases', () => {
 });
 
 describe('INTERNAL symbol access', () => {
-  let pdfium: PDFium;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-  });
-
-  afterAll(() => {
-    pdfium?.dispose();
-  });
-
   test('INTERNAL provides handle access on page', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = document.getPage(0);
     const internal = page[INTERNAL];
@@ -770,6 +815,7 @@ describe('INTERNAL symbol access', () => {
   });
 
   test('INTERNAL provides textPageHandle access on page', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = document.getPage(0);
     const internal = page[INTERNAL];
@@ -778,6 +824,7 @@ describe('INTERNAL symbol access', () => {
   });
 
   test('cannot access internal via arbitrary symbol', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = document.getPage(0);
     const fakeSymbol = Symbol('fake-internal');
@@ -787,23 +834,10 @@ describe('INTERNAL symbol access', () => {
 });
 
 describe('PDFiumPage page boxes', () => {
-  let pdfium: PDFium;
-  let document: PDFiumDocument;
-  let page: PDFiumPage;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-    document = await loadTestDocument(pdfium, 'test_1.pdf');
-    page = document.getPage(0);
-  });
-
-  afterAll(() => {
-    page?.dispose();
-    document?.dispose();
-    pdfium?.dispose();
-  });
-
-  test('getPageBox returns MediaBox for standard PDF', () => {
+  test('getPageBox returns MediaBox for standard PDF', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_1.pdf');
+    using page = document.getPage(0);
     const mediaBox = page.getPageBox(PageBoxType.MediaBox);
     expect(mediaBox).toBeDefined();
     expect(mediaBox?.left).toBeDefined();
@@ -812,7 +846,10 @@ describe('PDFiumPage page boxes', () => {
     expect(mediaBox?.top).toBeDefined();
   });
 
-  test('getPageBox returns CropBox', () => {
+  test('getPageBox returns CropBox', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_1.pdf');
+    using page = document.getPage(0);
     const cropBox = page.getPageBox(PageBoxType.CropBox);
     // CropBox may or may not be set - if not, returns undefined
     if (cropBox !== undefined) {
@@ -820,7 +857,10 @@ describe('PDFiumPage page boxes', () => {
     }
   });
 
-  test('getPageBox returns BleedBox', () => {
+  test('getPageBox returns BleedBox', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_1.pdf');
+    using page = document.getPage(0);
     const bleedBox = page.getPageBox(PageBoxType.BleedBox);
     // BleedBox may or may not be set
     if (bleedBox !== undefined) {
@@ -828,7 +868,10 @@ describe('PDFiumPage page boxes', () => {
     }
   });
 
-  test('getPageBox returns TrimBox', () => {
+  test('getPageBox returns TrimBox', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_1.pdf');
+    using page = document.getPage(0);
     const trimBox = page.getPageBox(PageBoxType.TrimBox);
     // TrimBox may or may not be set
     if (trimBox !== undefined) {
@@ -836,7 +879,10 @@ describe('PDFiumPage page boxes', () => {
     }
   });
 
-  test('getPageBox returns ArtBox', () => {
+  test('getPageBox returns ArtBox', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_1.pdf');
+    using page = document.getPage(0);
     const artBox = page.getPageBox(PageBoxType.ArtBox);
     // ArtBox may or may not be set
     if (artBox !== undefined) {
@@ -844,7 +890,10 @@ describe('PDFiumPage page boxes', () => {
     }
   });
 
-  test('getPageBox returns undefined for invalid box type', () => {
+  test('getPageBox returns undefined for invalid box type', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_1.pdf');
+    using page = document.getPage(0);
     // @ts-expect-error - testing invalid enum value
     const result = page.getPageBox(999);
     expect(result).toBeUndefined();
@@ -852,17 +901,8 @@ describe('PDFiumPage page boxes', () => {
 });
 
 describe('PDFiumPage rotation setter', () => {
-  let pdfium: PDFium;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-  });
-
-  afterAll(() => {
-    pdfium?.dispose();
-  });
-
   test('can set rotation on a page', async () => {
+    using pdfium = await initPdfium();
     using builder = pdfium.createDocument();
     builder.addPage();
     const bytes = builder.save();
@@ -875,6 +915,7 @@ describe('PDFiumPage rotation setter', () => {
   });
 
   test('can set all rotation values', async () => {
+    using pdfium = await initPdfium();
     using builder = pdfium.createDocument();
     builder.addPage();
     const bytes = builder.save();
@@ -896,17 +937,8 @@ describe('PDFiumPage rotation setter', () => {
 });
 
 describe('PDFiumPage text extraction edge cases', () => {
-  let pdfium: PDFium;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-  });
-
-  afterAll(() => {
-    pdfium?.dispose();
-  });
-
   test('getText returns empty string for empty page', async () => {
+    using pdfium = await initPdfium();
     using builder = pdfium.createDocument();
     builder.addPage();
     const bytes = builder.save();
@@ -918,6 +950,7 @@ describe('PDFiumPage text extraction edge cases', () => {
   });
 
   test('getCharCount returns 0 for empty page', async () => {
+    using pdfium = await initPdfium();
     using builder = pdfium.createDocument();
     builder.addPage();
     const bytes = builder.save();
@@ -928,6 +961,7 @@ describe('PDFiumPage text extraction edge cases', () => {
   });
 
   test('findText returns empty generator for empty page', async () => {
+    using pdfium = await initPdfium();
     using builder = pdfium.createDocument();
     builder.addPage();
     const bytes = builder.save();
@@ -939,6 +973,7 @@ describe('PDFiumPage text extraction edge cases', () => {
   });
 
   test('findText with match case flag', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = document.getPage(0);
     const text = page.getText();
@@ -953,6 +988,7 @@ describe('PDFiumPage text extraction edge cases', () => {
   });
 
   test('findText with whole word flag', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = document.getPage(0);
     const text = page.getText();
@@ -968,23 +1004,10 @@ describe('PDFiumPage text extraction edge cases', () => {
 });
 
 describe('PDFiumPage character information', () => {
-  let pdfium: PDFium;
-  let document: PDFiumDocument;
-  let page: PDFiumPage;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-    document = await loadTestDocument(pdfium, 'test_1.pdf');
-    page = document.getPage(0);
-  });
-
-  afterAll(() => {
-    page?.dispose();
-    document?.dispose();
-    pdfium?.dispose();
-  });
-
-  test('getCharBox returns box for valid character index', () => {
+  test('getCharBox returns box for valid character index', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_1.pdf');
+    using page = document.getPage(0);
     if (page.charCount > 0) {
       const box = page.getCharBox(0);
       expect(box).toBeDefined();
@@ -995,7 +1018,10 @@ describe('PDFiumPage character information', () => {
     }
   });
 
-  test('getCharBox returns undefined for invalid index', () => {
+  test('getCharBox returns undefined for invalid index', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_1.pdf');
+    using page = document.getPage(0);
     const box = page.getCharBox(-1);
     expect(box).toBeUndefined();
 
@@ -1003,14 +1029,20 @@ describe('PDFiumPage character information', () => {
     expect(box2).toBeUndefined();
   });
 
-  test('getCharAngle returns angle for valid character', () => {
+  test('getCharAngle returns angle for valid character', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_1.pdf');
+    using page = document.getPage(0);
     if (page.charCount > 0) {
       const angle = page.getCharAngle(0);
       expect(typeof angle).toBe('number');
     }
   });
 
-  test('getCharFontSize returns size for valid character', () => {
+  test('getCharFontSize returns size for valid character', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_1.pdf');
+    using page = document.getPage(0);
     if (page.charCount > 0) {
       const size = page.getCharFontSize(0);
       expect(typeof size).toBe('number');
@@ -1018,7 +1050,10 @@ describe('PDFiumPage character information', () => {
     }
   });
 
-  test('getCharOrigin returns origin for valid character', () => {
+  test('getCharOrigin returns origin for valid character', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_1.pdf');
+    using page = document.getPage(0);
     if (page.charCount > 0) {
       const origin = page.getCharOrigin(0);
       expect(origin).toBeDefined();
@@ -1029,17 +1064,8 @@ describe('PDFiumPage character information', () => {
 });
 
 describe('PDFiumPage image extraction', () => {
-  let pdfium: PDFium;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-  });
-
-  afterAll(() => {
-    pdfium?.dispose();
-  });
-
   test('should extract images from PDF with images', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_3_with_images.pdf');
     using page = document.getPage(0);
 
@@ -1048,6 +1074,7 @@ describe('PDFiumPage image extraction', () => {
   });
 
   test('should get page objects from PDF with images', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_3_with_images.pdf');
     using page = document.getPage(0);
 
@@ -1056,34 +1083,27 @@ describe('PDFiumPage image extraction', () => {
   });
 
   test('pageObjects generator yields objects', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_3_with_images.pdf');
     using page = document.getPage(0);
 
-    const objects = [...page.pageObjects()];
+    const objects = [...page.objects()];
     expect(Array.isArray(objects)).toBe(true);
   });
 
   test('should handle PDF with embedded images', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_4_with_images.pdf');
     using page = document.getPage(0);
 
     expect(() => page.getObjects()).not.toThrow();
-    expect(() => [...page.pageObjects()]).not.toThrow();
+    expect(() => [...page.objects()]).not.toThrow();
   });
 });
 
 describe('PDFiumPage link handling', () => {
-  let pdfium: PDFium;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-  });
-
-  afterAll(() => {
-    pdfium?.dispose();
-  });
-
   test('should get links from page', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = document.getPage(0);
 
@@ -1092,6 +1112,7 @@ describe('PDFiumPage link handling', () => {
   });
 
   test('links generator yields same links', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = document.getPage(0);
 
@@ -1101,6 +1122,7 @@ describe('PDFiumPage link handling', () => {
   });
 
   test('webLinkCount returns non-negative number', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = document.getPage(0);
 
@@ -1109,6 +1131,7 @@ describe('PDFiumPage link handling', () => {
   });
 
   test('getWebLinks returns array', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = document.getPage(0);
 
@@ -1118,17 +1141,8 @@ describe('PDFiumPage link handling', () => {
 });
 
 describe('PDFiumPage text methods extended', () => {
-  let pdfium: PDFium;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-  });
-
-  afterAll(() => {
-    pdfium?.dispose();
-  });
-
   test('getTextInRect with valid rect returns string', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = document.getPage(0);
 
@@ -1138,6 +1152,7 @@ describe('PDFiumPage text methods extended', () => {
   });
 
   test('findText with no match returns empty results', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = document.getPage(0);
 
@@ -1147,6 +1162,7 @@ describe('PDFiumPage text methods extended', () => {
   });
 
   test('findText returns results for existing text', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = document.getPage(0);
 
@@ -1160,6 +1176,7 @@ describe('PDFiumPage text methods extended', () => {
   });
 
   test('getCharIndexAtPos returns valid index for point', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = document.getPage(0);
 
@@ -1169,6 +1186,7 @@ describe('PDFiumPage text methods extended', () => {
   });
 
   test('getCharUnicode returns unicode for valid char', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = document.getPage(0);
 
@@ -1180,17 +1198,8 @@ describe('PDFiumPage text methods extended', () => {
 });
 
 describe('PDFiumPage rendering edge cases', () => {
-  let pdfium: PDFium;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-  });
-
-  afterAll(() => {
-    pdfium?.dispose();
-  });
-
   test('render with very small dimensions', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = document.getPage(0);
 
@@ -1202,6 +1211,7 @@ describe('PDFiumPage rendering edge cases', () => {
   });
 
   test('render with large dimensions', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = document.getPage(0);
 
@@ -1212,6 +1222,7 @@ describe('PDFiumPage rendering edge cases', () => {
   });
 
   test('render with scale factor', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = document.getPage(0);
 
@@ -1222,6 +1233,7 @@ describe('PDFiumPage rendering edge cases', () => {
   });
 
   test('render with background colour', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = document.getPage(0);
 
@@ -1231,6 +1243,7 @@ describe('PDFiumPage rendering edge cases', () => {
   });
 
   test('render with rotation', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = document.getPage(0);
 
@@ -1240,6 +1253,7 @@ describe('PDFiumPage rendering edge cases', () => {
   });
 
   test('render with form fields', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_6_with_form.pdf');
     using page = document.getPage(0);
 
@@ -1249,27 +1263,19 @@ describe('PDFiumPage rendering edge cases', () => {
 });
 
 describe('PDFiumPage with forms', () => {
-  let pdfium: PDFium;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-  });
-
-  afterAll(() => {
-    pdfium?.dispose();
-  });
-
   test('form field methods work with form PDF', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_6_with_form.pdf');
     using page = document.getPage(0);
 
-    expect(() => page.hasFormFieldAtPoint(100, 100)).not.toThrow();
+    expect(() => page.getFormFieldTypeAtPoint(100, 100)).not.toThrow();
     expect(() => page.getFormFieldZOrderAtPoint(100, 100)).not.toThrow();
     expect(() => page.canFormUndo()).not.toThrow();
     expect(() => page.canFormRedo()).not.toThrow();
   });
 
   test('form rendering with form PDF', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_6_with_form.pdf');
     using page = document.getPage(0);
 
@@ -1279,10 +1285,33 @@ describe('PDFiumPage with forms', () => {
   });
 
   test('widget annotations on form page', async () => {
+    using pdfium = await initPdfium();
     using document = await loadTestDocument(pdfium, 'test_7_with_form.pdf');
     using page = document.getPage(0);
 
-    const widgets = page.getWidgetAnnotations();
-    expect(Array.isArray(widgets)).toBe(true);
+    const annotations = page.getAnnotations();
+    expect(Array.isArray(annotations)).toBe(true);
+    for (const annot of annotations) {
+      annot.dispose();
+    }
+  });
+});
+
+describe('Re-entrancy', () => {
+  test('should throw or handle re-entrant render calls gracefully', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_1.pdf');
+    using page = document.getPage(0);
+
+    // Attempt to call render inside the progress callback of another render
+    expect(() => {
+      page.render({
+        scale: 1,
+        onProgress: () => {
+          // Re-entrant call
+          page.render({ scale: 0.5 });
+        },
+      });
+    }).toThrow();
   });
 });

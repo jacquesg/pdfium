@@ -22,3 +22,8 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Generated/Copied assets in public
+public/*.js
+public/*.js.map
+!public/reference.pdf

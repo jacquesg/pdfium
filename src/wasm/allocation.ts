@@ -24,7 +24,8 @@ import { NULL_PTR, type WASMMemoryManager } from './memory.js';
  * // alloc is automatically freed when scope exits
  * ```
  *
- * @example Ownership transfer with `take()`:
+ * @example
+ * Ownership transfer with `take()`:
  * ```typescript
  * using alloc = memory.allocFrom(data);
  * const handle = createNativeResource(alloc.ptr);
@@ -35,10 +36,14 @@ import { NULL_PTR, type WASMMemoryManager } from './memory.js';
 export class WASMAllocation implements Disposable {
   #ptr: WASMPointer;
   readonly #memory: WASMMemoryManager;
+  readonly #size: number;
+  readonly #secure: boolean;
 
-  constructor(ptr: WASMPointer, memory: WASMMemoryManager) {
+  constructor(ptr: WASMPointer, size: number, memory: WASMMemoryManager, secure = false) {
     this.#ptr = ptr;
+    this.#size = size;
     this.#memory = memory;
+    this.#secure = secure;
   }
 
   /**
@@ -51,6 +56,13 @@ export class WASMAllocation implements Disposable {
       throw new MemoryError(PDFiumErrorCode.MEMORY_INVALID_POINTER, 'Allocation has been disposed or taken');
     }
     return this.#ptr;
+  }
+
+  /**
+   * Get the allocation size in bytes.
+   */
+  get size(): number {
+    return this.#size;
   }
 
   /**
@@ -81,6 +93,11 @@ export class WASMAllocation implements Disposable {
     }
     const ptr = this.#ptr;
     this.#ptr = NULL_PTR;
+
+    if (this.#secure) {
+      this.#memory.heapU8.fill(0, ptr, ptr + this.#size);
+    }
+
     this.#memory.free(ptr);
   }
 }

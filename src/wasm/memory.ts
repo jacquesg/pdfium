@@ -7,6 +7,7 @@
  */
 
 import { MemoryError, PDFiumErrorCode } from '../core/errors.js';
+import { getLogger } from '../core/logger.js';
 import type { WASMPointer } from '../internal/handles.js';
 import { WASMAllocation } from './allocation.js';
 import type { PDFiumWASM } from './bindings/index.js';
@@ -125,7 +126,7 @@ export class WASMMemoryManager {
       return;
     }
     if (!this.#allocations.has(ptr)) {
-      console.warn('[PDFium] Attempted to free untracked pointer:', ptr);
+      getLogger().warn('Attempted to free untracked pointer:', ptr);
       return;
     }
     this.#module._free(ptr);
@@ -203,7 +204,7 @@ export class WASMMemoryManager {
     const value = this.#module.HEAP32[index];
     if (value === undefined) {
       if (__DEV__) {
-        console.warn(`[PDFium] readInt32: out-of-bounds read at pointer ${ptr} (HEAP32 index ${index})`);
+        getLogger().warn(`readInt32: out-of-bounds read at pointer ${ptr} (HEAP32 index ${index})`);
       }
       return 0;
     }
@@ -256,6 +257,61 @@ export class WASMMemoryManager {
     const buffer = this.#module.HEAPU8.buffer;
     const view = new DataView(buffer, ptr, 4);
     return view.getFloat32(0, true); // little-endian
+  }
+
+  /**
+   * Write a 32-bit float to WASM memory.
+   *
+   * @param ptr - Pointer to write to (must be 4-byte aligned)
+   * @param value - Value to write
+   */
+  writeFloat32(ptr: WASMPointer, value: number): void {
+    if ((ptr & 3) !== 0) {
+      throw new MemoryError(PDFiumErrorCode.MEMORY_INVALID_POINTER, `Misaligned pointer for float write: ${ptr}`, {
+        ptr,
+        alignment: ptr & 3,
+      });
+    }
+    // Create a DataView to write the float
+    const buffer = this.#module.HEAPU8.buffer;
+    const view = new DataView(buffer, ptr, 4);
+    view.setFloat32(0, value, true); // little-endian
+  }
+
+  /**
+   * Read a 64-bit float from WASM memory.
+   *
+   * @param ptr - Pointer to read from (must be 8-byte aligned)
+   * @returns The float value
+   */
+  readFloat64(ptr: WASMPointer): number {
+    if ((ptr & 7) !== 0) {
+      throw new MemoryError(PDFiumErrorCode.MEMORY_INVALID_POINTER, `Misaligned pointer for double read: ${ptr}`, {
+        ptr,
+        alignment: ptr & 7,
+      });
+    }
+    const buffer = this.#module.HEAPU8.buffer;
+    const view = new DataView(buffer, ptr, 8);
+    return view.getFloat64(0, true); // little-endian
+  }
+
+  /**
+   * Write a 64-bit float to WASM memory.
+   *
+   * @param ptr - Pointer to write to (must be 8-byte aligned)
+   * @param value - Value to write
+   */
+  writeFloat64(ptr: WASMPointer, value: number): void {
+    if ((ptr & 7) !== 0) {
+      throw new MemoryError(PDFiumErrorCode.MEMORY_INVALID_POINTER, `Misaligned pointer for double write: ${ptr}`, {
+        ptr,
+        alignment: ptr & 7,
+      });
+    }
+    const buffer = this.#module.HEAPU8.buffer;
+    const view = new DataView(buffer, ptr, 8);
+    view.setFloat64(0, value, true); // little-endian
   }
 
   /**
@@ -349,7 +405,7 @@ export class WASMMemoryManager {
    * @throws {MemoryError} If allocation fails
    */
   alloc(size: number): WASMAllocation {
-    return new WASMAllocation(this.malloc(size), this);
+    return new WASMAllocation(this.malloc(size), size, this);
   }
 
   /**
@@ -360,18 +416,24 @@ export class WASMMemoryManager {
    * @throws {MemoryError} If allocation fails
    */
   allocFrom(data: Uint8Array): WASMAllocation {
-    return new WASMAllocation(this.copyToWASM(data), this);
+    return new WASMAllocation(this.copyToWASM(data), data.length, this);
   }
 
   /**
    * Copy a null-terminated UTF-8 string to WASM memory and return an RAII wrapper.
    *
    * @param str - String to copy
+   * @param secure - If true, memory will be zeroed on disposal
    * @returns A disposable allocation wrapper
    * @throws {MemoryError} If allocation fails
    */
-  allocString(str: string): WASMAllocation {
-    return new WASMAllocation(this.copyStringToWASM(str), this);
+  allocString(str: string, secure = false): WASMAllocation {
+    const encoded = textEncoder.encode(str);
+    const size = encoded.length + 1; // +1 for null terminator
+    const ptr = this.malloc(size);
+    this.#module.HEAPU8.set(encoded, ptr);
+    this.#module.HEAPU8[ptr + encoded.length] = 0; // null terminator
+    return new WASMAllocation(ptr, size, this, secure);
   }
 
   /**
@@ -382,7 +444,9 @@ export class WASMMemoryManager {
    * @throws {MemoryError} If allocation fails
    */
   allocBuffer(buffer: ArrayBuffer): WASMAllocation {
-    return new WASMAllocation(this.copyBufferToWASM(buffer), this);
+    const view = new Uint8Array(buffer);
+    const data = buffer instanceof SharedArrayBuffer ? view.slice() : view;
+    return new WASMAllocation(this.copyToWASM(data), data.length, this);
   }
 
   /**

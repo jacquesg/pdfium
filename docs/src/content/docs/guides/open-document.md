@@ -303,6 +303,6 @@ loadPDF('encrypted.pdf', 'secret123');
 ## See Also
 
 - [PDFium](/pdfium/api/classes/pdfium/) — openDocument API
-- [PDFiumDocument](/pdfium/api/classes/pdfium-document/) — Document API
+- [PDFiumDocument](/pdfium/api/classes/pdfiumdocument/) — Document API
 - [Error Handling](/pdfium/concepts/error-handling/) — Error patterns
 - [Progressive Loading](/pdfium/guides/progressive-loading/) — Streaming large PDFs

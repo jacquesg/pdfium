@@ -9,6 +9,7 @@
  */
 
 import { PDFiumError, PDFiumErrorCode } from './errors.js';
+import { getLogger } from './logger.js';
 
 /**
  * Held value for FinalizationRegistry.
@@ -31,8 +32,8 @@ interface FinalizerHeldValue {
  */
 const disposalRegistry = new FinalizationRegistry<FinalizerHeldValue>((held) => {
   if (__DEV__) {
-    console.warn(
-      `[PDFium] Resource "${held.name}" was garbage collected without being disposed. ` +
+    getLogger().warn(
+      `Resource "${held.name}" was garbage collected without being disposed. ` +
         'This may cause memory leaks. Use the "using" keyword or call dispose() explicitly.',
     );
   }
@@ -40,7 +41,7 @@ const disposalRegistry = new FinalizationRegistry<FinalizerHeldValue>((held) => 
     held.cleanup?.();
   } catch (error) {
     if (__DEV__) {
-      console.warn(`[PDFium] FinalizationRegistry cleanup error for "${held.name}":`, error);
+      getLogger().warn(`FinalizationRegistry cleanup error for "${held.name}":`, error);
     }
   }
 });
@@ -143,8 +144,6 @@ export abstract class Disposable extends DisposableBase implements globalThis.Di
    *
    * This method is idempotent - calling it multiple times has no effect
    * after the first call.
-   *
-   * @implements {Symbol.dispose}
    */
   [Symbol.dispose](): void {
     if (this.disposed) {
@@ -192,8 +191,6 @@ export abstract class Disposable extends DisposableBase implements globalThis.Di
 export abstract class AsyncDisposable extends DisposableBase implements globalThis.AsyncDisposable {
   /**
    * Asynchronously dispose of this resource.
-   *
-   * @implements {Symbol.asyncDispose}
    */
   async [Symbol.asyncDispose](): Promise<void> {
     if (this.disposed) {

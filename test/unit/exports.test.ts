@@ -1,10 +1,9 @@
 import { describe, expect, test } from 'vitest';
 
 describe('public exports', () => {
-  test('index.ts exports INTERNAL symbol', async () => {
+  test('index.ts does not export INTERNAL symbol', async () => {
     const mod = await import('../../src/index.js');
-    expect(mod.INTERNAL).toBeDefined();
-    expect(typeof mod.INTERNAL).toBe('symbol');
+    expect('INTERNAL' in mod).toBe(false);
   });
 
   test('index.ts exports core classes', async () => {
@@ -17,15 +16,11 @@ describe('public exports', () => {
     expect(mod.WorkerProxy).toBeDefined();
   });
 
-  test('index.ts exports enums', async () => {
-    const mod = await import('../../src/index.js');
-    expect(mod.BitmapFormat).toBeDefined();
-    expect(mod.RenderFlags).toBeDefined();
-    expect(mod.PDFiumNativeErrorCode).toBeDefined();
-  });
-
   test('index.ts does not export WASM internals', async () => {
     const mod = await import('../../src/index.js');
+    expect('BitmapFormat' in mod).toBe(false);
+    expect('RenderFlags' in mod).toBe(false);
+    expect('PDFiumNativeErrorCode' in mod).toBe(false);
     expect('WASMMemoryManager' in mod).toBe(false);
     expect('WASMAllocation' in mod).toBe(false);
     expect('PDFiumWASM' in mod).toBe(false);
@@ -36,7 +31,7 @@ describe('public exports', () => {
     expect(mod.PDFiumDocumentBuilder).toBeDefined();
     expect(mod.PDFiumPageBuilder).toBeDefined();
     expect(mod.ProgressivePDFLoader).toBeDefined();
-    expect(mod.INTERNAL).toBeDefined();
+    expect('INTERNAL' in mod).toBe(false);
   });
 
   test('node.ts exports workers and builders', async () => {
@@ -44,7 +39,7 @@ describe('public exports', () => {
     expect(mod.WorkerProxy).toBeDefined();
     expect(mod.PDFiumDocumentBuilder).toBeDefined();
     expect(mod.ProgressivePDFLoader).toBeDefined();
-    expect(mod.INTERNAL).toBeDefined();
+    expect('INTERNAL' in mod).toBe(false);
   });
 
   test('internal module exports handles and INTERNAL symbol', async () => {

@@ -403,4 +403,4 @@ function pageToScreen(box: CharBox, pageHeight: number): CharBox {
 - [Extract Text Guide](/pdfium/guides/extract-text/) — Basic text extraction
 - [Search Text Guide](/pdfium/guides/search-text/) — Finding text with positions
 - [Coordinate Systems](/pdfium/concepts/coordinates/) — Understanding PDF coordinates
-- [PDFiumPage](/pdfium/api/classes/pdfium-page/) — Page API reference
+- [PDFiumPage](/pdfium/api/classes/pdfiumpage/) — Page API reference

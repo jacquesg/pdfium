@@ -271,22 +271,38 @@ async function renderPDFInWorker() {
 The library provides a built-in `WorkerProxy` class:
 
 ```typescript
-import { WorkerProxy } from '@scaryterry/pdfium';
+import { PDFium } from '@scaryterry/pdfium';
 
-async function useWorkerProxy() {
-  const wasmBinary = await fetch('/pdfium.wasm').then(r => r.arrayBuffer());
-
-  await using proxy = await WorkerProxy.create('/pdfium-worker.js', wasmBinary, {
-    timeout: 30000,
+async function useWorkerMode() {
+  await using pdfium = await PDFium.init({
+    useWorker: true,
+    workerUrl: '/pdfium-worker.js',
+    wasmUrl: '/pdfium.wasm',
+    workerTimeout: 30_000,
   });
 
-  const pdfData = await fetch('/document.pdf').then(r => r.arrayBuffer());
-  using document = await proxy.openDocument(pdfData);
-
-  const result = await proxy.renderPage(document.id, 0, { scale: 2 });
+  const pdfData = await fetch('/document.pdf').then((r) => r.arrayBuffer());
+  await using document = await pdfium.openDocument(pdfData);
+  const result = await document.renderPage(0, { scale: 2 });
 
   // Use result...
 }
+```
+
+For low-level control, use `WorkerProxy` directly:
+
+```typescript
+import { WorkerProxy } from '@scaryterry/pdfium';
+
+const wasmBinary = await fetch('/pdfium.wasm').then((r) => r.arrayBuffer());
+await using proxy = await WorkerProxy.create('/pdfium-worker.js', wasmBinary, { timeout: 30_000 });
+
+const pdfData = await fetch('/document.pdf').then((r) => r.arrayBuffer());
+const { documentId } = await proxy.openDocument(pdfData);
+const { pageId } = await proxy.loadPage(documentId, 0);
+const result = await proxy.renderPage(pageId, { scale: 2 });
+await proxy.closePage(pageId);
+await proxy.closeDocument(documentId);
 ```
 
 ## Bundler Configuration
@@ -480,6 +496,6 @@ const results = await Promise.all(
 
 ## See Also
 
-- [WorkerProxy](/pdfium/api/classes/worker-proxy/) — Built-in worker proxy class
+- [WorkerProxy](/pdfium/api/classes/workerproxy/) — Built-in worker proxy class
 - [Browser Examples](/pdfium/examples/browser/) — Browser usage examples
 - [Performance](/pdfium/concepts/performance/) — Optimisation tips

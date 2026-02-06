@@ -6,6 +6,7 @@
  */
 
 import { readFile } from 'node:fs/promises';
+import type { PDFiumInitOptions } from '../../src/core/types.js';
 import type { PDFiumDocument } from '../../src/document/document.js';
 import type { NativePDFiumInstance } from '../../src/document/native-instance.js';
 import { loadNativeBinding } from '../../src/native/loader.js';
@@ -24,11 +25,13 @@ export async function loadWasmBinary(): Promise<ArrayBuffer> {
 /**
  * Initialise a PDFium instance for testing.
  *
+ * @param options - Optional init options
  * @returns A fully initialised PDFium instance (caller must dispose)
  */
-export async function initPdfium(): Promise<PDFium> {
+export async function initPdfium(options: PDFiumInitOptions = {}): Promise<PDFium> {
   const wasmBinary = await loadWasmBinary();
-  return PDFium.init({ wasmBinary });
+  // Merge wasmBinary into provided options (explicit wasmBinary in options takes precedence if provided)
+  return PDFium.init({ wasmBinary, ...options });
 }
 
 /**
@@ -68,9 +71,9 @@ export function hasNativeBackend(): boolean {
  * @param filename - PDF filename relative to test/fixtures/
  * @returns The loaded document (caller must dispose)
  */
-export async function loadTestDocument(pdfium: PDFium, filename: string): Promise<PDFiumDocument> {
+export async function loadTestDocument(pdfium: PDFium, filename: string, password?: string): Promise<PDFiumDocument> {
   const pdfData = await readFile(`test/fixtures/${filename}`);
-  return pdfium.openDocument(pdfData);
+  return pdfium.openDocument(pdfData, password ? { password } : {});
 }
 
 /**

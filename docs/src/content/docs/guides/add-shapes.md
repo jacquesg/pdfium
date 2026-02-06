@@ -311,5 +311,5 @@ createShapesDocument();
 
 - [Create Document Guide](/pdfium/guides/create-document/) — Full document creation workflow
 - [Add Text Guide](/pdfium/guides/add-text/) — Adding text content
-- [PDFiumPageBuilder](/pdfium/api/classes/pdfium-page-builder/) — Page builder API
+- [PDFiumPageBuilder](/pdfium/api/classes/pdfiumpagebuilder/) — Page builder API
 - [Coordinate Systems](/pdfium/concepts/coordinates/) — Understanding PDF coordinates

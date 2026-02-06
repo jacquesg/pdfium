@@ -3,7 +3,7 @@ title: Attachments
 description: Working with embedded file attachments in PDFs
 ---
 
-PDFs can contain embedded files (attachments). This guide explains how to extract and work with attachments.
+PDFs can contain embedded files (attachments). This guide explains how to read, create, and delete attachments.
 
 ## Overview
 
@@ -372,8 +372,86 @@ Found 3 attachments:
 Total extracted: 1.3 MB
 ```
 
+## Adding Attachments
+
+Use `document.addAttachment()` to embed files into a PDF. This returns a `PDFiumAttachmentWriter` for setting contents and metadata:
+
+```typescript
+import { promises as fs } from 'fs';
+
+// Read the file to embed
+const spreadsheet = await fs.readFile('data.xlsx');
+
+// Add the attachment
+const writer = document.addAttachment('data.xlsx');
+if (writer) {
+  // Set the file contents
+  writer.setFile(spreadsheet);
+
+  // Set optional metadata
+  writer.setStringValue('CreationDate', 'D:20250115120000Z');
+  writer.setStringValue('Desc', 'Monthly sales data');
+}
+
+// Save the document to persist the attachment
+const bytes = document.save();
+await fs.writeFile('with-attachment.pdf', bytes);
+```
+
+### PDFiumAttachmentWriter API
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `setFile(contents)` | `boolean` | Set the file contents |
+| `setStringValue(key, value)` | `boolean` | Set a metadata string |
+| `getStringValue(key)` | `string \| undefined` | Read a metadata value |
+| `hasKey(key)` | `boolean` | Check if a key exists |
+| `getValueType(key)` | `AttachmentValueType` | Get the type of a key's value |
+
+### Add Multiple Attachments
+
+```typescript
+const files = [
+  { name: 'report.csv', path: './report.csv' },
+  { name: 'config.json', path: './config.json' },
+  { name: 'logo.png', path: './logo.png' },
+];
+
+for (const file of files) {
+  const data = await fs.readFile(file.path);
+  const writer = document.addAttachment(file.name);
+  if (writer) {
+    writer.setFile(data);
+  }
+}
+
+const bytes = document.save();
+```
+
+## Deleting Attachments
+
+Remove an attachment by its zero-based index:
+
+```typescript
+// Delete the first attachment
+const deleted = document.deleteAttachment(0);
+console.log(`Deleted: ${deleted}`);
+```
+
+:::caution
+Deleting an attachment shifts the indices of all subsequent attachments. When deleting multiple attachments, iterate in reverse order:
+
+```typescript
+// Delete all attachments
+for (let i = document.attachmentCount - 1; i >= 0; i--) {
+  document.deleteAttachment(i);
+}
+```
+:::
+
 ## See Also
 
-- [PDFiumDocument](/pdfium/api/classes/pdfium-document/) — Document API reference
+- [PDFiumDocument](/pdfium/api/classes/pdfiumdocument/) — Document API reference
+- [PDFiumAttachmentWriter](/pdfium/api/classes/pdfiumattachmentwriter/) — Attachment writer API
 - [Open Document Guide](/pdfium/guides/open-document/) — Loading documents
 - [Bookmarks Guide](/pdfium/guides/bookmarks/) — Working with outlines

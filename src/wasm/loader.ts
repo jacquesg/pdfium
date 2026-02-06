@@ -4,8 +4,47 @@
  * @module wasm/loader
  */
 
-import { InitialisationError, PDFiumErrorCode } from '../core/errors.js';
+import { isNodeEnvironment } from '../core/env.js';
+import { InitialisationError, NetworkError, PDFiumErrorCode } from '../core/errors.js';
 import type { PDFiumWASM, WASMLoadOptions } from './bindings/index.js';
+import { REQUIRED_SYMBOLS } from './manifest.js';
+
+/**
+ * Check if the environment supports WebAssembly SIMD.
+ */
+export function hasSIMDSupport(): boolean {
+  try {
+    return WebAssembly.validate(
+      new Uint8Array([
+        0, 97, 115, 109, 1, 0, 0, 0, 1, 5, 1, 96, 0, 1, 123, 3, 2, 1, 0, 10, 10, 1, 8, 0, 65, 0, 253, 15, 253, 98, 11,
+      ]),
+    );
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Validate that the WASM module has all required exports and stub optional ones.
+ *
+ * @param module - The loaded WASM module
+ */
+function validateRuntime(module: Record<string, unknown>): void {
+  const missingRequired: string[] = [];
+
+  for (const symbol of REQUIRED_SYMBOLS) {
+    if (typeof module[symbol] !== 'function') {
+      missingRequired.push(symbol);
+    }
+  }
+
+  if (missingRequired.length > 0) {
+    throw new InitialisationError(
+      PDFiumErrorCode.INIT_WASM_LOAD_FAILED,
+      `WASM module missing required symbols: ${missingRequired.join(', ')}`,
+    );
+  }
+}
 
 /**
  * Load the PDFium WASM module.
@@ -17,6 +56,7 @@ import type { PDFiumWASM, WASMLoadOptions } from './bindings/index.js';
 export async function loadWASM(options: WASMLoadOptions): Promise<PDFiumWASM> {
   try {
     const module = await instantiateModule(options);
+    validateRuntime(module as unknown as Record<string, unknown>);
     return module;
   } catch (error) {
     if (error instanceof InitialisationError) {
@@ -60,30 +100,36 @@ function validateWASMMagic(binary: ArrayBuffer): void {
  * Fetch WASM binary from a URL.
  */
 async function fetchWASMBinary(url: string): Promise<ArrayBuffer> {
+  // Validate protocol for absolute URLs to prevent file:// access or other schemes
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+      throw new InitialisationError(
+        PDFiumErrorCode.INIT_INVALID_OPTIONS,
+        `Invalid WASM URL protocol: ${parsed.protocol}. Only http: and https: are supported.`,
+      );
+    }
+  } catch (error) {
+    if (error instanceof InitialisationError) {
+      throw error;
+    }
+    // URL parsing failed -> relative URL, safe to proceed (uses current origin)
+  }
+
   try {
     const response = await fetch(url);
     if (!response.ok) {
-      throw new InitialisationError(
-        PDFiumErrorCode.INIT_WASM_LOAD_FAILED,
-        `Failed to fetch WASM binary: HTTP ${String(response.status)}`,
-      );
+      throw new NetworkError(`Failed to fetch WASM binary: HTTP ${String(response.status)}`);
     }
     return response.arrayBuffer();
   } catch (error) {
     if (error instanceof InitialisationError) {
       throw error;
     }
-    throw new InitialisationError(PDFiumErrorCode.INIT_WASM_LOAD_FAILED, 'Failed to fetch WASM binary from URL', {
+    throw new NetworkError('Failed to fetch WASM binary from URL', {
       cause: error,
     });
   }
-}
-
-/**
- * Check if running in Node.js environment.
- */
-function isNodeEnvironment(): boolean {
-  return typeof process !== 'undefined' && process.versions !== undefined && process.versions.node !== undefined;
 }
 
 /**

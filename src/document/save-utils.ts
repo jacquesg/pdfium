@@ -5,16 +5,16 @@
  */
 
 import { DocumentError, PDFiumErrorCode } from '../core/errors.js';
+import { getLogger } from '../core/logger.js';
 import { SaveFlags, type SaveOptions } from '../core/types.js';
-import type { DocumentHandle } from '../internal/handles.js';
-import { NativeHandle } from '../wasm/allocation.js';
+import { saveFlagsMap, toNative } from '../internal/enum-maps.js';
+import type { DocumentHandle, WASMPointer } from '../internal/handles.js';
+import type { WASMAllocation } from '../wasm/allocation.js';
 import type { PDFiumWASM } from '../wasm/bindings/index.js';
 import { ptrOffset, type WASMMemoryManager } from '../wasm/memory.js';
 
 /** Size of FPDF_FILEWRITE struct: version (4 bytes) + WriteBlock callback pointer (4 bytes). */
 const FPDF_FILEWRITE_SIZE = 8;
-/** Byte offset of the version field in FPDF_FILEWRITE. */
-const FPDF_FILEWRITE_VERSION_OFFSET = 0;
 /** Byte offset of the WriteBlock callback pointer in FPDF_FILEWRITE. */
 const FPDF_FILEWRITE_CALLBACK_OFFSET = 4;
 
@@ -58,7 +58,7 @@ export function saveDocument(
     );
   }
 
-  const flags = options.flags ?? SaveFlags.None;
+  const nativeFlags = toNative(saveFlagsMap.toNative, options.flags ?? SaveFlags.None);
   const chunks: Uint8Array[] = [];
   let totalSize = 0;
 
@@ -72,23 +72,18 @@ export function saveDocument(
       return 1;
     } catch (error) {
       if (__DEV__) {
-        console.warn('[PDFium] WriteBlock callback error:', error);
+        getLogger().warn('WriteBlock callback error:', error);
       }
       return 0;
     }
   };
 
-  const funcPtr = module.addFunction(writeBlock, 'iiii');
-  using _func = new NativeHandle(funcPtr, (ptr) => module.removeFunction(ptr));
-
-  using fileWrite = memory.alloc(FPDF_FILEWRITE_SIZE);
-  memory.writeInt32(ptrOffset(fileWrite.ptr, FPDF_FILEWRITE_VERSION_OFFSET), 1);
-  memory.writeInt32(ptrOffset(fileWrite.ptr, FPDF_FILEWRITE_CALLBACK_OFFSET), funcPtr);
+  using fileWrite = new FSFileWrite(memory, module, writeBlock);
 
   const success =
     options.version !== undefined
-      ? module._FPDF_SaveWithVersion(docHandle, fileWrite.ptr, flags, options.version)
-      : module._FPDF_SaveAsCopy(docHandle, fileWrite.ptr, flags);
+      ? module._FPDF_SaveWithVersion(docHandle, fileWrite.ptr, nativeFlags, options.version)
+      : module._FPDF_SaveAsCopy(docHandle, fileWrite.ptr, nativeFlags);
 
   if (!success) {
     throw new DocumentError(PDFiumErrorCode.DOC_SAVE_FAILED, 'Failed to save document');
@@ -101,4 +96,40 @@ export function saveDocument(
     offset += chunk.length;
   }
   return result;
+}
+
+/**
+ * RAII wrapper for FPDF_FILEWRITE struct.
+ * Handles allocation and callback registration.
+ */
+class FSFileWrite implements Disposable {
+  readonly #allocation: WASMAllocation;
+  readonly #module: PDFiumWASM;
+  readonly #callbackPtr: number;
+
+  constructor(
+    memory: WASMMemoryManager,
+    module: PDFiumWASM,
+    callback: (pThis: number, pData: number, size: number) => number,
+  ) {
+    this.#module = module;
+    this.#allocation = memory.alloc(FPDF_FILEWRITE_SIZE);
+
+    // Register callback: int (*WriteBlock)(FPDF_FILEWRITE* pThis, void* pData, unsigned long size);
+    this.#callbackPtr = module.addFunction(callback, 'iiii');
+
+    memory.writeInt32(this.#allocation.ptr, 1); // version = 1
+    memory.writeInt32(ptrOffset(this.#allocation.ptr, FPDF_FILEWRITE_CALLBACK_OFFSET), this.#callbackPtr);
+  }
+
+  get ptr(): WASMPointer {
+    return this.#allocation.ptr;
+  }
+
+  [Symbol.dispose](): void {
+    if (this.#callbackPtr !== 0) {
+      this.#module.removeFunction(this.#callbackPtr);
+    }
+    this.#allocation[Symbol.dispose]();
+  }
 }

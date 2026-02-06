@@ -176,6 +176,54 @@ pnpm add @scaryterry/pdfium-linux-x64-gnu # Linux x64
 
 See [Native vs WASM Backends](/pdfium/concepts/backends/) for details.
 
+## Entry Points
+
+The package provides several sub-path exports for different environments and use cases:
+
+| Sub-path | Description |
+|----------|-------------|
+| `@scaryterry/pdfium` | Main auto-detecting entry — re-exports everything |
+| `@scaryterry/pdfium/browser` | Browser-specific — excludes native backend classes |
+| `@scaryterry/pdfium/node` | Node.js-specific — auto-loads WASM from `node_modules` |
+| `@scaryterry/pdfium/worker` | Self-executing Web Worker script for off-main-thread processing |
+| `@scaryterry/pdfium/internal` | Low-level handles, constants, and WASM helpers (advanced usage) |
+| `@scaryterry/pdfium/types` | Type-only export — interfaces, enums, and type definitions |
+| `@scaryterry/pdfium/pdfium.wasm` | Raw WASM binary for manual loading |
+
+### When to Use Each Entry Point
+
+**Main entry** — use for most applications. It detects the environment and selects the appropriate backend:
+
+```typescript
+import { PDFium } from '@scaryterry/pdfium';
+```
+
+**Browser entry** — use when bundling for the browser to avoid importing Node.js-specific code:
+
+```typescript
+import { PDFium } from '@scaryterry/pdfium/browser';
+```
+
+**Node entry** — use in Node.js when you want automatic WASM loading from the filesystem:
+
+```typescript
+import { PDFium } from '@scaryterry/pdfium/node';
+```
+
+**Worker entry** — pass the URL of this entry point when creating a `WorkerProxy`. It is self-executing and should not be imported directly:
+
+```typescript
+const workerUrl = new URL('@scaryterry/pdfium/worker', import.meta.url);
+```
+
+**Types entry** — use for type-only imports in libraries that depend on PDFium types without importing runtime code:
+
+```typescript
+import type { RenderResult, PageObjectType } from '@scaryterry/pdfium/types';
+```
+
+**Internal entry** — for advanced use cases that need direct access to WASM handles or memory utilities. This API is not covered by semver guarantees.
+
 ## Feature Comparison
 
 | Feature | Node.js (WASM) | Node.js (Native) | Browser |
@@ -288,21 +336,30 @@ For large PDFs, use Web Workers:
 
 ```typescript
 // See Worker Mode guide for details
-import { WorkerProxy } from '@scaryterry/pdfium';
+import { PDFium } from '@scaryterry/pdfium';
 
-await using proxy = await WorkerProxy.create(workerUrl, wasmBinary);
-using document = await proxy.openDocument(pdfData);
+await using pdfium = await PDFium.init({
+  useWorker: true,
+  workerUrl,
+  wasmBinary,
+});
+await using document = await pdfium.openDocument(pdfData);
 ```
 
 ### Node.js Workers
 
-Node.js worker threads can also be used:
+Node.js worker threads are supported automatically in high-level worker mode:
 
 ```typescript
-import { Worker } from 'worker_threads';
+import { PDFium } from '@scaryterry/pdfium/node';
 
-const worker = new Worker('./pdf-worker.js');
-worker.postMessage({ type: 'process', data: pdfData });
+await using pdfium = await PDFium.init({
+  useWorker: true,
+  workerUrl: new URL('./pdf-worker.js', import.meta.url),
+  wasmBinary,
+});
+await using document = await pdfium.openDocument(pdfData);
+const page = await document.renderPage(0, { scale: 2 });
 ```
 
 ## Testing

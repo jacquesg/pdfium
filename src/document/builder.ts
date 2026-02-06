@@ -11,6 +11,7 @@ import type { DocumentHandle, FontHandle, PageHandle, PageObjectHandle } from '.
 import { INTERNAL } from '../internal/symbols.js';
 import type { PDFiumWASM } from '../wasm/bindings/index.js';
 import { asHandle, encodeUTF16LE, type WASMMemoryManager } from '../wasm/memory.js';
+import { PDFiumBuilderFont } from './builder-font.js';
 import { saveDocument } from './save-utils.js';
 
 /** Default page dimensions (US Letter in points). */
@@ -32,9 +33,10 @@ export class PDFiumDocumentBuilder extends Disposable {
   readonly #memory: WASMMemoryManager;
   readonly #documentHandle: DocumentHandle;
   readonly #pages: PageHandle[] = [];
-  readonly #fonts: FontHandle[] = [];
+  readonly #fonts: PDFiumBuilderFont[] = [];
   readonly #pageBuilders: PDFiumPageBuilder[] = [];
 
+  /** @internal */
   constructor(module: PDFiumWASM, memory: WASMMemoryManager) {
     super('PDFiumDocumentBuilder');
 
@@ -55,7 +57,7 @@ export class PDFiumDocumentBuilder extends Disposable {
         this.#module._FPDF_ClosePage(page);
       }
       for (const font of this.#fonts) {
-        this.#module._FPDFFont_Close(font);
+        this.#module._FPDFFont_Close(font[INTERNAL].handle);
       }
       this.#module._FPDF_CloseDocument(this.#documentHandle);
     });
@@ -146,7 +148,7 @@ export class PDFiumDocumentBuilder extends Disposable {
    * @param fontName - Standard font name
    * @returns A font handle for use with page builder's addText method
    */
-  loadStandardFont(fontName: string): FontHandle {
+  loadStandardFont(fontName: string): PDFiumBuilderFont {
     this.ensureNotDisposed();
 
     if (!fontName) {
@@ -154,11 +156,12 @@ export class PDFiumDocumentBuilder extends Disposable {
     }
 
     using nameAlloc = this.#memory.allocString(fontName);
-    const font = this.#module._FPDFText_LoadStandardFont(this.#documentHandle, nameAlloc.ptr);
-    if (font === asHandle<FontHandle>(0)) {
+    const handle = this.#module._FPDFText_LoadStandardFont(this.#documentHandle, nameAlloc.ptr);
+    if (handle === asHandle<FontHandle>(0)) {
       throw new DocumentError(PDFiumErrorCode.DOC_FORMAT_INVALID, `Failed to load standard font: ${fontName}`);
     }
 
+    const font = new PDFiumBuilderFont(handle, fontName);
     this.#fonts.push(font);
     return font;
   }
@@ -193,7 +196,7 @@ export class PDFiumDocumentBuilder extends Disposable {
     this.#pages.length = 0;
 
     for (const font of this.#fonts) {
-      this.#module._FPDFFont_Close(font);
+      this.#module._FPDFFont_Close(font[INTERNAL].handle);
     }
     this.#fonts.length = 0;
 
@@ -207,6 +210,9 @@ export class PDFiumDocumentBuilder extends Disposable {
  * Obtained from {@link PDFiumDocumentBuilder.addPage}. Use method chaining
  * to add shapes, text, and other page objects.
  *
+ * Content is generated automatically when the document is saved — there is
+ * no need to call `generateContent()` on builder pages.
+ *
  * @example
  * ```typescript
  * using builder = pdfium.createDocument();
@@ -214,8 +220,7 @@ export class PDFiumDocumentBuilder extends Disposable {
  * const font = builder.loadStandardFont('Helvetica');
  * page
  *   .addRectangle(50, 700, 200, 100, { fill: { r: 200, g: 220, b: 255, a: 255 } })
- *   .addText('Hello, PDF!', 60, 750, font, 24)
- *   .generateContent();
+ *   .addText('Hello, PDF!', 60, 750, font, 24);
  * const bytes = builder.save();
  * ```
  */
@@ -225,6 +230,7 @@ export class PDFiumPageBuilder extends Disposable {
   readonly #pageHandle: PageHandle;
   readonly #documentHandle: DocumentHandle;
 
+  /** @internal */
   constructor(module: PDFiumWASM, memory: WASMMemoryManager, pageHandle: PageHandle, documentHandle: DocumentHandle) {
     super('PDFiumPageBuilder');
     this.#module = module;
@@ -268,17 +274,17 @@ export class PDFiumPageBuilder extends Disposable {
    * @param text - The text content
    * @param x - X position in points
    * @param y - Y position in points
-   * @param font - Font handle from builder.loadStandardFont()
+   * @param font - Font from builder.loadStandardFont()
    * @param fontSize - Font size in points
    * @returns this for method chaining
    */
-  addText(text: string, x: number, y: number, font: FontHandle, fontSize: number): this {
+  addText(text: string, x: number, y: number, font: PDFiumBuilderFont, fontSize: number): this {
     this.ensureNotDisposed();
     if (!Number.isFinite(fontSize) || fontSize <= 0) {
       throw new DocumentError(PDFiumErrorCode.DOC_CREATE_FAILED, 'Font size must be a positive finite number');
     }
 
-    const textObj = this.#module._FPDFPageObj_CreateTextObj(this.#documentHandle, font, fontSize);
+    const textObj = this.#module._FPDFPageObj_CreateTextObj(this.#documentHandle, font[INTERNAL].handle, fontSize);
     if (textObj === asHandle<PageObjectHandle>(0)) {
       throw new DocumentError(PDFiumErrorCode.DOC_CREATE_FAILED, 'Failed to create text object');
     }
@@ -296,17 +302,6 @@ export class PDFiumPageBuilder extends Disposable {
   }
 
   /**
-   * Generate the page content stream. Call after adding all objects.
-   *
-   * @returns this for method chaining
-   */
-  generateContent(): this {
-    this.ensureNotDisposed();
-    this.#module._FPDFPage_GenerateContent(this.#pageHandle);
-    return this;
-  }
-
-  /**
    * No-op: the page handle is owned by {@link PDFiumDocumentBuilder}.
    * Disposing the page builder only prevents further modifications.
    */
@@ -315,20 +310,34 @@ export class PDFiumPageBuilder extends Disposable {
   }
 
   #applyShapeStyle(obj: PageObjectHandle, style?: ShapeStyle): void {
+    let fillMode = 0; // None
+    let strokeMode = 0; // No stroke
+
     if (style?.fill) {
+      fillMode = 1; // Alternate (default)
       const c = style.fill;
       if (!this.#module._FPDFPageObj_SetFillColor(obj, c.r, c.g, c.b, c.a)) {
         throw new DocumentError(PDFiumErrorCode.DOC_CREATE_FAILED, 'Failed to set fill colour');
       }
     }
+
     if (style?.stroke) {
+      strokeMode = 1;
       const c = style.stroke;
       if (!this.#module._FPDFPageObj_SetStrokeColor(obj, c.r, c.g, c.b, c.a)) {
         throw new DocumentError(PDFiumErrorCode.DOC_CREATE_FAILED, 'Failed to set stroke colour');
       }
     }
+
     if (style?.strokeWidth !== undefined) {
       this.#module._FPDFPageObj_SetStrokeWidth(obj, style.strokeWidth);
+    }
+
+    // Apply draw mode if there is any style
+    if (fillMode !== 0 || strokeMode !== 0) {
+      if (!this.#module._FPDFPath_SetDrawMode(obj, fillMode, strokeMode)) {
+        throw new DocumentError(PDFiumErrorCode.DOC_CREATE_FAILED, 'Failed to set path draw mode');
+      }
     }
   }
 }

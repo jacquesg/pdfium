@@ -4,35 +4,33 @@
  * Tests the FPDFText_* functions for character-level information.
  */
 
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { TextRenderMode } from '../../src/core/types.js';
-import type { PDFiumDocument } from '../../src/document/document.js';
-import type { PDFium } from '../../src/pdfium.js';
+import {
+  countRects,
+  getCharIndexAtPoint,
+  getRect,
+  getText,
+  getTextBounded,
+  search,
+} from '../../src/document/page_impl/text.js';
+import { INTERNAL } from '../../src/internal/symbols.js';
 import { initPdfium, loadTestDocument } from '../utils/helpers.js';
 
 describe('Extended Text API', () => {
-  let pdfium: PDFium;
-  let document: PDFiumDocument;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-    document = await loadTestDocument(pdfium, 'test_1.pdf');
-  });
-
-  afterAll(() => {
-    document?.dispose();
-    pdfium?.dispose();
-  });
-
   describe('charCount', () => {
-    test('should return character count', () => {
+    test('should return character count', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       const count = page.charCount;
       expect(typeof count).toBe('number');
       expect(count).toBeGreaterThanOrEqual(0);
     });
 
-    test('should be consistent with text extraction', () => {
+    test('should be consistent with text extraction', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       const count = page.charCount;
       // charCount should return a reasonable number
@@ -40,8 +38,115 @@ describe('Extended Text API', () => {
     });
   });
 
+  describe('Direct internal calls (happy paths)', () => {
+    test('getText returns content', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+
+      // Ensure text page is loaded
+      const charCount = page.charCount;
+      expect(charCount).toBeGreaterThan(0);
+
+      const pageInternal = page[INTERNAL];
+      const pdfiumInternal = pdfium[INTERNAL];
+
+      const text = getText(pdfiumInternal.module, pdfiumInternal.memory, pageInternal.textPageHandle, 0, charCount);
+      expect(text.length).toBeGreaterThan(0);
+    });
+
+    test('getTextBounded returns content', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+
+      page.getText(); // load text page
+
+      const pageInternal = page[INTERNAL];
+      const pdfiumInternal = pdfium[INTERNAL];
+
+      const text = getTextBounded(
+        pdfiumInternal.module,
+        pdfiumInternal.memory,
+        pageInternal.textPageHandle,
+        0,
+        page.height,
+        page.width,
+        0,
+      );
+      expect(typeof text).toBe('string');
+    });
+
+    test('getCharIndexAtPoint returns index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+
+      page.getText(); // load
+
+      const pageInternal = page[INTERNAL];
+      const pdfiumInternal = pdfium[INTERNAL];
+
+      const index = getCharIndexAtPoint(pdfiumInternal.module, pageInternal.textPageHandle, 100, 700, 10, 10);
+      expect(typeof index).toBe('number');
+    });
+
+    test('search finds text', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_7_with_form.pdf');
+      using page = document.getPage(0);
+
+      // Ensure text page is loaded
+      const text = page.getText();
+      expect(text.length).toBeGreaterThan(0);
+
+      const pageInternal = page[INTERNAL];
+      const pdfiumInternal = pdfium[INTERNAL];
+
+      const { results } = search(pdfiumInternal.module, pdfiumInternal.memory, pageInternal.textPageHandle, 'the');
+      expect(results.length).toBeGreaterThan(0);
+      const firstResult = results[0];
+      expect(firstResult).toBeDefined();
+      if (firstResult) {
+        expect(firstResult.index).toBeGreaterThanOrEqual(0);
+        expect(firstResult.length).toBe(3);
+      }
+    });
+
+    test('countRects and getRect return geometry', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_7_with_form.pdf');
+      using page = document.getPage(0);
+
+      // Ensure text page is loaded
+      page.getText();
+
+      const pageInternal = page[INTERNAL];
+      const pdfiumInternal = pdfium[INTERNAL];
+
+      // Find "the" to get an index
+      const { results } = search(pdfiumInternal.module, pdfiumInternal.memory, pageInternal.textPageHandle, 'the');
+      const match = results[0];
+      expect(match).toBeDefined();
+
+      if (match) {
+        const rectCount = countRects(pdfiumInternal.module, pageInternal.textPageHandle, match.index, match.length);
+        expect(rectCount).toBeGreaterThan(0);
+
+        const rect = getRect(pdfiumInternal.module, pdfiumInternal.memory, pageInternal.textPageHandle, 0);
+        expect(rect).toBeDefined();
+        if (rect) {
+          expect(typeof rect.left).toBe('number');
+          expect(typeof rect.top).toBe('number');
+        }
+      }
+    });
+  });
+
   describe('getCharUnicode', () => {
-    test('should return unicode code point for valid index', () => {
+    test('should return unicode code point for valid index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       if (page.charCount > 0) {
         const unicode = page.getCharUnicode(0);
@@ -50,13 +155,17 @@ describe('Extended Text API', () => {
       }
     });
 
-    test('should return 0 for invalid index', () => {
+    test('should return 0 for invalid index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       const unicode = page.getCharUnicode(-1);
       expect(unicode).toBe(0);
     });
 
-    test('should return 0 for out of bounds index', () => {
+    test('should return 0 for out of bounds index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       const unicode = page.getCharUnicode(999999);
       expect(unicode).toBe(0);
@@ -64,7 +173,9 @@ describe('Extended Text API', () => {
   });
 
   describe('getCharFontSize', () => {
-    test('should return font size for valid index', () => {
+    test('should return font size for valid index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       if (page.charCount > 0) {
         const fontSize = page.getCharFontSize(0);
@@ -73,7 +184,9 @@ describe('Extended Text API', () => {
       }
     });
 
-    test('should return 0 for invalid index', () => {
+    test('should return 0 for invalid index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       const fontSize = page.getCharFontSize(-1);
       expect(fontSize).toBe(0);
@@ -81,7 +194,9 @@ describe('Extended Text API', () => {
   });
 
   describe('getCharFontWeight', () => {
-    test('should return font weight for valid index', () => {
+    test('should return font weight for valid index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       if (page.charCount > 0) {
         const fontWeight = page.getCharFontWeight(0);
@@ -91,7 +206,9 @@ describe('Extended Text API', () => {
       }
     });
 
-    test('should return -1 for invalid index', () => {
+    test('should return -1 for invalid index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       const fontWeight = page.getCharFontWeight(-1);
       expect(fontWeight).toBe(-1);
@@ -99,7 +216,9 @@ describe('Extended Text API', () => {
   });
 
   describe('getCharFontName', () => {
-    test('should return font name for valid index', () => {
+    test('should return font name for valid index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       if (page.charCount > 0) {
         const fontName = page.getCharFontName(0);
@@ -111,26 +230,79 @@ describe('Extended Text API', () => {
       }
     });
 
-    test('should return undefined for invalid index', () => {
+    test('should return undefined for invalid index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       const fontName = page.getCharFontName(-1);
       expect(fontName).toBeUndefined();
     });
   });
 
+  describe('getText edge cases', () => {
+    test('should return empty string when count is 0', async () => {
+      using pdfium = await initPdfium();
+      using builder = pdfium.createDocument();
+      builder.addPage();
+      const bytes = builder.save();
+      using emptyDoc = await pdfium.openDocument(bytes);
+      using emptyPage = emptyDoc.getPage(0);
+      expect(emptyPage.getText()).toBe('');
+    });
+
+    test('should return empty string when count is negative', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+
+      const pageInternal = page[INTERNAL];
+      const pdfiumInternal = pdfium[INTERNAL];
+
+      const text = getText(pdfiumInternal.module, pdfiumInternal.memory, pageInternal.textPageHandle, 0, -1);
+      expect(text).toBe('');
+    });
+  });
+
+  describe('search edge cases', () => {
+    test('should return empty results for invalid handle', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using _page = document.getPage(0);
+      const pdfiumInternal = pdfium[INTERNAL];
+
+      // Pass 0 as handle
+      const { results } = search(pdfiumInternal.module, pdfiumInternal.memory, 0 as never, 'test');
+      expect(results).toEqual([]);
+    });
+  });
+
+  describe('getTextInRect edge cases', () => {
+    test('should return empty string for rect with no text', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
+      // A small rect in corner likely has no text
+      const text = page.getTextInRect(0, 10, 10, 0);
+      expect(text).toBe('');
+    });
+  });
+
   describe('getCharRenderMode', () => {
-    test('should return render mode for valid index', () => {
+    test('should return render mode for valid index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       if (page.charCount > 0) {
         const renderMode = page.getCharRenderMode(0);
-        expect(typeof renderMode).toBe('number');
-        // Should be one of the TextRenderMode values (0-7)
-        expect(renderMode).toBeGreaterThanOrEqual(0);
-        expect(renderMode).toBeLessThanOrEqual(7);
+        expect(typeof renderMode).toBe('string');
+        // Should be one of the TextRenderMode values
+        expect(Object.values(TextRenderMode)).toContain(renderMode);
       }
     });
 
-    test('should return Fill (0) for invalid index', () => {
+    test('should return Fill (0) for invalid index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       const renderMode = page.getCharRenderMode(-1);
       expect(renderMode).toBe(TextRenderMode.Fill);
@@ -138,7 +310,9 @@ describe('Extended Text API', () => {
   });
 
   describe('getCharAngle', () => {
-    test('should return angle for valid index', () => {
+    test('should return angle for valid index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       if (page.charCount > 0) {
         const angle = page.getCharAngle(0);
@@ -148,7 +322,9 @@ describe('Extended Text API', () => {
       }
     });
 
-    test('should return 0 for invalid index', () => {
+    test('should return 0 for invalid index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       const angle = page.getCharAngle(-1);
       expect(angle).toBe(0);
@@ -156,7 +332,9 @@ describe('Extended Text API', () => {
   });
 
   describe('getCharOrigin', () => {
-    test('should return origin for valid index', () => {
+    test('should return origin for valid index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       if (page.charCount > 0) {
         const origin = page.getCharOrigin(0);
@@ -169,7 +347,9 @@ describe('Extended Text API', () => {
       }
     });
 
-    test('should return undefined for invalid index', () => {
+    test('should return undefined for invalid index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       const origin = page.getCharOrigin(-1);
       expect(origin).toBeUndefined();
@@ -177,7 +357,9 @@ describe('Extended Text API', () => {
   });
 
   describe('isCharGenerated', () => {
-    test('should return boolean for valid index', () => {
+    test('should return boolean for valid index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       if (page.charCount > 0) {
         const isGenerated = page.isCharGenerated(0);
@@ -185,7 +367,9 @@ describe('Extended Text API', () => {
       }
     });
 
-    test('should return false for invalid index', () => {
+    test('should return false for invalid index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       const isGenerated = page.isCharGenerated(-1);
       expect(isGenerated).toBe(false);
@@ -193,7 +377,9 @@ describe('Extended Text API', () => {
   });
 
   describe('isCharHyphen', () => {
-    test('should return boolean for valid index', () => {
+    test('should return boolean for valid index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       if (page.charCount > 0) {
         const isHyphen = page.isCharHyphen(0);
@@ -201,7 +387,9 @@ describe('Extended Text API', () => {
       }
     });
 
-    test('should return false for invalid index', () => {
+    test('should return false for invalid index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       const isHyphen = page.isCharHyphen(-1);
       expect(isHyphen).toBe(false);
@@ -209,7 +397,9 @@ describe('Extended Text API', () => {
   });
 
   describe('hasCharUnicodeMapError', () => {
-    test('should return boolean for valid index', () => {
+    test('should return boolean for valid index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       if (page.charCount > 0) {
         const hasError = page.hasCharUnicodeMapError(0);
@@ -217,7 +407,9 @@ describe('Extended Text API', () => {
       }
     });
 
-    test('should return false for invalid index', () => {
+    test('should return false for invalid index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       const hasError = page.hasCharUnicodeMapError(-1);
       expect(hasError).toBe(false);
@@ -225,7 +417,9 @@ describe('Extended Text API', () => {
   });
 
   describe('getCharFillColour', () => {
-    test('should return colour for valid index', () => {
+    test('should return colour for valid index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       if (page.charCount > 0) {
         const colour = page.getCharFillColour(0);
@@ -246,7 +440,9 @@ describe('Extended Text API', () => {
       }
     });
 
-    test('should return undefined for invalid index', () => {
+    test('should return undefined for invalid index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       const colour = page.getCharFillColour(-1);
       expect(colour).toBeUndefined();
@@ -254,7 +450,9 @@ describe('Extended Text API', () => {
   });
 
   describe('getCharStrokeColour', () => {
-    test('should return colour for valid index', () => {
+    test('should return colour for valid index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       if (page.charCount > 0) {
         const colour = page.getCharStrokeColour(0);
@@ -268,7 +466,9 @@ describe('Extended Text API', () => {
       }
     });
 
-    test('should return undefined for invalid index', () => {
+    test('should return undefined for invalid index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       const colour = page.getCharStrokeColour(-1);
       expect(colour).toBeUndefined();
@@ -276,7 +476,9 @@ describe('Extended Text API', () => {
   });
 
   describe('getCharacterInfo', () => {
-    test('should return character info for valid index', () => {
+    test('should return character info for valid index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       if (page.charCount > 0) {
         const info = page.getCharacterInfo(0);
@@ -286,7 +488,7 @@ describe('Extended Text API', () => {
           expect(typeof info.char).toBe('string');
           expect(typeof info.fontSize).toBe('number');
           expect(typeof info.fontWeight).toBe('number');
-          expect(typeof info.renderMode).toBe('number');
+          expect(typeof info.renderMode).toBe('string');
           expect(typeof info.angle).toBe('number');
           expect(typeof info.originX).toBe('number');
           expect(typeof info.originY).toBe('number');
@@ -297,13 +499,17 @@ describe('Extended Text API', () => {
       }
     });
 
-    test('should return undefined for invalid index', () => {
+    test('should return undefined for invalid index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       const info = page.getCharacterInfo(-1);
       expect(info).toBeUndefined();
     });
 
-    test('should return undefined for out of bounds index', () => {
+    test('should return undefined for out of bounds index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       const info = page.getCharacterInfo(999999);
       expect(info).toBeUndefined();
@@ -312,40 +518,40 @@ describe('Extended Text API', () => {
 
   describe('TextRenderMode enum', () => {
     test('should have expected values', () => {
-      expect(TextRenderMode.Fill).toBe(0);
-      expect(TextRenderMode.Stroke).toBe(1);
-      expect(TextRenderMode.FillStroke).toBe(2);
-      expect(TextRenderMode.Invisible).toBe(3);
-      expect(TextRenderMode.FillClip).toBe(4);
-      expect(TextRenderMode.StrokeClip).toBe(5);
-      expect(TextRenderMode.FillStrokeClip).toBe(6);
-      expect(TextRenderMode.Clip).toBe(7);
+      expect(TextRenderMode.Fill).toBe('Fill');
+      expect(TextRenderMode.Stroke).toBe('Stroke');
+      expect(TextRenderMode.FillStroke).toBe('FillStroke');
+      expect(TextRenderMode.Invisible).toBe('Invisible');
+      expect(TextRenderMode.FillClip).toBe('FillClip');
+      expect(TextRenderMode.StrokeClip).toBe('StrokeClip');
+      expect(TextRenderMode.FillStrokeClip).toBe('FillStrokeClip');
+      expect(TextRenderMode.Clip).toBe('Clip');
     });
   });
 
   describe('post-dispose guards', () => {
     test('should throw on charCount after dispose', async () => {
-      const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+      using pdfium = await initPdfium();
+      using doc = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = doc.getPage(0);
       page.dispose();
       expect(() => page.charCount).toThrow();
-      doc.dispose();
     });
 
     test('should throw on getCharUnicode after dispose', async () => {
-      const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+      using pdfium = await initPdfium();
+      using doc = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = doc.getPage(0);
       page.dispose();
       expect(() => page.getCharUnicode(0)).toThrow();
-      doc.dispose();
     });
 
     test('should throw on getCharacterInfo after dispose', async () => {
-      const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+      using pdfium = await initPdfium();
+      using doc = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = doc.getPage(0);
       page.dispose();
       expect(() => page.getCharacterInfo(0)).toThrow();
-      doc.dispose();
     });
   });
 });

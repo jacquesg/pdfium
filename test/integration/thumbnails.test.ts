@@ -4,33 +4,22 @@
  * Tests the FPDFPage_GetThumbnail* functions.
  */
 
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import type { PDFiumDocument } from '../../src/document/document.js';
-import type { PDFium } from '../../src/pdfium.js';
+import { describe, expect, test } from 'vitest';
 import { initPdfium, loadTestDocument } from '../utils/helpers.js';
 
 describe('Thumbnails API', () => {
-  let pdfium: PDFium;
-  let document: PDFiumDocument;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-    document = await loadTestDocument(pdfium, 'test_1.pdf');
-  });
-
-  afterAll(() => {
-    document?.dispose();
-    pdfium?.dispose();
-  });
-
   describe('hasThumbnail', () => {
-    test('should return boolean', () => {
+    test('should return boolean', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       const hasThumbnail = page.hasThumbnail();
       expect(typeof hasThumbnail).toBe('boolean');
     });
 
-    test('should work for all pages', () => {
+    test('should work for all pages', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       const pageCount = document.pageCount;
       for (let i = 0; i < pageCount; i++) {
         using page = document.getPage(i);
@@ -40,7 +29,9 @@ describe('Thumbnails API', () => {
   });
 
   describe('getThumbnailAsBitmap', () => {
-    test('should return undefined if no thumbnail', () => {
+    test('should return undefined if no thumbnail', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       const bitmap = page.getThumbnailAsBitmap();
       // Most PDFs don't have embedded thumbnails
@@ -51,14 +42,18 @@ describe('Thumbnails API', () => {
       }
     });
 
-    test('should not throw', () => {
+    test('should not throw', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       expect(() => page.getThumbnailAsBitmap()).not.toThrow();
     });
   });
 
   describe('getDecodedThumbnailData', () => {
-    test('should return undefined if no thumbnail', () => {
+    test('should return undefined if no thumbnail', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       const data = page.getDecodedThumbnailData();
       // Most PDFs don't have embedded thumbnails
@@ -69,14 +64,18 @@ describe('Thumbnails API', () => {
       }
     });
 
-    test('should not throw', () => {
+    test('should not throw', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       expect(() => page.getDecodedThumbnailData()).not.toThrow();
     });
   });
 
   describe('getRawThumbnailData', () => {
-    test('should return undefined if no thumbnail', () => {
+    test('should return undefined if no thumbnail', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       const data = page.getRawThumbnailData();
       // Most PDFs don't have embedded thumbnails
@@ -87,7 +86,9 @@ describe('Thumbnails API', () => {
       }
     });
 
-    test('should not throw', () => {
+    test('should not throw', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = document.getPage(0);
       expect(() => page.getRawThumbnailData()).not.toThrow();
     });
@@ -95,6 +96,7 @@ describe('Thumbnails API', () => {
 
   describe('with PDF that may have thumbnails', () => {
     test('should handle test_3_with_images.pdf', async () => {
+      using pdfium = await initPdfium();
       using doc = await loadTestDocument(pdfium, 'test_3_with_images.pdf');
       using page = doc.getPage(0);
 
@@ -108,7 +110,8 @@ describe('Thumbnails API', () => {
 
   describe('post-dispose guards', () => {
     test('should throw on hasThumbnail after dispose', async () => {
-      const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+      using pdfium = await initPdfium();
+      using doc = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = doc.getPage(0);
       page.dispose();
       expect(() => page.hasThumbnail()).toThrow();
@@ -116,7 +119,8 @@ describe('Thumbnails API', () => {
     });
 
     test('should throw on getThumbnailAsBitmap after dispose', async () => {
-      const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+      using pdfium = await initPdfium();
+      using doc = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = doc.getPage(0);
       page.dispose();
       expect(() => page.getThumbnailAsBitmap()).toThrow();
@@ -124,7 +128,8 @@ describe('Thumbnails API', () => {
     });
 
     test('should throw on getDecodedThumbnailData after dispose', async () => {
-      const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+      using pdfium = await initPdfium();
+      using doc = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = doc.getPage(0);
       page.dispose();
       expect(() => page.getDecodedThumbnailData()).toThrow();
@@ -132,7 +137,8 @@ describe('Thumbnails API', () => {
     });
 
     test('should throw on getRawThumbnailData after dispose', async () => {
-      const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+      using pdfium = await initPdfium();
+      using doc = await loadTestDocument(pdfium, 'test_1.pdf');
       using page = doc.getPage(0);
       page.dispose();
       expect(() => page.getRawThumbnailData()).toThrow();

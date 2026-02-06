@@ -10,7 +10,9 @@
 import { Disposable } from '../core/disposable.js';
 import { DocumentError, PDFiumErrorCode } from '../core/errors.js';
 import { DEFAULT_LIMITS, DocumentAvailability, LinearisationStatus, type PDFiumLimits } from '../core/types.js';
+import { documentAvailabilityMap, fromNative } from '../internal/enum-maps.js';
 import type { AvailabilityHandle, DocumentHandle, WASMPointer } from '../internal/handles.js';
+import type { WASMAllocation } from '../wasm/allocation.js';
 import type { PDFiumWASM } from '../wasm/bindings/index.js';
 import { asHandle, NULL_PTR, ptrOffset, type WASMMemoryManager } from '../wasm/memory.js';
 import { PDFiumDocument } from './document.js';
@@ -63,17 +65,15 @@ export class ProgressivePDFLoader extends Disposable {
 
   /** WASM pointer to the data buffer. */
   #dataPtr: WASMPointer = NULL_PTR;
-  /** WASM pointer to FX_FILEAVAIL struct. */
-  #fileAvailPtr: WASMPointer = NULL_PTR;
-  /** WASM pointer to FPDF_FILEACCESS struct. */
-  #fileAccessPtr: WASMPointer = NULL_PTR;
-  /** WASM pointer to FX_DOWNLOADHINTS struct. */
-  #hintsPtr: WASMPointer = NULL_PTR;
+  /** RAII allocation for data buffer. */
+  #dataAlloc: WASMAllocation | undefined;
 
-  /** Registered WASM function pointers. */
-  #isDataAvailFuncPtr = 0;
-  #getBlockFuncPtr = 0;
-  #addSegmentFuncPtr = 0;
+  /** RAII wrapper for FX_FILEAVAIL struct. */
+  #fileAvail: FSFileAvail | undefined;
+  /** RAII wrapper for FPDF_FILEACCESS struct. */
+  #fileAccess: FSFileAccess | undefined;
+  /** RAII wrapper for FX_DOWNLOADHINTS struct. */
+  #hints: FSDownloadHints | undefined;
 
   /** The availability handle from FPDFAvail_Create. */
   #availHandle: AvailabilityHandle = NULL_AVAIL;
@@ -108,6 +108,8 @@ export class ProgressivePDFLoader extends Disposable {
    * Create a progressive loader from a complete buffer.
    *
    * Even for complete buffers, this is useful for checking linearisation status.
+   *
+   * @internal
    */
   static fromBuffer(
     data: Uint8Array | ArrayBuffer,
@@ -141,13 +143,6 @@ export class ProgressivePDFLoader extends Disposable {
   }
 
   /**
-   * @deprecated Use {@link linearisationStatus} instead.
-   */
-  get linearizationStatus(): LinearisationStatus {
-    return this.linearisationStatus;
-  }
-
-  /**
    * Convenience check for whether the document is linearised.
    */
   get isLinearised(): boolean {
@@ -159,8 +154,11 @@ export class ProgressivePDFLoader extends Disposable {
    */
   get isDocumentAvailable(): boolean {
     this.ensureNotDisposed();
-    const result = this.#module._FPDFAvail_IsDocAvail(this.#availHandle, this.#hintsPtr);
-    return result === DocumentAvailability.DataAvailable;
+    const result = this.#module._FPDFAvail_IsDocAvail(this.#availHandle, this.#hints?.ptr ?? NULL_PTR);
+    return (
+      fromNative(documentAvailabilityMap.fromNative, result, DocumentAvailability.DataNotAvailable) ===
+      DocumentAvailability.DataAvailable
+    );
   }
 
   /**
@@ -170,8 +168,11 @@ export class ProgressivePDFLoader extends Disposable {
    */
   isPageAvailable(pageIndex: number): boolean {
     this.ensureNotDisposed();
-    const result = this.#module._FPDFAvail_IsPageAvail(this.#availHandle, pageIndex, this.#hintsPtr);
-    return result === DocumentAvailability.DataAvailable;
+    const result = this.#module._FPDFAvail_IsPageAvail(this.#availHandle, pageIndex, this.#hints?.ptr ?? NULL_PTR);
+    return (
+      fromNative(documentAvailabilityMap.fromNative, result, DocumentAvailability.DataNotAvailable) ===
+      DocumentAvailability.DataAvailable
+    );
   }
 
   /**
@@ -220,8 +221,19 @@ export class ProgressivePDFLoader extends Disposable {
 
     // Create document first; only transfer data pointer ownership on success
     const dataPtr = this.#dataPtr;
-    const document = new PDFiumDocument(this.#module, this.#memory, docHandle, dataPtr, this.#limits);
+    const dataSize = this.#dataAlloc?.size ?? 0;
+
+    let document: PDFiumDocument;
+    try {
+      document = new PDFiumDocument(this.#module, this.#memory, docHandle, dataPtr, dataSize, this.#limits);
+    } catch (error) {
+      this.#module._FPDF_CloseDocument(docHandle);
+      this.#documentExtracted = false;
+      throw error;
+    }
+
     // Transfer succeeded — stop our cleanup from freeing the data pointer
+    this.#dataAlloc = undefined;
     this.#dataPtr = NULL_PTR;
 
     return document;
@@ -242,8 +254,9 @@ export class ProgressivePDFLoader extends Disposable {
   }
 
   #initialise(): void {
-    // RAII allocations — if any step throws, earlier allocations are auto-freed
-    using dataAlloc = this.#memory.allocFrom(this.#data);
+    // Allocate data buffer and keep ownership
+    this.#dataAlloc = this.#memory.allocFrom(this.#data);
+    this.#dataPtr = this.#dataAlloc.ptr;
 
     // Create the IsDataAvail callback: (pThis, offset, size) => int
     const availableBytes = () => this.#availableBytes;
@@ -265,64 +278,26 @@ export class ProgressivePDFLoader extends Disposable {
     };
 
     // Create the AddSegment callback: (pThis, offset, size) => void
-    // We don't need to track hints for complete buffers, just provide a no-op
     const addSegment = (_pThis: number, _offset: number, _size: number): number => {
-      return 0; // void return, but addFunction needs a return type
+      return 0;
     };
 
-    // Register function pointers — clean up on failure
-    this.#isDataAvailFuncPtr = this.#module.addFunction(isDataAvail, 'iiii');
-    this.#getBlockFuncPtr = this.#module.addFunction(getBlock, 'iiiii');
-    this.#addSegmentFuncPtr = this.#module.addFunction(addSegment, 'iiii');
-
     try {
-      // Allocate FX_FILEAVAIL struct
-      using fileAvailAlloc = this.#memory.alloc(FILE_AVAIL_SIZE);
-      this.#memory.writeInt32(fileAvailAlloc.ptr, 1); // version = 1
-      this.#memory.writeInt32(ptrOffset(fileAvailAlloc.ptr, 4), this.#isDataAvailFuncPtr);
-
-      // Allocate FPDF_FILEACCESS struct
-      using fileAccessAlloc = this.#memory.alloc(FILE_ACCESS_SIZE);
-      this.#memory.writeInt32(fileAccessAlloc.ptr, this.#totalSize); // m_FileLen
-      this.#memory.writeInt32(ptrOffset(fileAccessAlloc.ptr, 4), this.#getBlockFuncPtr); // m_GetBlock
-      this.#memory.writeInt32(ptrOffset(fileAccessAlloc.ptr, 8), 0); // m_Param (not used)
-
-      // Allocate FX_DOWNLOADHINTS struct
-      using hintsAlloc = this.#memory.alloc(DOWNLOAD_HINTS_SIZE);
-      this.#memory.writeInt32(hintsAlloc.ptr, 1); // version = 1
-      this.#memory.writeInt32(ptrOffset(hintsAlloc.ptr, 4), this.#addSegmentFuncPtr);
+      // Create RAII wrappers
+      this.#fileAvail = new FSFileAvail(this.#memory, this.#module, isDataAvail);
+      this.#fileAccess = new FSFileAccess(this.#memory, this.#module, this.#totalSize, getBlock);
+      this.#hints = new FSDownloadHints(this.#memory, this.#module, addSegment);
 
       // Create the availability provider
-      const availHandle = this.#module._FPDFAvail_Create(fileAvailAlloc.ptr, fileAccessAlloc.ptr);
+      const availHandle = this.#module._FPDFAvail_Create(this.#fileAvail.ptr, this.#fileAccess.ptr);
       if (availHandle === NULL_AVAIL) {
         throw new DocumentError(PDFiumErrorCode.DOC_LOAD_UNKNOWN, 'Failed to create availability provider');
       }
 
-      // All allocations and setup succeeded — transfer ownership
-      this.#dataPtr = dataAlloc.take();
-      this.#fileAvailPtr = fileAvailAlloc.take();
-      this.#fileAccessPtr = fileAccessAlloc.take();
-      this.#hintsPtr = hintsAlloc.take();
       this.#availHandle = availHandle;
     } catch (error) {
-      // Clean up function pointers on failure — WASM allocations are auto-freed by `using`
-      this.#cleanupFunctionPointers();
+      this.#cleanup();
       throw error;
-    }
-  }
-
-  #cleanupFunctionPointers(): void {
-    if (this.#isDataAvailFuncPtr !== 0) {
-      this.#module.removeFunction(this.#isDataAvailFuncPtr);
-      this.#isDataAvailFuncPtr = 0;
-    }
-    if (this.#getBlockFuncPtr !== 0) {
-      this.#module.removeFunction(this.#getBlockFuncPtr);
-      this.#getBlockFuncPtr = 0;
-    }
-    if (this.#addSegmentFuncPtr !== 0) {
-      this.#module.removeFunction(this.#addSegmentFuncPtr);
-      this.#addSegmentFuncPtr = 0;
     }
   }
 
@@ -332,27 +307,137 @@ export class ProgressivePDFLoader extends Disposable {
       this.#availHandle = NULL_AVAIL;
     }
 
-    this.#cleanupFunctionPointers();
+    if (this.#fileAvail) {
+      this.#fileAvail[Symbol.dispose]();
+      this.#fileAvail = undefined;
+    }
+    if (this.#fileAccess) {
+      this.#fileAccess[Symbol.dispose]();
+      this.#fileAccess = undefined;
+    }
+    if (this.#hints) {
+      this.#hints[Symbol.dispose]();
+      this.#hints = undefined;
+    }
 
-    if (this.#fileAvailPtr !== NULL_PTR) {
-      this.#memory.free(this.#fileAvailPtr);
-      this.#fileAvailPtr = NULL_PTR;
+    if (this.#dataAlloc) {
+      this.#dataAlloc[Symbol.dispose]();
+      this.#dataAlloc = undefined;
     }
-    if (this.#fileAccessPtr !== NULL_PTR) {
-      this.#memory.free(this.#fileAccessPtr);
-      this.#fileAccessPtr = NULL_PTR;
-    }
-    if (this.#hintsPtr !== NULL_PTR) {
-      this.#memory.free(this.#hintsPtr);
-      this.#hintsPtr = NULL_PTR;
-    }
-    if (this.#dataPtr !== NULL_PTR) {
-      this.#memory.free(this.#dataPtr);
-      this.#dataPtr = NULL_PTR;
-    }
+    this.#dataPtr = NULL_PTR;
   }
 
   protected disposeInternal(): void {
     this.#cleanup();
+  }
+}
+
+/**
+ * RAII wrapper for FX_FILEAVAIL struct.
+ * Handles allocation and callback registration.
+ */
+class FSFileAvail {
+  readonly #allocation: WASMAllocation;
+  readonly #module: PDFiumWASM;
+  readonly #callbackPtr: number;
+
+  constructor(
+    memory: WASMMemoryManager,
+    module: PDFiumWASM,
+    callback: (pThis: number, offset: number, size: number) => number,
+  ) {
+    this.#module = module;
+    this.#allocation = memory.alloc(FILE_AVAIL_SIZE);
+
+    // Register callback: int (*IsDataAvail)(FX_FILEAVAIL* pThis, size_t offset, size_t size);
+    this.#callbackPtr = module.addFunction(callback, 'iiii');
+
+    memory.writeInt32(this.#allocation.ptr, 1); // version = 1
+    memory.writeInt32(ptrOffset(this.#allocation.ptr, 4), this.#callbackPtr); // IsDataAvail
+  }
+
+  get ptr(): WASMPointer {
+    return this.#allocation.ptr;
+  }
+
+  [Symbol.dispose](): void {
+    if (this.#callbackPtr !== 0) {
+      this.#module.removeFunction(this.#callbackPtr);
+    }
+    this.#allocation[Symbol.dispose]();
+  }
+}
+
+/**
+ * RAII wrapper for FPDF_FILEACCESS struct.
+ * Handles allocation and callback registration.
+ */
+class FSFileAccess {
+  readonly #allocation: WASMAllocation;
+  readonly #module: PDFiumWASM;
+  readonly #callbackPtr: number;
+
+  constructor(
+    memory: WASMMemoryManager,
+    module: PDFiumWASM,
+    fileLength: number,
+    callback: (param: number, position: number, pBuf: number, size: number) => number,
+  ) {
+    this.#module = module;
+    this.#allocation = memory.alloc(FILE_ACCESS_SIZE);
+
+    // Register callback: int (*m_GetBlock)(void* param, unsigned long position, unsigned char* pBuf, unsigned long size);
+    this.#callbackPtr = module.addFunction(callback, 'iiiii');
+
+    memory.writeInt32(this.#allocation.ptr, fileLength); // m_FileLen
+    memory.writeInt32(ptrOffset(this.#allocation.ptr, 4), this.#callbackPtr); // m_GetBlock
+    memory.writeInt32(ptrOffset(this.#allocation.ptr, 8), 0); // m_Param
+  }
+
+  get ptr(): WASMPointer {
+    return this.#allocation.ptr;
+  }
+
+  [Symbol.dispose](): void {
+    if (this.#callbackPtr !== 0) {
+      this.#module.removeFunction(this.#callbackPtr);
+    }
+    this.#allocation[Symbol.dispose]();
+  }
+}
+
+/**
+ * RAII wrapper for FX_DOWNLOADHINTS struct.
+ * Handles allocation and callback registration.
+ */
+class FSDownloadHints {
+  readonly #allocation: WASMAllocation;
+  readonly #module: PDFiumWASM;
+  readonly #callbackPtr: number;
+
+  constructor(
+    memory: WASMMemoryManager,
+    module: PDFiumWASM,
+    callback: (pThis: number, offset: number, size: number) => number,
+  ) {
+    this.#module = module;
+    this.#allocation = memory.alloc(DOWNLOAD_HINTS_SIZE);
+
+    // Register callback: void (*AddSegment)(FX_DOWNLOADHINTS* pThis, size_t offset, size_t size);
+    this.#callbackPtr = module.addFunction(callback, 'iiii');
+
+    memory.writeInt32(this.#allocation.ptr, 1); // version = 1
+    memory.writeInt32(ptrOffset(this.#allocation.ptr, 4), this.#callbackPtr); // AddSegment
+  }
+
+  get ptr(): WASMPointer {
+    return this.#allocation.ptr;
+  }
+
+  [Symbol.dispose](): void {
+    if (this.#callbackPtr !== 0) {
+      this.#module.removeFunction(this.#callbackPtr);
+    }
+    this.#allocation[Symbol.dispose]();
   }
 }

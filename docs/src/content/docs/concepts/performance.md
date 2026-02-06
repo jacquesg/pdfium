@@ -208,6 +208,26 @@ const pdfium = await PDFium.init({
 });
 ```
 
+### Global Limits for Batch Processing
+
+When processing many documents in a pipeline, set limits once with `configure()` instead of passing them to every `PDFium.init()` call:
+
+```typescript
+import { configure } from '@scaryterry/pdfium';
+
+configure({
+  limits: {
+    maxTextCharCount: 100_000,
+    maxDocumentSize: 50 * 1024 * 1024,
+  },
+});
+
+// All subsequent PDFium.init() calls inherit these limits
+using pdfium = await PDFium.init();
+```
+
+See the [Security Guide](/pdfium/guides/security/#global-configuration) for more details on global configuration.
+
 ## Search Optimisation
 
 ### Early Exit
@@ -262,9 +282,13 @@ function findLimited(
 Move PDF processing off the main thread:
 
 ```typescript
-// Main thread stays responsive
-await using proxy = await WorkerProxy.create(workerUrl, wasmBinary);
-const result = await proxy.renderPage(docId, 0, { scale: 2 });
+await using pdfium = await PDFium.init({
+  useWorker: true,
+  workerUrl,
+  wasmBinary,
+});
+await using document = await pdfium.openDocument(pdfData);
+const result = await document.renderPage(0, { scale: 2 });
 ```
 
 ### Progressive Rendering

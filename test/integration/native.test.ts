@@ -489,807 +489,666 @@ describe.skipIf(!hasNative)('native PDFium binding (low-level)', () => {
 
 describe.skipIf(!hasNative)('NativePDFiumInstance (high-level)', () => {
   test('opens a document and gets page count', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      using doc = pdfium.openDocument(pdfData);
-      expect(doc.pageCount).toBeGreaterThan(0);
-    } finally {
-      pdfium.dispose();
-    }
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using doc = pdfium.openDocument(pdfData);
+    expect(doc.pageCount).toBeGreaterThan(0);
   });
 
   test('loads a page and reads dimensions', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      using doc = pdfium.openDocument(pdfData);
-      using page = doc.getPage(0);
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using doc = pdfium.openDocument(pdfData);
+    using page = doc.getPage(0);
 
-      expect(page.width).toBeGreaterThan(0);
-      expect(page.height).toBeGreaterThan(0);
-      expect(page.size).toEqual({ width: page.width, height: page.height });
-      expect(page.index).toBe(0);
-    } finally {
-      pdfium.dispose();
-    }
+    expect(page.width).toBeGreaterThan(0);
+    expect(page.height).toBeGreaterThan(0);
+    expect(page.size).toEqual({ width: page.width, height: page.height });
+    expect(page.index).toBe(0);
   });
 
   test('extracts text from a page', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      using doc = pdfium.openDocument(pdfData);
-      using page = doc.getPage(0);
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using doc = pdfium.openDocument(pdfData);
+    using page = doc.getPage(0);
 
-      const text = page.getText();
-      expect(typeof text).toBe('string');
-      expect(page.charCount).toBeGreaterThanOrEqual(0);
-    } finally {
-      pdfium.dispose();
-    }
+    const text = page.getText();
+    expect(typeof text).toBe('string');
+    expect(page.charCount).toBeGreaterThanOrEqual(0);
   });
 
   test('renders a page to RGBA buffer', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      using doc = pdfium.openDocument(pdfData);
-      using page = doc.getPage(0);
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using doc = pdfium.openDocument(pdfData);
+    using page = doc.getPage(0);
 
-      const result = page.render({ scale: 1 });
-      expect(result.width).toBe(Math.round(page.width));
-      expect(result.height).toBe(Math.round(page.height));
-      expect(result.data.length).toBe(result.width * result.height * 4);
-      expect(result.originalWidth).toBe(page.width);
-      expect(result.originalHeight).toBe(page.height);
-    } finally {
-      pdfium.dispose();
-    }
+    const result = page.render({ scale: 1 });
+    expect(result.width).toBe(Math.round(page.width));
+    expect(result.height).toBe(Math.round(page.height));
+    expect(result.data.length).toBe(result.width * result.height * 4);
+    expect(result.originalWidth).toBe(page.width);
+    expect(result.originalHeight).toBe(page.height);
   });
 
   test('iterates over all pages', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      using doc = pdfium.openDocument(pdfData);
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using doc = pdfium.openDocument(pdfData);
 
-      const pageCount = doc.pageCount;
-      let count = 0;
-      for (const page of doc.pages()) {
-        expect(page.width).toBeGreaterThan(0);
-        page.dispose();
-        count++;
-      }
-      expect(count).toBe(pageCount);
-    } finally {
-      pdfium.dispose();
+    const pageCount = doc.pageCount;
+    let count = 0;
+    for (const page of doc.pages()) {
+      using p = page;
+      expect(p.width).toBeGreaterThan(0);
+      count++;
     }
+    expect(count).toBe(pageCount);
   });
 
   test('throws on invalid page index', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      using doc = pdfium.openDocument(pdfData);
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using doc = pdfium.openDocument(pdfData);
 
-      expect(() => doc.getPage(-1)).toThrow();
-      expect(() => doc.getPage(999)).toThrow();
-    } finally {
-      pdfium.dispose();
-    }
+    expect(() => doc.getPage(-1)).toThrow();
+    expect(() => doc.getPage(999)).toThrow();
   });
 
   test('throws on oversized document', () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, { maxDocumentSize: 10 });
-    try {
-      const data = new Uint8Array(100);
-      expect(() => pdfium.openDocument(data)).toThrow(/exceeds maximum/);
-    } finally {
-      pdfium.dispose();
-    }
+    using pdfium = NativePDFiumInstance.fromBinding(native!, { maxDocumentSize: 10 });
+    const data = new Uint8Array(100);
+    expect(() => pdfium.openDocument(data)).toThrow(/exceeds maximum/);
   });
 
   test('reads document metadata', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      using doc = pdfium.openDocument(pdfData);
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using doc = pdfium.openDocument(pdfData);
 
-      const metadata = doc.getMetadata();
-      expect(metadata).toBeDefined();
-      expect(typeof metadata).toBe('object');
+    const metadata = doc.getMetadata();
+    expect(metadata).toBeDefined();
+    expect(typeof metadata).toBe('object');
 
-      // fileVersion should be a number (e.g. 15 for PDF 1.5)
-      const version = doc.fileVersion;
-      if (version !== undefined) {
-        expect(version).toBeGreaterThan(0);
-      }
-
-      // permissions should be a number
-      expect(typeof doc.permissions).toBe('number');
-      expect(typeof doc.userPermissions).toBe('number');
-
-      // pageMode should be a valid enum value
-      expect(doc.pageMode).toBeGreaterThanOrEqual(0);
-      expect(doc.pageMode).toBeLessThanOrEqual(6);
-
-      // securityHandlerRevision: -1 for unencrypted
-      expect(typeof doc.securityHandlerRevision).toBe('number');
-
-      // isTagged returns boolean
-      expect(typeof doc.isTagged()).toBe('boolean');
-    } finally {
-      pdfium.dispose();
+    // fileVersion should be a number (e.g. 15 for PDF 1.5)
+    const version = doc.fileVersion;
+    if (version !== undefined) {
+      expect(version).toBeGreaterThan(0);
     }
+
+    // rawPermissions should be a number
+    expect(typeof doc.rawPermissions).toBe('number');
+    expect(typeof doc.userPermissions).toBe('number');
+
+    // pageMode should be a valid enum value
+    expect(doc.pageMode).toBeGreaterThanOrEqual(0);
+    expect(doc.pageMode).toBeLessThanOrEqual(6);
+
+    // securityHandlerRevision: -1 for unencrypted
+    expect(typeof doc.securityHandlerRevision).toBe('number');
+
+    // isTagged returns boolean
+    expect(typeof doc.isTagged()).toBe('boolean');
   });
 
   test('reads page labels', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      using doc = pdfium.openDocument(pdfData);
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using doc = pdfium.openDocument(pdfData);
 
-      // getPageLabel returns string or undefined
-      const label = doc.getPageLabel(0);
-      expect(label === undefined || typeof label === 'string').toBe(true);
+    // getPageLabel returns string or undefined
+    const label = doc.getPageLabel(0);
+    expect(label === undefined || typeof label === 'string').toBe(true);
 
-      // Out-of-range index should return null/undefined
-      const badLabel = doc.getPageLabel(999);
-      expect(badLabel).toBeUndefined();
-    } finally {
-      pdfium.dispose();
-    }
+    // Out-of-range index should return null/undefined
+    const badLabel = doc.getPageLabel(999);
+    expect(badLabel).toBeUndefined();
   });
 
   test('reads page boxes', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      using doc = pdfium.openDocument(pdfData);
-      using page = doc.getPage(0);
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using doc = pdfium.openDocument(pdfData);
+    using page = doc.getPage(0);
 
-      // MediaBox should always be present for a valid page
-      const mediaBox = page.mediaBox;
-      expect(mediaBox).toBeDefined();
-      expect(mediaBox!.left).toBeDefined();
-      expect(mediaBox!.bottom).toBeDefined();
-      expect(mediaBox!.right).toBeGreaterThan(0);
-      expect(mediaBox!.top).toBeGreaterThan(0);
+    // MediaBox should always be present for a valid page
+    const mediaBox = page.mediaBox;
+    expect(mediaBox).toBeDefined();
+    expect(mediaBox!.left).toBeDefined();
+    expect(mediaBox!.bottom).toBeDefined();
+    expect(mediaBox!.right).toBeGreaterThan(0);
+    expect(mediaBox!.top).toBeGreaterThan(0);
 
-      // CropBox may or may not be set
-      const cropBox = page.cropBox;
-      expect(cropBox === undefined || typeof cropBox.left === 'number').toBe(true);
+    // CropBox may or may not be set
+    const cropBox = page.cropBox;
+    expect(cropBox === undefined || typeof cropBox.left === 'number').toBe(true);
 
-      // Test getPageBox method directly
-      const { PageBoxType } = await import('../../src/core/types.js');
-      const box = page.getPageBox(PageBoxType.MediaBox);
-      expect(box).toEqual(mediaBox);
-    } finally {
-      pdfium.dispose();
-    }
+    // Test getPageBox method directly
+    const { PageBoxType } = await import('../../src/core/types.js');
+    const box = page.getPageBox(PageBoxType.MediaBox);
+    expect(box).toEqual(mediaBox);
   });
 
   test('sets page boxes', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      using doc = pdfium.openDocument(pdfData);
-      using page = doc.getPage(0);
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using doc = pdfium.openDocument(pdfData);
+    using page = doc.getPage(0);
 
-      const { PageBoxType } = await import('../../src/core/types.js');
+    const { PageBoxType } = await import('../../src/core/types.js');
 
-      // Set a crop box
-      page.setPageBox(PageBoxType.CropBox, { left: 10, bottom: 10, right: 200, top: 300 });
+    // Set a crop box
+    page.setPageBox(PageBoxType.CropBox, { left: 10, bottom: 10, right: 200, top: 300 });
 
-      // Read it back
-      const cropBox = page.cropBox;
-      expect(cropBox).toBeDefined();
-      expect(cropBox!.left).toBeCloseTo(10, 0);
-      expect(cropBox!.bottom).toBeCloseTo(10, 0);
-      expect(cropBox!.right).toBeCloseTo(200, 0);
-      expect(cropBox!.top).toBeCloseTo(300, 0);
-    } finally {
-      pdfium.dispose();
-    }
+    // Read it back
+    const cropBox = page.cropBox;
+    expect(cropBox).toBeDefined();
+    expect(cropBox!.left).toBeCloseTo(10, 0);
+    expect(cropBox!.bottom).toBeCloseTo(10, 0);
+    expect(cropBox!.right).toBeCloseTo(200, 0);
+    expect(cropBox!.top).toBeCloseTo(300, 0);
   });
 
   test('reads signature count', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      using doc = pdfium.openDocument(pdfData);
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using doc = pdfium.openDocument(pdfData);
 
-      // signatureCount should be a number (likely 0 for unsigned PDFs)
-      expect(typeof doc.signatureCount).toBe('number');
-      expect(doc.signatureCount).toBeGreaterThanOrEqual(0);
+    // signatureCount should be a number (likely 0 for unsigned PDFs)
+    expect(typeof doc.signatureCount).toBe('number');
+    expect(doc.signatureCount).toBeGreaterThanOrEqual(0);
 
-      // hasSignatures returns boolean
-      expect(typeof doc.hasSignatures()).toBe('boolean');
+    // hasSignatures returns boolean
+    expect(typeof doc.hasSignatures()).toBe('boolean');
 
-      // getSignatures returns array
-      const sigs = doc.getSignatures();
-      expect(Array.isArray(sigs)).toBe(true);
-      expect(sigs.length).toBe(doc.signatureCount);
-    } finally {
-      pdfium.dispose();
-    }
+    // getSignatures returns array
+    const sigs = doc.getSignatures();
+    expect(Array.isArray(sigs)).toBe(true);
+    expect(sigs.length).toBe(doc.signatureCount);
   });
 
   test('imports pages from another document', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      using srcDoc = pdfium.openDocument(pdfData);
-      using destDoc = pdfium.openDocument(pdfData);
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using srcDoc = pdfium.openDocument(pdfData);
+    using destDoc = pdfium.openDocument(pdfData);
 
-      const originalCount = destDoc.pageCount;
+    const originalCount = destDoc.pageCount;
 
-      // Import all pages from source
-      destDoc.importPages(srcDoc);
-      expect(destDoc.pageCount).toBe(originalCount * 2);
+    // Import all pages from source
+    destDoc.importPages(srcDoc);
+    expect(destDoc.pageCount).toBe(originalCount * 2);
 
-      // Import by index
-      using destDoc2 = pdfium.openDocument(pdfData);
-      destDoc2.importPagesByIndex(srcDoc, [0]);
-      expect(destDoc2.pageCount).toBe(originalCount + 1);
-    } finally {
-      pdfium.dispose();
-    }
+    // Import by index
+    using destDoc2 = pdfium.openDocument(pdfData);
+    destDoc2.importPagesByIndex(srcDoc, [0]);
+    expect(destDoc2.pageCount).toBe(originalCount + 1);
   });
 
   test('creates N-up document', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      using srcDoc = pdfium.openDocument(pdfData);
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using srcDoc = pdfium.openDocument(pdfData);
 
-      const nupDoc = srcDoc.createNUpDocument({
-        outputWidth: 842,
-        outputHeight: 595,
-        pagesPerRow: 2,
-        pagesPerColumn: 1,
-      });
+    using nupDoc = srcDoc.createNUpDocument({
+      outputWidth: 842,
+      outputHeight: 595,
+      pagesPerRow: 2,
+      pagesPerColumn: 1,
+    });
 
-      expect(nupDoc).toBeDefined();
-      expect(nupDoc!.pageCount).toBeGreaterThan(0);
-      nupDoc!.dispose();
-    } finally {
-      pdfium.dispose();
-    }
+    expect(nupDoc).toBeDefined();
+    expect(nupDoc!.pageCount).toBeGreaterThan(0);
   });
 
   test('saves a document to bytes', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      using doc = pdfium.openDocument(pdfData);
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using doc = pdfium.openDocument(pdfData);
 
-      // Save without specific version
-      const saved = doc.save();
-      expect(saved).toBeInstanceOf(Uint8Array);
-      expect(saved.length).toBeGreaterThan(0);
-      // Verify it starts with %PDF header
-      const header = new TextDecoder().decode(saved.slice(0, 5));
-      expect(header).toBe('%PDF-');
+    // Save without specific version
+    const saved = doc.save();
+    expect(saved).toBeInstanceOf(Uint8Array);
+    expect(saved.length).toBeGreaterThan(0);
+    // Verify it starts with %PDF header
+    const header = new TextDecoder().decode(saved.slice(0, 5));
+    expect(header).toBe('%PDF-');
 
-      // Save with specific version
-      const savedV17 = doc.save({ version: 17 });
-      expect(savedV17.length).toBeGreaterThan(0);
+    // Save with specific version
+    const savedV17 = doc.save({ version: 17 });
+    expect(savedV17.length).toBeGreaterThan(0);
 
-      // Verify the saved output can be re-loaded
-      using reloaded = pdfium.openDocument(saved);
-      expect(reloaded.pageCount).toBe(doc.pageCount);
-    } finally {
-      pdfium.dispose();
-    }
+    // Verify the saved output can be re-loaded
+    using reloaded = pdfium.openDocument(saved);
+    expect(reloaded.pageCount).toBe(doc.pageCount);
   });
 
   test('reads attachments', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      // Test with a PDF that has no attachments
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      using doc = pdfium.openDocument(pdfData);
-      expect(doc.attachmentCount).toBe(0);
-      expect(doc.getAttachments()).toEqual([]);
-      expect(doc.getAttachment(0)).toBeUndefined();
-    } finally {
-      pdfium.dispose();
-    }
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    // Test with a PDF that has no attachments
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using doc = pdfium.openDocument(pdfData);
+    expect(doc.attachmentCount).toBe(0);
+    expect(doc.getAttachments()).toEqual([]);
+    expect(doc.getAttachment(0)).toBeUndefined();
   });
 
   test('reads attachments from PDF with attachments', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_9_with_attachment.pdf');
-      using doc = pdfium.openDocument(pdfData);
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_9_with_attachment.pdf');
+    using doc = pdfium.openDocument(pdfData);
 
-      expect(doc.attachmentCount).toBe(1);
+    expect(doc.attachmentCount).toBe(1);
 
-      const attachment = doc.getAttachment(0);
-      expect(attachment).toBeDefined();
-      expect(attachment!.index).toBe(0);
-      expect(attachment!.name).toBe('test-attachment.txt');
-      expect(attachment!.data).toBeInstanceOf(Uint8Array);
-      expect(attachment!.data.length).toBeGreaterThan(0);
+    const attachment = doc.getAttachment(0);
+    expect(attachment).toBeDefined();
+    expect(attachment!.index).toBe(0);
+    expect(attachment!.name).toBe('test-attachment.txt');
+    expect(attachment!.data).toBeInstanceOf(Uint8Array);
+    expect(attachment!.data.length).toBeGreaterThan(0);
 
-      // Verify getAttachments matches
-      const allAttachments = doc.getAttachments();
-      expect(allAttachments).toHaveLength(1);
-      expect(allAttachments[0]!.name).toBe('test-attachment.txt');
+    // Verify getAttachments matches
+    const allAttachments = doc.getAttachments();
+    expect(allAttachments).toHaveLength(1);
+    expect(allAttachments[0]!.name).toBe('test-attachment.txt');
 
-      // Out of range
-      expect(doc.getAttachment(1)).toBeUndefined();
-      expect(doc.getAttachment(-1)).toBeUndefined();
-    } finally {
-      pdfium.dispose();
-    }
+    // Out of range
+    expect(doc.getAttachment(1)).toBeUndefined();
+    expect(doc.getAttachment(-1)).toBeUndefined();
   });
 
   test('returns empty bookmarks for document without bookmarks', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      using doc = pdfium.openDocument(pdfData);
-      const bookmarks = doc.getBookmarks();
-      expect(bookmarks).toEqual([]);
-    } finally {
-      pdfium.dispose();
-    }
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using doc = pdfium.openDocument(pdfData);
+    const bookmarks = doc.getBookmarks();
+    expect(bookmarks).toEqual([]);
   });
 
   test('reads bookmarks from document with bookmarks', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_3_with_images.pdf');
-      using doc = pdfium.openDocument(pdfData);
-      const bookmarks = doc.getBookmarks();
-      expect(bookmarks.length).toBeGreaterThan(0);
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_3_with_images.pdf');
+    using doc = pdfium.openDocument(pdfData);
+    const bookmarks = doc.getBookmarks();
+    expect(bookmarks.length).toBeGreaterThan(0);
 
-      const first = bookmarks[0]!;
-      expect(typeof first.title).toBe('string');
-      expect(first.title.length).toBeGreaterThan(0);
-      expect(Array.isArray(first.children)).toBe(true);
+    const first = bookmarks[0]!;
+    expect(typeof first.title).toBe('string');
+    expect(first.title.length).toBeGreaterThan(0);
+    expect(Array.isArray(first.children)).toBe(true);
 
-      // pageIndex should be a number >= 0, or undefined
-      if (first.pageIndex !== undefined) {
-        expect(typeof first.pageIndex).toBe('number');
-        expect(first.pageIndex).toBeGreaterThanOrEqual(0);
-      }
-    } finally {
-      pdfium.dispose();
+    // pageIndex should be a number >= 0, or undefined
+    if (first.pageIndex !== undefined) {
+      expect(typeof first.pageIndex).toBe('number');
+      expect(first.pageIndex).toBeGreaterThanOrEqual(0);
     }
   });
 
   test('bookmarks() generator yields same results as getBookmarks()', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_3_with_images.pdf');
-      using doc = pdfium.openDocument(pdfData);
-      const eager = doc.getBookmarks();
-      const lazy = [...doc.bookmarks()];
-      expect(lazy.length).toBe(eager.length);
-      for (let i = 0; i < eager.length; i++) {
-        expect(lazy[i]!.title).toBe(eager[i]!.title);
-        expect(lazy[i]!.pageIndex).toBe(eager[i]!.pageIndex);
-      }
-    } finally {
-      pdfium.dispose();
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_3_with_images.pdf');
+    using doc = pdfium.openDocument(pdfData);
+    const eager = doc.getBookmarks();
+    const lazy = [...doc.bookmarks()];
+    expect(lazy.length).toBe(eager.length);
+    for (let i = 0; i < eager.length; i++) {
+      expect(lazy[i]!.title).toBe(eager[i]!.title);
+      expect(lazy[i]!.pageIndex).toBe(eager[i]!.pageIndex);
     }
   });
 
   test('reads annotations from a page', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      using doc = pdfium.openDocument(pdfData);
-      using page = doc.getPage(0);
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using doc = pdfium.openDocument(pdfData);
+    using page = doc.getPage(0);
 
-      const annotations = page.getAnnotations();
-      expect(Array.isArray(annotations)).toBe(true);
-      expect(page.annotationCount).toBe(annotations.length);
+    const annotations = page.getAnnotations();
+    expect(Array.isArray(annotations)).toBe(true);
+    expect(page.annotationCount).toBe(annotations.length);
 
-      for (const ann of annotations) {
-        expect(typeof ann.index).toBe('number');
-        expect(ann.index).toBeGreaterThanOrEqual(0);
-        expect(typeof ann.type).toBe('number');
-        expect(ann.bounds).toBeDefined();
-        expect(typeof ann.bounds.left).toBe('number');
-        expect(typeof ann.bounds.top).toBe('number');
-        expect(typeof ann.bounds.right).toBe('number');
-        expect(typeof ann.bounds.bottom).toBe('number');
-      }
-    } finally {
-      pdfium.dispose();
+    for (const ann of annotations) {
+      expect(typeof ann.index).toBe('number');
+      expect(ann.index).toBeGreaterThanOrEqual(0);
+      expect(typeof ann.type).toBe('number');
+      expect(ann.bounds).toBeDefined();
+      expect(typeof ann.bounds.left).toBe('number');
+      expect(typeof ann.bounds.top).toBe('number');
+      expect(typeof ann.bounds.right).toBe('number');
+      expect(typeof ann.bounds.bottom).toBe('number');
     }
   });
 
   test('reads annotations from PDF with annotations', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      // test_3_with_images.pdf is a multi-page PDF that may have annotations
-      const pdfData = await readFile('test/fixtures/test_3_with_images.pdf');
-      using doc = pdfium.openDocument(pdfData);
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    // test_3_with_images.pdf is a multi-page PDF that may have annotations
+    const pdfData = await readFile('test/fixtures/test_3_with_images.pdf');
+    using doc = pdfium.openDocument(pdfData);
 
-      // Check all pages for annotations
-      let totalAnnotations = 0;
-      for (const page of doc.pages()) {
-        const annotations = page.getAnnotations();
-        totalAnnotations += annotations.length;
-        page.dispose();
-      }
-      // Just verify it doesn't crash; total can be 0
-      expect(totalAnnotations).toBeGreaterThanOrEqual(0);
-    } finally {
-      pdfium.dispose();
+    // Check all pages for annotations
+    let totalAnnotations = 0;
+    for (const page of doc.pages()) {
+      using p = page;
+      const annotations = p.getAnnotations();
+      totalAnnotations += annotations.length;
     }
+    // Just verify it doesn't crash; total can be 0
+    expect(totalAnnotations).toBeGreaterThanOrEqual(0);
   });
 
   test('reads links from a page', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      using doc = pdfium.openDocument(pdfData);
-      using page = doc.getPage(0);
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using doc = pdfium.openDocument(pdfData);
+    using page = doc.getPage(0);
 
-      const links = page.getLinks();
-      expect(Array.isArray(links)).toBe(true);
+    const links = page.getLinks();
+    expect(Array.isArray(links)).toBe(true);
 
-      for (const link of links) {
-        expect(typeof link.index).toBe('number');
-        expect(link.bounds).toBeDefined();
-        expect(typeof link.bounds.left).toBe('number');
-        expect(typeof link.bounds.right).toBe('number');
-        if (link.action) {
-          expect(typeof link.action.type).toBe('number');
-        }
-        if (link.destination) {
-          expect(typeof link.destination.pageIndex).toBe('number');
-          expect(typeof link.destination.fitType).toBe('number');
-        }
+    for (const link of links) {
+      expect(typeof link.index).toBe('number');
+      expect(link.bounds).toBeDefined();
+      expect(typeof link.bounds.left).toBe('number');
+      expect(typeof link.bounds.right).toBe('number');
+      if (link.action) {
+        expect(typeof link.action.type).toBe('number');
       }
-    } finally {
-      pdfium.dispose();
+      if (link.destination) {
+        expect(typeof link.destination.pageIndex).toBe('number');
+        expect(typeof link.destination.fitType).toBe('number');
+      }
     }
   });
 
   test('reads links from PDF with links', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_3_with_images.pdf');
-      using doc = pdfium.openDocument(pdfData);
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_3_with_images.pdf');
+    using doc = pdfium.openDocument(pdfData);
 
-      let totalLinks = 0;
-      for (const page of doc.pages()) {
-        const links = page.getLinks();
-        totalLinks += links.length;
-        page.dispose();
-      }
-      // Just verify it doesn't crash; total can be 0
-      expect(totalLinks).toBeGreaterThanOrEqual(0);
-    } finally {
-      pdfium.dispose();
+    let totalLinks = 0;
+    for (const page of doc.pages()) {
+      using p = page;
+      const links = p.getLinks();
+      totalLinks += links.length;
     }
+    // Just verify it doesn't crash; total can be 0
+    expect(totalLinks).toBeGreaterThanOrEqual(0);
   });
 
   test('creates and mutates annotations via high-level API', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      using doc = pdfium.openDocument(pdfData);
-      using page = doc.getPage(0);
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using doc = pdfium.openDocument(pdfData);
+    using page = doc.getPage(0);
 
-      const initialCount = page.annotationCount;
+    const initialCount = page.annotationCount;
 
-      // Create a Text annotation
-      const newIndex = page.createAnnotation(AnnotationType.Text);
-      expect(newIndex).toBeGreaterThanOrEqual(0);
-      expect(page.annotationCount).toBe(initialCount + 1);
+    // Create a Text annotation
+    const newIndex = page.createAnnotation(AnnotationType.Text);
+    expect(newIndex).toBeGreaterThanOrEqual(0);
+    expect(page.annotationCount).toBe(initialCount + 1);
 
-      // Set rect
-      expect(page.setAnnotationRect(newIndex, { left: 10, top: 200, right: 100, bottom: 10 })).toBe(true);
+    // Set rect
+    expect(page.setAnnotationRect(newIndex, { left: 10, top: 200, right: 100, bottom: 10 })).toBe(true);
 
-      // Set colour
-      expect(page.setAnnotationColour(newIndex, { r: 255, g: 0, b: 0, a: 255 })).toBe(true);
+    // Set colour
+    expect(page.setAnnotationColour(newIndex, { r: 255, g: 0, b: 0, a: 255 })).toBe(true);
 
-      // Set flags (Hidden = 4)
-      expect(page.setAnnotationFlags(newIndex, 4)).toBe(true);
-      expect(page.getAnnotationFlags(newIndex)).toBe(4);
+    // Set flags (Hidden = 4)
+    expect(page.setAnnotationFlags(newIndex, 4)).toBe(true);
+    expect(page.getAnnotationFlags(newIndex)).toBe(4);
 
-      // Set string value
-      expect(page.setAnnotationStringValue(newIndex, 'Contents', 'Hello from native')).toBe(true);
+    // Set string value
+    expect(page.setAnnotationStringValue(newIndex, 'Contents', 'Hello from native')).toBe(true);
 
-      // Set border
-      expect(page.setAnnotationBorder(newIndex, 0, 0, 1.5)).toBe(true);
+    // Set border
+    expect(page.setAnnotationBorder(newIndex, 0, 0, 1.5)).toBe(true);
 
-      // Remove
-      expect(page.removeAnnotation(newIndex)).toBe(true);
-      expect(page.annotationCount).toBe(initialCount);
-    } finally {
-      pdfium.dispose();
-    }
+    // Remove
+    expect(page.removeAnnotation(newIndex)).toBe(true);
+    expect(page.annotationCount).toBe(initialCount);
   });
 
   test('annotation mutations persist after save', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      using doc = pdfium.openDocument(pdfData);
-      using page = doc.getPage(0);
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using doc = pdfium.openDocument(pdfData);
+    using page = doc.getPage(0);
 
-      // Create annotation and set properties
-      const newIndex = page.createAnnotation(AnnotationType.Text);
-      page.setAnnotationRect(newIndex, { left: 50, top: 100, right: 150, bottom: 50 });
-      page.setAnnotationColour(newIndex, { r: 0, g: 255, b: 0, a: 255 });
-      page.setAnnotationStringValue(newIndex, 'Contents', 'Persistent note');
+    // Create annotation and set properties
+    const newIndex = page.createAnnotation(AnnotationType.Text);
+    page.setAnnotationRect(newIndex, { left: 50, top: 100, right: 150, bottom: 50 });
+    page.setAnnotationColour(newIndex, { r: 0, g: 255, b: 0, a: 255 });
+    page.setAnnotationStringValue(newIndex, 'Contents', 'Persistent note');
 
-      // Save and reopen
-      const savedBytes = doc.save();
-      expect(savedBytes.length).toBeGreaterThan(0);
+    // Save and reopen
+    const savedBytes = doc.save();
+    expect(savedBytes.length).toBeGreaterThan(0);
 
-      using doc2 = pdfium.openDocument(savedBytes);
-      using page2 = doc2.getPage(0);
+    using doc2 = pdfium.openDocument(savedBytes);
+    using page2 = doc2.getPage(0);
 
-      // Verify annotation persists
-      const annotations = page2.getAnnotations();
-      expect(annotations.length).toBeGreaterThan(0);
+    // Verify annotation persists
+    const annotations = page2.getAnnotations();
+    expect(annotations.length).toBeGreaterThan(0);
 
-      // The last annotation should be our new one
-      const last = annotations[annotations.length - 1];
-      expect(last).toBeDefined();
-      expect(last!.type).toBe(AnnotationType.Text);
-    } finally {
-      pdfium.dispose();
-    }
+    // The last annotation should be our new one
+    const last = annotations[annotations.length - 1];
+    expect(last).toBeDefined();
+    expect(last!.type).toBe(AnnotationType.Text);
   });
 
   test('reads character font info', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      using doc = pdfium.openDocument(pdfData);
-      using page = doc.getPage(0);
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using doc = pdfium.openDocument(pdfData);
+    using page = doc.getPage(0);
 
-      const charCount = page.charCount;
-      if (charCount > 0) {
-        // Font size should be positive for valid characters
-        const fontSize = page.getCharFontSize(0);
-        expect(fontSize).toBeGreaterThan(0);
+    const charCount = page.charCount;
+    if (charCount > 0) {
+      // Font size should be positive for valid characters
+      const fontSize = page.getCharFontSize(0);
+      expect(fontSize).toBeGreaterThan(0);
 
-        // Font weight: valid range 100-900, or -1 if unavailable
-        const fontWeight = page.getCharFontWeight(0);
-        expect(fontWeight === -1 || (fontWeight >= 100 && fontWeight <= 900)).toBe(true);
+      // Font weight: valid range 100-900, or -1 if unavailable
+      const fontWeight = page.getCharFontWeight(0);
+      expect(fontWeight === -1 || (fontWeight >= 100 && fontWeight <= 900)).toBe(true);
 
-        // Font name should be a non-empty string
-        const fontName = page.getCharFontName(0);
-        expect(fontName).toBeDefined();
-        expect(typeof fontName).toBe('string');
-        expect(fontName!.length).toBeGreaterThan(0);
+      // Font name should be a non-empty string
+      const fontName = page.getCharFontName(0);
+      expect(fontName).toBeDefined();
+      expect(typeof fontName).toBe('string');
+      expect(fontName!.length).toBeGreaterThan(0);
 
-        // Render mode: 0-7
-        const renderMode = page.getCharRenderMode(0);
-        expect(renderMode).toBeGreaterThanOrEqual(0);
-        expect(renderMode).toBeLessThanOrEqual(7);
+      // Render mode: 0-7
+      const renderMode = page.getCharRenderMode(0);
+      expect(renderMode).toBeGreaterThanOrEqual(0);
+      expect(renderMode).toBeLessThanOrEqual(7);
 
-        // Out-of-range index should return defaults
-        expect(page.getCharFontSize(-1)).toBe(0);
-        expect(page.getCharFontWeight(-1)).toBe(-1);
-        expect(page.getCharFontName(-1)).toBeUndefined();
-      }
-    } finally {
-      pdfium.dispose();
+      // Out-of-range index should return defaults
+      expect(page.getCharFontSize(-1)).toBe(0);
+      expect(page.getCharFontWeight(-1)).toBe(-1);
+      expect(page.getCharFontName(-1)).toBeUndefined();
     }
   });
 
   test('reads text character extended operations', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      using doc = pdfium.openDocument(pdfData);
-      using page = doc.getPage(0);
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using doc = pdfium.openDocument(pdfData);
+    using page = doc.getPage(0);
 
-      const charCount = page.charCount;
-      if (charCount > 0) {
-        // Unicode codepoint
-        const unicode = page.getCharUnicode(0);
-        expect(unicode).toBeGreaterThan(0);
+    const charCount = page.charCount;
+    if (charCount > 0) {
+      // Unicode codepoint
+      const unicode = page.getCharUnicode(0);
+      expect(unicode).toBeGreaterThan(0);
 
-        // Boolean character properties
-        expect(typeof page.isCharGenerated(0)).toBe('boolean');
-        expect(typeof page.isCharHyphen(0)).toBe('boolean');
-        expect(typeof page.hasCharUnicodeMapError(0)).toBe('boolean');
+      // Boolean character properties
+      expect(typeof page.isCharGenerated(0)).toBe('boolean');
+      expect(typeof page.isCharHyphen(0)).toBe('boolean');
+      expect(typeof page.hasCharUnicodeMapError(0)).toBe('boolean');
 
-        // Character angle (radians)
-        const angle = page.getCharAngle(0);
-        expect(typeof angle).toBe('number');
+      // Character angle (radians)
+      const angle = page.getCharAngle(0);
+      expect(typeof angle).toBe('number');
 
-        // Character origin
-        const origin = page.getCharOrigin(0);
-        expect(origin).toBeDefined();
-        expect(typeof origin!.x).toBe('number');
-        expect(typeof origin!.y).toBe('number');
+      // Character origin
+      const origin = page.getCharOrigin(0);
+      expect(origin).toBeDefined();
+      expect(typeof origin!.x).toBe('number');
+      expect(typeof origin!.y).toBe('number');
 
-        // Character box
-        const box = page.getCharBox(0);
-        expect(box).toBeDefined();
-        expect(typeof box!.left).toBe('number');
-        expect(typeof box!.right).toBe('number');
-        expect(typeof box!.bottom).toBe('number');
-        expect(typeof box!.top).toBe('number');
+      // Character box
+      const box = page.getCharBox(0);
+      expect(box).toBeDefined();
+      expect(typeof box!.left).toBe('number');
+      expect(typeof box!.right).toBe('number');
+      expect(typeof box!.bottom).toBe('number');
+      expect(typeof box!.top).toBe('number');
 
-        // Character loose box
-        const looseBox = page.getCharLooseBox(0);
-        expect(looseBox).toBeDefined();
-        expect(typeof looseBox!.left).toBe('number');
+      // Character loose box
+      const looseBox = page.getCharLooseBox(0);
+      expect(looseBox).toBeDefined();
+      expect(typeof looseBox!.left).toBe('number');
 
-        // Fill colour
-        const fillColour = page.getCharFillColour(0);
-        if (fillColour) {
-          expect(typeof fillColour.r).toBe('number');
-          expect(typeof fillColour.g).toBe('number');
-          expect(typeof fillColour.b).toBe('number');
-          expect(typeof fillColour.a).toBe('number');
-        }
-
-        // Stroke colour
-        const strokeColour = page.getCharStrokeColour(0);
-        expect(strokeColour === undefined || typeof strokeColour.r === 'number').toBe(true);
-
-        // Character matrix
-        const matrix = page.getCharMatrix(0);
-        if (matrix) {
-          expect(matrix).toHaveLength(6);
-        }
-
-        // Out-of-range returns defaults
-        expect(page.getCharUnicode(-1)).toBe(0);
-        expect(page.isCharGenerated(-1)).toBe(false);
-        expect(page.getCharOrigin(-1)).toBeUndefined();
-        expect(page.getCharBox(-1)).toBeUndefined();
+      // Fill colour
+      const fillColour = page.getCharFillColour(0);
+      if (fillColour) {
+        expect(typeof fillColour.r).toBe('number');
+        expect(typeof fillColour.g).toBe('number');
+        expect(typeof fillColour.b).toBe('number');
+        expect(typeof fillColour.a).toBe('number');
       }
-    } finally {
-      pdfium.dispose();
+
+      // Stroke colour
+      const strokeColour = page.getCharStrokeColour(0);
+      expect(strokeColour === undefined || typeof strokeColour.r === 'number').toBe(true);
+
+      // Character matrix
+      const matrix = page.getCharMatrix(0);
+      if (matrix) {
+        expect(matrix).toHaveLength(6);
+      }
+
+      // Out-of-range returns defaults
+      expect(page.getCharUnicode(-1)).toBe(0);
+      expect(page.isCharGenerated(-1)).toBe(false);
+      expect(page.getCharOrigin(-1)).toBeUndefined();
+      expect(page.getCharBox(-1)).toBeUndefined();
     }
   });
 
   test('searches text on a page', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      using doc = pdfium.openDocument(pdfData);
-      using page = doc.getPage(0);
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using doc = pdfium.openDocument(pdfData);
+    using page = doc.getPage(0);
 
-      const text = page.getText();
-      if (text.length > 3) {
-        // Search for the first 3 characters of the text
-        const query = [...text].slice(0, 3).join('');
-        const results = [...page.findText(query)];
-        expect(results.length).toBeGreaterThan(0);
+    const text = page.getText();
+    if (text.length > 3) {
+      // Search for the first 3 characters of the text
+      const query = [...text].slice(0, 3).join('');
+      const results = [...page.findText(query)];
+      expect(results.length).toBeGreaterThan(0);
 
-        const first = results[0]!;
-        expect(first.charIndex).toBeGreaterThanOrEqual(0);
-        expect(first.charCount).toBe(query.length);
-        expect(Array.isArray(first.rects)).toBe(true);
-      }
-
-      // Empty query returns no results
-      expect([...page.findText('')]).toHaveLength(0);
-    } finally {
-      pdfium.dispose();
+      const first = results[0]!;
+      expect(first.charIndex).toBeGreaterThanOrEqual(0);
+      expect(first.charCount).toBe(query.length);
+      expect(Array.isArray(first.rects)).toBe(true);
     }
+
+    // Empty query returns no results
+    expect([...page.findText('')]).toHaveLength(0);
   });
 
   test('gets char index at position', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      using doc = pdfium.openDocument(pdfData);
-      using page = doc.getPage(0);
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using doc = pdfium.openDocument(pdfData);
+    using page = doc.getPage(0);
 
-      // Just verify the method works — result depends on PDF content
-      const index = page.getCharIndexAtPos(100, 100);
-      expect(typeof index).toBe('number');
-    } finally {
-      pdfium.dispose();
-    }
+    // Just verify the method works — result depends on PDF content
+    const index = page.getCharIndexAtPos(100, 100);
+    expect(typeof index).toBe('number');
   });
 
   test('reads page rotation and transparency', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      using doc = pdfium.openDocument(pdfData);
-      using page = doc.getPage(0);
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using doc = pdfium.openDocument(pdfData);
+    using page = doc.getPage(0);
 
-      // Rotation should be 0-3
-      expect(page.rotation).toBeGreaterThanOrEqual(0);
-      expect(page.rotation).toBeLessThanOrEqual(3);
+    // Rotation should be 0-3
+    expect(page.rotation).toBeGreaterThanOrEqual(0);
+    expect(page.rotation).toBeLessThanOrEqual(3);
 
-      // Transparency returns boolean
-      expect(typeof page.hasTransparency()).toBe('boolean');
-    } finally {
-      pdfium.dispose();
-    }
+    // Transparency returns boolean
+    expect(typeof page.hasTransparency()).toBe('boolean');
   });
 
   test('flattens a page', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      using doc = pdfium.openDocument(pdfData);
-      using page = doc.getPage(0);
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using doc = pdfium.openDocument(pdfData);
+    using page = doc.getPage(0);
 
-      // Flatten returns 0=fail, 1=success, 2=nothing to flatten
-      const result = page.flatten();
-      expect(result).toBeGreaterThanOrEqual(0);
-      expect(result).toBeLessThanOrEqual(2);
-    } finally {
-      pdfium.dispose();
-    }
+    // Flatten returns 0=fail, 1=success, 2=nothing to flatten
+    const result = page.flatten();
+    expect(result).toBeGreaterThanOrEqual(0);
+    expect(result).toBeLessThanOrEqual(2);
   });
 
   test('converts coordinates between device and page', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      using doc = pdfium.openDocument(pdfData);
-      using page = doc.getPage(0);
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using doc = pdfium.openDocument(pdfData);
+    using page = doc.getPage(0);
 
-      const { PageRotation: Rot } = await import('../../src/core/types.js');
-      const context = {
-        startX: 0,
-        startY: 0,
-        sizeX: Math.round(page.width),
-        sizeY: Math.round(page.height),
-        rotate: Rot.None,
-      };
+    const { PageRotation: Rot } = await import('../../src/core/types.js');
+    const context = {
+      startX: 0,
+      startY: 0,
+      sizeX: Math.round(page.width),
+      sizeY: Math.round(page.height),
+      rotate: Rot.None,
+    };
 
-      // Device to page
-      const pageCoord = page.deviceToPage(context, 100, 100);
-      expect(typeof pageCoord.x).toBe('number');
-      expect(typeof pageCoord.y).toBe('number');
+    // Device to page
+    const pageCoord = page.deviceToPage(context, 100, 100);
+    expect(typeof pageCoord.x).toBe('number');
+    expect(typeof pageCoord.y).toBe('number');
 
-      // Page to device
-      const deviceCoord = page.pageToDevice(context, pageCoord.x, pageCoord.y);
-      expect(typeof deviceCoord.x).toBe('number');
-      expect(typeof deviceCoord.y).toBe('number');
+    // Page to device
+    const deviceCoord = page.pageToDevice(context, pageCoord.x, pageCoord.y);
+    expect(typeof deviceCoord.x).toBe('number');
+    expect(typeof deviceCoord.y).toBe('number');
 
-      // Round-trip should be approximately consistent
-      expect(deviceCoord.x).toBeCloseTo(100, 0);
-      expect(deviceCoord.y).toBeCloseTo(100, 0);
-    } finally {
-      pdfium.dispose();
-    }
+    // Round-trip should be approximately consistent
+    expect(deviceCoord.x).toBeCloseTo(100, 0);
+    expect(deviceCoord.y).toBeCloseTo(100, 0);
   });
 
   test('generates content after modifications', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      using doc = pdfium.openDocument(pdfData);
-      using page = doc.getPage(0);
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using doc = pdfium.openDocument(pdfData);
+    using page = doc.getPage(0);
 
-      const result = page.generateContent();
-      expect(typeof result).toBe('boolean');
-    } finally {
-      pdfium.dispose();
-    }
+    const result = page.generateContent();
+    expect(typeof result).toBe('boolean');
   });
 
   test('gets bounded text', async () => {
-    const pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
-    try {
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      using doc = pdfium.openDocument(pdfData);
-      using page = doc.getPage(0);
+    using pdfium = NativePDFiumInstance.fromBinding(native!, undefined);
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using doc = pdfium.openDocument(pdfData);
+    using page = doc.getPage(0);
 
-      // Get text in the full page area
-      const text = page.getBoundedText(0, page.height, page.width, 0);
-      expect(typeof text).toBe('string');
-    } finally {
-      pdfium.dispose();
-    }
+    // Get text in the full page area
+    const text = page.getBoundedText(0, page.height, page.width, 0);
+    expect(typeof text).toBe('string');
   });
 
   test('disposes documents and pages on instance dispose', async () => {
@@ -1335,39 +1194,26 @@ describe('PDFium.initNative()', () => {
 
 describe('PDFium.init({ useNative: true })', () => {
   test('returns NativePDFiumInstance when native is available', async () => {
-    const pdfium = await PDFium.init({ useNative: true });
-    try {
-      if (hasNative) {
-        expect(pdfium).toBeInstanceOf(NativePDFiumInstance);
-      } else {
-        expect(pdfium).toBeInstanceOf(PDFium);
-      }
-    } finally {
-      pdfium.dispose();
+    using pdfium = await PDFium.init({ useNative: true });
+    if (hasNative) {
+      expect(pdfium).toBeInstanceOf(NativePDFiumInstance);
+    } else {
+      expect(pdfium).toBeInstanceOf(PDFium);
     }
   });
 
   test.skipIf(!hasNative)('opens documents via native-preferred init', async () => {
-    const pdfium = await PDFium.init({ useNative: true });
+    using pdfium = (await PDFium.init({ useNative: true })) as NativePDFiumInstance;
     expect(pdfium).toBeInstanceOf(NativePDFiumInstance);
 
-    try {
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      const instance = pdfium as NativePDFiumInstance;
-      using doc = instance.openDocument(pdfData);
-      expect(doc.pageCount).toBeGreaterThan(0);
-    } finally {
-      pdfium.dispose();
-    }
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using doc = pdfium.openDocument(pdfData);
+    expect(doc.pageCount).toBeGreaterThan(0);
   });
 
   test('falls back to WASM when useNative is false or omitted', async () => {
-    const pdfium = await PDFium.init();
-    try {
-      expect(pdfium).toBeInstanceOf(PDFium);
-    } finally {
-      pdfium.dispose();
-    }
+    using pdfium = await PDFium.init();
+    expect(pdfium).toBeInstanceOf(PDFium);
   });
 });
 
@@ -1384,13 +1230,9 @@ describe('native loader', () => {
 
 describe('PDFium.init({ forceWasm: true })', () => {
   test('returns PDFium (WASM) instance regardless of native availability', async () => {
-    const pdfium = await PDFium.init({ forceWasm: true });
-    try {
-      // Should always be PDFium (WASM), never NativePDFiumInstance
-      expect(pdfium).toBeInstanceOf(PDFium);
-    } finally {
-      pdfium.dispose();
-    }
+    using pdfium = await PDFium.init({ forceWasm: true });
+    // Should always be PDFium (WASM), never NativePDFiumInstance
+    expect(pdfium).toBeInstanceOf(PDFium);
   });
 
   test('throws InitialisationError when combined with useNative: true', async () => {
@@ -1400,35 +1242,28 @@ describe('PDFium.init({ forceWasm: true })', () => {
   });
 
   test('opens and processes documents via WASM backend', async () => {
-    const pdfium = await PDFium.init({ forceWasm: true });
-    try {
-      const pdfData = await readFile('test/fixtures/test_1.pdf');
-      using doc = await pdfium.openDocument(pdfData);
-      expect(doc.pageCount).toBeGreaterThan(0);
+    using pdfium = await PDFium.init({ forceWasm: true });
+    const pdfData = await readFile('test/fixtures/test_1.pdf');
+    using doc = await pdfium.openDocument(pdfData);
+    expect(doc.pageCount).toBeGreaterThan(0);
 
-      using page = doc.getPage(0);
-      expect(page.width).toBeGreaterThan(0);
+    using page = doc.getPage(0);
+    expect(page.width).toBeGreaterThan(0);
 
-      const text = page.getText();
-      expect(typeof text).toBe('string');
-    } finally {
-      pdfium.dispose();
-    }
+    const text = page.getText();
+    expect(typeof text).toBe('string');
   });
 
   test.skipIf(!hasNative)('returns WASM instance even when native is available', async () => {
     // First verify native is available
-    const nativeInstance = await PDFium.init({ useNative: true });
-    expect(nativeInstance).toBeInstanceOf(NativePDFiumInstance);
-    nativeInstance.dispose();
+    {
+      using nativeInstance = await PDFium.init({ useNative: true });
+      expect(nativeInstance).toBeInstanceOf(NativePDFiumInstance);
+    }
 
     // Now verify forceWasm overrides this
-    const wasmInstance = await PDFium.init({ forceWasm: true });
-    try {
-      expect(wasmInstance).toBeInstanceOf(PDFium);
-      expect(wasmInstance).not.toBeInstanceOf(NativePDFiumInstance);
-    } finally {
-      wasmInstance.dispose();
-    }
+    using wasmInstance = await PDFium.init({ forceWasm: true });
+    expect(wasmInstance).toBeInstanceOf(PDFium);
+    expect(wasmInstance).not.toBeInstanceOf(NativePDFiumInstance);
   });
 });

@@ -4,7 +4,13 @@
  * @module wasm/bindings/text
  */
 
-import type { PageHandle, SearchHandle, TextPageHandle, WASMPointer } from '../../internal/handles.js';
+import type {
+  PageHandle,
+  PageObjectHandle,
+  SearchHandle,
+  TextPageHandle,
+  WASMPointer,
+} from '../../internal/handles.js';
 
 /**
  * Text extraction WASM bindings.
@@ -15,6 +21,7 @@ export interface TextBindings {
   _FPDFText_ClosePage: (textPage: TextPageHandle) => void;
   _FPDFText_CountChars: (textPage: TextPageHandle) => number;
   _FPDFText_GetText: (textPage: TextPageHandle, startIndex: number, count: number, buffer: WASMPointer) => number;
+  _FPDFText_GetTextObject: (textPage: TextPageHandle, index: number) => PageObjectHandle;
 
   // Extended text operations
   _FPDFText_GetUnicode: (textPage: TextPageHandle, index: number) => number;
@@ -30,7 +37,6 @@ export interface TextBindings {
     flags: WASMPointer,
   ) => number;
   _FPDFText_GetFontWeight: (textPage: TextPageHandle, index: number) => number;
-  _FPDFText_GetTextRenderMode: (textPage: TextPageHandle, index: number) => number;
   _FPDFText_GetFillColor: (
     textPage: TextPageHandle,
     index: number,

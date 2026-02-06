@@ -176,17 +176,13 @@ export async function verifyRoundTrip(
   // Perform round-trip
   const result = await roundTripDocument(pdfium, document, options);
 
-  try {
-    if (!result.success) {
-      throw new Error(`Round-trip failed: ${result.errors.join('; ')}`);
-    }
-
-    // Verify reloaded document
-    await verifyFn(result.reloadedDocument);
-  } finally {
-    // Clean up reloaded document
-    result.reloadedDocument.dispose();
+  if (!result.success) {
+    throw new Error(`Round-trip failed: ${result.errors.join('; ')}`);
   }
+
+  // Verify reloaded document
+  using reloadedDoc = result.reloadedDocument;
+  await verifyFn(reloadedDoc);
 }
 
 /**

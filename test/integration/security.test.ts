@@ -5,32 +5,17 @@
  * recursion depth limits.
  */
 
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { describe, expect, test } from 'vitest';
 
 import { PDFiumErrorCode, RenderError } from '../../src/core/errors.js';
-import type { PDFiumDocument } from '../../src/document/document.js';
-import type { PDFiumPage } from '../../src/document/page.js';
 import { PDFium } from '../../src/pdfium.js';
 import { initPdfium, loadTestDocument, loadWasmBinary } from '../utils/helpers.js';
 
 describe('Security: render dimension validation', () => {
-  let pdfium: PDFium;
-  let document: PDFiumDocument;
-  let page: PDFiumPage;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-    document = await loadTestDocument(pdfium, 'test_1.pdf');
-    page = document.getPage(0);
-  });
-
-  afterAll(() => {
-    page?.dispose();
-    document?.dispose();
-    pdfium?.dispose();
-  });
-
-  test('NaN width should throw RenderError with RENDER_INVALID_DIMENSIONS', () => {
+  test('NaN width should throw RenderError with RENDER_INVALID_DIMENSIONS', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_1.pdf');
+    using page = document.getPage(0);
     try {
       page.render({ width: NaN, height: 100 });
       expect.fail('Expected RenderError');
@@ -42,7 +27,10 @@ describe('Security: render dimension validation', () => {
     }
   });
 
-  test('Infinity height should throw RenderError with RENDER_INVALID_DIMENSIONS', () => {
+  test('Infinity height should throw RenderError with RENDER_INVALID_DIMENSIONS', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_1.pdf');
+    using page = document.getPage(0);
     try {
       page.render({ width: 100, height: Infinity });
       expect.fail('Expected RenderError');
@@ -54,7 +42,10 @@ describe('Security: render dimension validation', () => {
     }
   });
 
-  test('NaN scale should throw RenderError with RENDER_INVALID_DIMENSIONS', () => {
+  test('NaN scale should throw RenderError with RENDER_INVALID_DIMENSIONS', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_1.pdf');
+    using page = document.getPage(0);
     try {
       page.render({ scale: NaN });
       expect.fail('Expected RenderError');
@@ -66,63 +57,71 @@ describe('Security: render dimension validation', () => {
     }
   });
 
-  test('-Infinity dimensions should throw RenderError', () => {
+  test('-Infinity dimensions should throw RenderError', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_1.pdf');
+    using page = document.getPage(0);
     expect(() => page.render({ width: -Infinity })).toThrow(RenderError);
     expect(() => page.render({ height: -Infinity })).toThrow(RenderError);
   });
 });
 
 describe('Security: integer overflow protection', () => {
-  let pdfium: PDFium;
-  let document: PDFiumDocument;
-  let page: PDFiumPage;
-
-  beforeAll(async () => {
+  test('extremely large dimensions should throw (overflow guard)', async () => {
     const wasmBinary = await loadWasmBinary();
     // Use high render limit to test the overflow guard, not the dimension limit
-    pdfium = await PDFium.init({
+    using pdfium = await PDFium.init({
       wasmBinary,
       limits: { maxRenderDimension: 1_000_000 },
     });
-    document = await loadTestDocument(pdfium, 'test_1.pdf');
-    page = document.getPage(0);
-  });
+    using document = await loadTestDocument(pdfium, 'test_1.pdf');
+    using page = document.getPage(0);
 
-  afterAll(() => {
-    page?.dispose();
-    document?.dispose();
-    pdfium?.dispose();
-  });
-
-  test('extremely large dimensions should throw (overflow guard)', () => {
     // Width * height * 4 would overflow Number.MAX_SAFE_INTEGER
     expect(() => page.render({ width: 100_000, height: 100_000 })).toThrow(RenderError);
   });
 });
 
 describe('Security: page index validation', () => {
-  let pdfium: PDFium;
-  let document: PDFiumDocument;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-    document = await loadTestDocument(pdfium, 'test_1.pdf');
-  });
-
-  afterAll(() => {
-    document?.dispose();
-    pdfium?.dispose();
-  });
-
-  test('NaN page index should throw', () => {
+  test('NaN page index should throw', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_1.pdf');
     expect(() => document.getPage(NaN)).toThrow();
   });
 
-  test('Infinity page index should throw', () => {
+  test('Infinity page index should throw', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_1.pdf');
     expect(() => document.getPage(Infinity)).toThrow();
   });
 
-  test('floating point page index should throw', () => {
+  test('floating point page index should throw', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_1.pdf');
     expect(() => document.getPage(1.5)).toThrow();
+  });
+});
+
+describe('Security: encryption support', () => {
+  // We only have one encrypted fixture (likely RC4 or AES-128), but we can verify
+  // that the security handler revision is exposed correctly.
+  test('should identify encrypted document security handler revision', async () => {
+    using pdfium = await initPdfium();
+    const pdfData = await loadWasmBinary().then(() =>
+      import('node:fs/promises').then((fs) => fs.readFile('test/fixtures/test_1_pass_12345678.pdf')),
+    );
+    using document = await pdfium.openDocument(pdfData, { password: '12345678' });
+
+    // Security handler revision should be > 0 for encrypted files
+    expect(document.securityHandlerRevision).toBeGreaterThan(0);
+
+    // Permissions should be restricted (or at least valid number)
+    expect(typeof document.rawPermissions).toBe('number');
+  });
+
+  test('unencrypted document should have -1 revision', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_1.pdf');
+    expect(document.securityHandlerRevision).toBe(-1);
   });
 });

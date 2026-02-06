@@ -32,7 +32,9 @@ async function main() {
   using pdfium = await PDFium.init();
 
   // Open the document
-  using document = await pdfium.openDocument(pdfData);
+  using document = await pdfium.openDocument(pdfData, {
+    onProgress: (progress) => console.log(`Loading: ${Math.round(progress * 100)}%`),
+  });
 
   console.log(`Document has ${document.pageCount} pages`);
 

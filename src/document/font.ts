@@ -12,6 +12,7 @@
 import { Disposable } from '../core/disposable.js';
 import { PDFiumErrorCode } from '../core/errors.js';
 import { FontFlags, type FontInfo, type FontMetrics } from '../core/types.js';
+import { toBitflags } from '../internal/enum-maps.js';
 import type { FontHandle } from '../internal/handles.js';
 import { readUtf8String } from '../internal/wasm-string.js';
 import type { PDFiumWASM } from '../wasm/bindings/index.js';
@@ -27,10 +28,9 @@ import { NULL_PTR, type WASMMemoryManager } from '../wasm/memory.js';
  *
  * @example
  * ```typescript
- * const objects = page.getObjects();
- * for (const obj of objects) {
- *   if (obj.type === PageObjectType.Text) {
- *     using font = page.getTextObjectFont(obj.handle);
+ * for (const obj of page.objects()) {
+ *   if (obj instanceof PDFiumTextObject) {
+ *     using font = obj.getFont();
  *     if (font) {
  *       console.log('Font:', font.familyName, font.weight);
  *       const metrics = font.getMetrics(12);
@@ -82,20 +82,13 @@ export class PDFiumFont extends Disposable {
   }
 
   /**
-   * Gets the full font name (e.g., 'Helvetica-Bold', 'Times-Roman').
+   * Gets the base font name (PostScript name).
    *
-   * Returns an empty string if the font name is not available or the
-   * underlying WASM function is not supported.
+   * Returns an empty string if the font name is not available.
    */
   get fontName(): string {
     this.ensureNotDisposed();
-
-    const fn = this.#module._FPDFFont_GetFontName;
-    if (typeof fn !== 'function') {
-      return '';
-    }
-
-    return readUtf8String(this.#memory, (buf, size) => fn(this.#handle, buf, size));
+    return readUtf8String(this.#memory, (buf, size) => this.#module._FPDFFont_GetBaseFontName(this.#handle, buf, size));
   }
 
   /**
@@ -106,7 +99,7 @@ export class PDFiumFont extends Disposable {
   get flags(): FontFlags {
     this.ensureNotDisposed();
     const result = this.#module._FPDFFont_GetFlags(this.#handle);
-    return result === -1 ? (0 as FontFlags) : (result as FontFlags);
+    return toBitflags<FontFlags>(result === -1 ? 0 : result);
   }
 
   /**
@@ -156,7 +149,6 @@ export class PDFiumFont extends Disposable {
   getInfo(): FontInfo {
     this.ensureNotDisposed();
 
-    const fn = this.#module._FPDFFont_GetFontName;
     const rawFlags = this.#module._FPDFFont_GetFlags(this.#handle);
     const rawWeight = this.#module._FPDFFont_GetWeight(this.#handle);
 
@@ -164,9 +156,10 @@ export class PDFiumFont extends Disposable {
       familyName: readUtf8String(this.#memory, (buf, size) =>
         this.#module._FPDFFont_GetFamilyName(this.#handle, buf, size),
       ),
-      fontName:
-        typeof fn === 'function' ? readUtf8String(this.#memory, (buf, size) => fn(this.#handle, buf, size)) : '',
-      flags: rawFlags === -1 ? (0 as FontFlags) : (rawFlags as FontFlags),
+      fontName: readUtf8String(this.#memory, (buf, size) =>
+        this.#module._FPDFFont_GetBaseFontName(this.#handle, buf, size),
+      ),
+      flags: toBitflags<FontFlags>(rawFlags === -1 ? 0 : rawFlags),
       weight: rawWeight === -1 ? 0 : rawWeight,
       italicAngle: this.#module._FPDFFont_GetItalicAngle(this.#handle),
       isEmbedded: this.#module._FPDFFont_GetIsEmbedded(this.#handle) === 1,

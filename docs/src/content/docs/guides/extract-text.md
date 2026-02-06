@@ -68,3 +68,9 @@ console.log(`Character at (100, 200): index ${charIndex}`);
 const regionText = page.getTextInRect(0, 0, 300, 400);
 console.log(`Text in region: ${regionText}`);
 ```
+
+## See Also
+
+- [Page Objects Guide](/pdfium/guides/page-objects/) — Inspecting text objects with positions and fonts
+- [Performance Guide](/pdfium/concepts/performance/) — Optimising text extraction for large documents
+- [PDFiumPage](/pdfium/api/classes/pdfiumpage/) — Page API reference

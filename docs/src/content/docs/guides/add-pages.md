@@ -285,4 +285,4 @@ createMultiPageDocument();
 - [Add Text Guide](/pdfium/guides/add-text/) — Adding text content
 - [Add Shapes Guide](/pdfium/guides/add-shapes/) — Drawing rectangles
 - [Save Document Guide](/pdfium/guides/save-document/) — Saving options
-- [PDFiumDocumentBuilder](/pdfium/api/classes/pdfium-document-builder/) — Document builder API
+- [PDFiumDocumentBuilder](/pdfium/api/classes/pdfiumdocumentbuilder/) — Document builder API

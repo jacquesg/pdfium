@@ -3,7 +3,7 @@ title: Annotations
 description: Working with PDF annotations
 ---
 
-PDF annotations are interactive or visual elements overlaid on page content. This guide explains how to read and inspect annotations.
+PDF annotations are interactive or visual elements overlaid on page content. This guide explains how to read, create, modify, and remove annotations.
 
 ## Overview
 
@@ -19,10 +19,12 @@ Annotations include:
 
 ### Single Annotation by Index
 
+`getAnnotation()` returns a `PDFiumAnnotation` — a disposable wrapper with full read/write access:
+
 ```typescript
 using page = document.getPage(0);
+using annotation = page.getAnnotation(0);
 
-const annotation = page.getAnnotation(0);
 console.log(`Type: ${annotation.type}`);
 console.log(`Bounds: ${JSON.stringify(annotation.bounds)}`);
 ```
@@ -42,29 +44,30 @@ console.log(`Page has ${page.annotationCount} annotations`);
 
 ## Annotation Properties
 
-Each annotation has:
+`PDFiumAnnotation` provides both read-only and mutable access:
 
-| Property | Type | Description |
-|----------|------|-------------|
+| Property / Method | Type | Description |
+|-------------------|------|-------------|
 | `index` | `number` | Zero-based index on page |
 | `type` | `AnnotationType` | Annotation subtype |
-| `bounds` | `AnnotationBounds` | Bounding rectangle |
-| `colour` | `Colour \| undefined` | Annotation colour (if set) |
+| `bounds` | `Rect` | Bounding rectangle |
+| `colour` | `Colour \| null` | Stroke colour (cached) |
+| `flags` | `AnnotationFlags` | Annotation flags bitmask |
+| `objectCount` | `number` | Page objects inside (ink/stamp) |
+| `contents` | `string \| undefined` | Text body (get/set) |
+| `author` | `string \| undefined` | Author name (get/set) |
+| `subject` | `string \| undefined` | Subject line (get/set) |
 
-### Bounds
+### Rect & Colour
 
 ```typescript
-interface AnnotationBounds {
+interface Rect {
   left: number;   // Left edge in points
   top: number;    // Top edge in points
   right: number;  // Right edge in points
   bottom: number; // Bottom edge in points
 }
-```
 
-### Colour
-
-```typescript
 interface Colour {
   r: number; // Red (0-255)
   g: number; // Green (0-255)
@@ -334,8 +337,159 @@ async function analyseAnnotations(filename: string) {
 analyseAnnotations('document.pdf');
 ```
 
+## Creating Annotations
+
+Use `page.createAnnotation()` to add a new annotation:
+
+```typescript
+import { AnnotationType } from '@scaryterry/pdfium';
+
+using page = document.getPage(0);
+
+// Create a text (sticky note) annotation
+using annot = page.createAnnotation(AnnotationType.Text);
+if (annot) {
+  annot.setRect({ left: 100, bottom: 700, right: 120, top: 720 });
+  annot.setColour({ r: 255, g: 255, b: 0, a: 255 }); // Yellow
+  annot.contents = 'Review this section';
+  annot.author = 'Reviewer';
+}
+```
+
+### Create a Highlight
+
+```typescript
+using annot = page.createAnnotation(AnnotationType.Highlight);
+if (annot) {
+  annot.setRect({ left: 72, bottom: 700, right: 300, top: 712 });
+  annot.setColour({ r: 255, g: 255, b: 0, a: 128 });
+
+  // Set quad points to define the highlighted region
+  annot.appendAttachmentPoints({
+    x1: 72, y1: 712,
+    x2: 300, y2: 712,
+    x3: 72, y3: 700,
+    x4: 300, y4: 700,
+  });
+}
+```
+
+### Create an Ink Annotation
+
+```typescript
+using annot = page.createAnnotation(AnnotationType.Ink);
+if (annot) {
+  annot.setRect({ left: 50, bottom: 400, right: 200, top: 500 });
+  annot.setColour({ r: 255, g: 0, b: 0, a: 255 });
+
+  // Add freehand stroke points
+  annot.addInkStroke([
+    { x: 50, y: 450 },
+    { x: 100, y: 480 },
+    { x: 150, y: 420 },
+    { x: 200, y: 460 },
+  ]);
+}
+```
+
+### Create a Link Annotation
+
+```typescript
+using annot = page.createAnnotation(AnnotationType.Link);
+if (annot) {
+  annot.setRect({ left: 72, bottom: 650, right: 200, top: 665 });
+  annot.setURI('https://example.com');
+}
+```
+
+### Check Supported Types
+
+```typescript
+// Check if an annotation type supports object manipulation
+const supported = page.isAnnotationSubtypeSupported(AnnotationType.Stamp);
+```
+
+## Modifying Annotations
+
+Open an existing annotation, change properties, and the changes persist when you save the document:
+
+```typescript
+using annot = page.getAnnotation(0);
+
+// Update rectangle
+annot.setRect({ left: 100, bottom: 700, right: 200, top: 750 });
+
+// Change colours
+annot.setColour({ r: 0, g: 128, b: 255, a: 255 });             // stroke
+annot.setColour({ r: 200, g: 200, b: 255, a: 128 }, 'interior'); // fill
+
+// Update text content
+annot.contents = 'Updated comment text';
+annot.author = 'Editor';
+
+// Update border
+annot.setBorder({ horizontalRadius: 0, verticalRadius: 0, borderWidth: 2 });
+
+// Update flags
+annot.setFlags(0x04); // Print flag
+
+// Set/clear appearance
+annot.setAppearance('normal', undefined); // Clear to force re-render
+```
+
+### Dictionary Key/Value Access
+
+Annotations store arbitrary key/value pairs in their PDF dictionary:
+
+```typescript
+using annot = page.getAnnotation(0);
+
+// Check if a key exists
+if (annot.hasKey('Contents')) {
+  const value = annot.getStringValue('Contents');
+  console.log(`Contents: ${value}`);
+}
+
+// Set a custom string value
+annot.setStringValue('NM', 'unique-annotation-id');
+```
+
+## Removing Annotations
+
+```typescript
+using page = document.getPage(0);
+
+// Remove annotation at index 0
+const removed = page.removeAnnotation(0);
+console.log(`Removed: ${removed}`);
+```
+
+:::caution
+Removing an annotation shifts the indices of all subsequent annotations on the page. When removing multiple annotations, iterate in reverse order:
+
+```typescript
+for (let i = page.annotationCount - 1; i >= 0; i--) {
+  const annot = page.getAnnotation(i);
+  if (annot.type === AnnotationType.Highlight) {
+    annot.dispose();
+    page.removeAnnotation(i);
+  }
+}
+```
+:::
+
+## Saving Changes
+
+After creating or modifying annotations, save the document to persist changes:
+
+```typescript
+const bytes = document.save();
+await fs.writeFile('annotated.pdf', bytes);
+```
+
 ## See Also
 
-- [PDFiumPage](/pdfium/api/classes/pdfium-page/) — Page API reference
-- [AnnotationType Enum](/pdfium/api/enums/annotation-type/) — All annotation types
+- [PDFiumAnnotation](/pdfium/api/classes/pdfiumannotation/) — Annotation API reference
+- [PDFiumPage](/pdfium/api/classes/pdfiumpage/) — Page API reference
+- [AnnotationType Enum](/pdfium/api/enumerations/annotationtype/) — All annotation types
 - [Render PDF Guide](/pdfium/guides/render-pdf/) — Rendering with annotations

@@ -101,7 +101,7 @@ jobs:
         run: |
           # Native library already in npm/<target>/ from download:pdfium
           # Just copy the built .node file there
-          cp *.node npm/${{ matrix.native-target }}/
+          cp ./*.node npm/${{ matrix.native-target }}/
           echo "Contents of npm/${{ matrix.native-target }}:"
           ls -la npm/${{ matrix.native-target }}/
 

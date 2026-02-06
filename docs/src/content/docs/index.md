@@ -121,6 +121,4 @@ Create documents for:
 - [Render PDF](/pdfium/guides/render-pdf/) — Rendering guide
 - [API Reference](/pdfium/api/classes/pdfium/) — Complete API docs
 
-## Based on Prior Work
 
-This library is based on prior work by [@hyzyla/pdfium](https://github.com/hyzyla/pdfium), with significant enhancements for TypeScript support, resource management, and error handling.

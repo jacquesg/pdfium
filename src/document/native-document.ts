@@ -24,6 +24,7 @@ import {
   SaveFlags,
   type SaveOptions,
 } from '../core/types.js';
+import { docMDPPermissionMap, fromNative, pageModeMap, saveFlagsMap, toNative } from '../internal/enum-maps.js';
 import { NativePDFiumPage } from './native-page.js';
 
 /**
@@ -102,7 +103,7 @@ export class NativePDFiumDocument extends Disposable {
    *
    * Each page is yielded and must be disposed by the caller.
    */
-  *pages(): Generator<NativePDFiumPage> {
+  *pages(): IterableIterator<NativePDFiumPage> {
     const count = this.pageCount;
     for (let i = 0; i < count; i++) {
       yield this.getPage(i);
@@ -156,8 +157,8 @@ export class NativePDFiumDocument extends Disposable {
     return this.#backend.getFileVersion(this.#docHandle) ?? undefined;
   }
 
-  /** Get the document permissions bitmask. */
-  get permissions(): number {
+  /** Get the raw document permissions bitmask. */
+  get rawPermissions(): number {
     this.ensureNotDisposed();
     return this.#backend.getDocPermissions(this.#docHandle);
   }
@@ -172,7 +173,7 @@ export class NativePDFiumDocument extends Disposable {
   get pageMode(): PageMode {
     this.ensureNotDisposed();
     const mode = this.#backend.getPageMode(this.#docHandle);
-    return mode >= 0 && mode <= 5 ? mode : PageMode.UseNone;
+    return fromNative(pageModeMap.fromNative, mode, PageMode.UseNone);
   }
 
   /** Get the security handler revision, or -1 if unencrypted. */
@@ -215,7 +216,7 @@ export class NativePDFiumDocument extends Disposable {
    * Each yielded bookmark includes its full subtree of children (eagerly loaded).
    * Use this to avoid building the entire bookmark array up-front.
    */
-  *bookmarks(): Generator<Bookmark> {
+  *bookmarks(): IterableIterator<Bookmark> {
     this.ensureNotDisposed();
     const raw = this.#backend.getBookmarks(this.#docHandle);
     for (const b of raw) {
@@ -258,7 +259,7 @@ export class NativePDFiumDocument extends Disposable {
     }
 
     const perm = raw.docMDPPermission;
-    const docMDPPermission = perm >= 0 && perm <= 3 ? (perm as DocMDPPermission) : DocMDPPermission.None;
+    const docMDPPermission = fromNative(docMDPPermissionMap.fromNative, perm, DocMDPPermission.None);
 
     return {
       index,
@@ -295,10 +296,10 @@ export class NativePDFiumDocument extends Disposable {
   save(options: SaveOptions = {}): Uint8Array {
     this.ensureNotDisposed();
 
-    const flags = options.flags ?? SaveFlags.None;
+    const nativeFlags = toNative(saveFlagsMap.toNative, options.flags ?? SaveFlags.None);
     const version = options.version ?? null;
 
-    return this.#backend.saveDocument(this.#docHandle, flags, version);
+    return this.#backend.saveDocument(this.#docHandle, nativeFlags, version);
   }
 
   // ── Attachments ─────────────────────────────────────────────────────
@@ -363,7 +364,7 @@ export class NativePDFiumDocument extends Disposable {
    * @param pageIndices - Zero-based page indices
    * @param insertIndex - Insertion point (default: end)
    */
-  importPagesByIndex(source: NativePDFiumDocument, pageIndices: number[], insertIndex?: number): void {
+  importPagesByIndex(source: NativePDFiumDocument, pageIndices: readonly number[], insertIndex?: number): void {
     this.ensureNotDisposed();
     source.ensureNotDisposed();
 
@@ -372,7 +373,7 @@ export class NativePDFiumDocument extends Disposable {
     }
 
     const targetIndex = insertIndex ?? this.pageCount;
-    this.#backend.importPagesByIndex(this.#docHandle, source.#docHandle, pageIndices, targetIndex);
+    this.#backend.importPagesByIndex(this.#docHandle, source.#docHandle, [...pageIndices], targetIndex);
   }
 
   /**

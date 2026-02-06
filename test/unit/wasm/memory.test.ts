@@ -2,28 +2,14 @@
  * Unit tests for WASMMemoryManager.
  */
 
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { describe, expect, test } from 'vitest';
 
 import { MemoryError } from '../../../src/core/errors.js';
 import { INTERNAL } from '../../../src/internal/symbols.js';
-import type { PDFium } from '../../../src/pdfium.js';
-import type { WASMMemoryManager } from '../../../src/wasm/memory.js';
 import { asPointer, encodeUTF16LE, NULL_PTR, ptrOffset } from '../../../src/wasm/memory.js';
 import { initPdfium } from '../../utils/helpers.js';
 
 describe('WASMMemoryManager', () => {
-  let pdfium: PDFium;
-  let memory: WASMMemoryManager;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-    memory = pdfium[INTERNAL].memory;
-  });
-
-  afterAll(() => {
-    pdfium?.dispose();
-  });
-
   describe('asPointer', () => {
     test('should create a branded pointer from a number', () => {
       const ptr = asPointer(1234);
@@ -91,7 +77,9 @@ describe('WASMMemoryManager', () => {
   });
 
   describe('malloc and free', () => {
-    test('should allocate and free memory', () => {
+    test('should allocate and free memory', async () => {
+      using pdfium = await initPdfium();
+      const memory = pdfium[INTERNAL].memory;
       const ptr = memory.malloc(100);
       expect(ptr).not.toBe(0);
 
@@ -99,7 +87,9 @@ describe('WASMMemoryManager', () => {
       expect(() => memory.free(ptr)).not.toThrow();
     });
 
-    test('should track allocations', () => {
+    test('should track allocations', async () => {
+      using pdfium = await initPdfium();
+      const memory = pdfium[INTERNAL].memory;
       const initialCount = memory.activeAllocations;
 
       const ptr = memory.malloc(50);
@@ -108,14 +98,18 @@ describe('WASMMemoryManager', () => {
       expect(memory.activeAllocations).toBe(initialCount);
     });
 
-    test('should ignore free of NULL_PTR', () => {
+    test('should ignore free of NULL_PTR', async () => {
+      using pdfium = await initPdfium();
+      const memory = pdfium[INTERNAL].memory;
       // Should not throw
       expect(() => memory.free(NULL_PTR)).not.toThrow();
     });
   });
 
   describe('copyToWASM and copyFromWASM', () => {
-    test('should copy data to and from WASM memory', () => {
+    test('should copy data to and from WASM memory', async () => {
+      using pdfium = await initPdfium();
+      const memory = pdfium[INTERNAL].memory;
       const data = new Uint8Array([1, 2, 3, 4, 5]);
       const ptr = memory.copyToWASM(data);
       const copied = memory.copyFromWASM(ptr, data.length);
@@ -126,7 +120,9 @@ describe('WASMMemoryManager', () => {
   });
 
   describe('copyBufferToWASM', () => {
-    test('should copy ArrayBuffer to WASM memory', () => {
+    test('should copy ArrayBuffer to WASM memory', async () => {
+      using pdfium = await initPdfium();
+      const memory = pdfium[INTERNAL].memory;
       const buffer = new ArrayBuffer(10);
       const view = new Uint8Array(buffer);
       view.set([10, 20, 30, 40, 50, 60, 70, 80, 90, 100]);
@@ -140,7 +136,9 @@ describe('WASMMemoryManager', () => {
   });
 
   describe('readInt32 and writeInt32', () => {
-    test('should read and write 32-bit integers', () => {
+    test('should read and write 32-bit integers', async () => {
+      using pdfium = await initPdfium();
+      const memory = pdfium[INTERNAL].memory;
       const ptr = memory.malloc(4);
 
       memory.writeInt32(ptr, 0x12345678);
@@ -150,7 +148,9 @@ describe('WASMMemoryManager', () => {
       memory.free(ptr);
     });
 
-    test('should handle negative integers', () => {
+    test('should handle negative integers', async () => {
+      using pdfium = await initPdfium();
+      const memory = pdfium[INTERNAL].memory;
       const ptr = memory.malloc(4);
 
       memory.writeInt32(ptr, -1);
@@ -162,7 +162,9 @@ describe('WASMMemoryManager', () => {
   });
 
   describe('copyStringToWASM', () => {
-    test('should copy null-terminated string to WASM', () => {
+    test('should copy null-terminated string to WASM', async () => {
+      using pdfium = await initPdfium();
+      const memory = pdfium[INTERNAL].memory;
       const ptr = memory.copyStringToWASM('hello');
       // Read back including null terminator
       const bytes = memory.copyFromWASM(ptr, 6);
@@ -179,7 +181,9 @@ describe('WASMMemoryManager', () => {
   });
 
   describe('readUTF16LE', () => {
-    test('should read UTF-16LE encoded text', () => {
+    test('should read UTF-16LE encoded text', async () => {
+      using pdfium = await initPdfium();
+      const memory = pdfium[INTERNAL].memory;
       // "Hi" in UTF-16LE is: 0x48 0x00 0x69 0x00
       const data = new Uint8Array([0x48, 0x00, 0x69, 0x00]);
       const ptr = memory.copyToWASM(data);
@@ -191,7 +195,9 @@ describe('WASMMemoryManager', () => {
   });
 
   describe('heapU8', () => {
-    test('should return the HEAPU8 view', () => {
+    test('should return the HEAPU8 view', async () => {
+      using pdfium = await initPdfium();
+      const memory = pdfium[INTERNAL].memory;
       const heap = memory.heapU8;
       expect(heap).toBeInstanceOf(Uint8Array);
       expect(heap.length).toBeGreaterThan(0);
@@ -199,7 +205,9 @@ describe('WASMMemoryManager', () => {
   });
 
   describe('activeAllocations', () => {
-    test('should return current allocation count', () => {
+    test('should return current allocation count', async () => {
+      using pdfium = await initPdfium();
+      const memory = pdfium[INTERNAL].memory;
       const count = memory.activeAllocations;
       expect(typeof count).toBe('number');
       expect(count).toBeGreaterThanOrEqual(0);
@@ -207,12 +215,16 @@ describe('WASMMemoryManager', () => {
   });
 
   describe('alloc', () => {
-    test('should return a disposable allocation with correct pointer', () => {
+    test('should return a disposable allocation with correct pointer', async () => {
+      using pdfium = await initPdfium();
+      const memory = pdfium[INTERNAL].memory;
       using allocation = memory.alloc(16);
       expect(allocation.ptr).not.toBe(0);
     });
 
-    test('should free memory on dispose', () => {
+    test('should free memory on dispose', async () => {
+      using pdfium = await initPdfium();
+      const memory = pdfium[INTERNAL].memory;
       const before = memory.activeAllocations;
       const allocation = memory.alloc(16);
       expect(memory.activeAllocations).toBe(before + 1);
@@ -222,7 +234,9 @@ describe('WASMMemoryManager', () => {
   });
 
   describe('allocFrom', () => {
-    test('should copy data and return disposable allocation', () => {
+    test('should copy data and return disposable allocation', async () => {
+      using pdfium = await initPdfium();
+      const memory = pdfium[INTERNAL].memory;
       const data = new Uint8Array([10, 20, 30]);
       using allocation = memory.allocFrom(data);
       const result = memory.copyFromWASM(allocation.ptr, 3);
@@ -231,7 +245,9 @@ describe('WASMMemoryManager', () => {
   });
 
   describe('allocString', () => {
-    test('should copy string and return disposable allocation', () => {
+    test('should copy string and return disposable allocation', async () => {
+      using pdfium = await initPdfium();
+      const memory = pdfium[INTERNAL].memory;
       using allocation = memory.allocString('test');
       const bytes = memory.copyFromWASM(allocation.ptr, 5);
       expect(bytes[0]).toBe(116); // 't'
@@ -240,7 +256,9 @@ describe('WASMMemoryManager', () => {
   });
 
   describe('allocBuffer', () => {
-    test('should copy ArrayBuffer and return disposable allocation', () => {
+    test('should copy ArrayBuffer and return disposable allocation', async () => {
+      using pdfium = await initPdfium();
+      const memory = pdfium[INTERNAL].memory;
       const buf = new ArrayBuffer(3);
       new Uint8Array(buf).set([7, 8, 9]);
       using allocation = memory.allocBuffer(buf);
@@ -251,19 +269,20 @@ describe('WASMMemoryManager', () => {
 
   describe('freeAll', () => {
     test('should free all tracked allocations', async () => {
-      const localPdfium = await initPdfium();
+      using localPdfium = await initPdfium();
       const localMemory = localPdfium[INTERNAL].memory;
       localMemory.malloc(10);
       localMemory.malloc(20);
       expect(localMemory.activeAllocations).toBeGreaterThanOrEqual(2);
       localMemory.freeAll();
       expect(localMemory.activeAllocations).toBe(0);
-      localPdfium.dispose();
     });
   });
 
   describe('copyStringToWASM', () => {
-    test('should handle empty string', () => {
+    test('should handle empty string', async () => {
+      using pdfium = await initPdfium();
+      const memory = pdfium[INTERNAL].memory;
       const ptr = memory.copyStringToWASM('');
       const bytes = memory.copyFromWASM(ptr, 1);
       expect(bytes[0]).toBe(0); // just null terminator
@@ -272,53 +291,71 @@ describe('WASMMemoryManager', () => {
   });
 
   describe('bounds checking', () => {
-    test('malloc throws for size <= 0', () => {
+    test('malloc throws for size <= 0', async () => {
+      using pdfium = await initPdfium();
+      const memory = pdfium[INTERNAL].memory;
       expect(() => memory.malloc(0)).toThrow(MemoryError);
       expect(() => memory.malloc(-1)).toThrow(MemoryError);
     });
 
-    test('copyFromWASM throws for length <= 0', () => {
+    test('copyFromWASM throws for length <= 0', async () => {
+      using pdfium = await initPdfium();
+      const memory = pdfium[INTERNAL].memory;
       const ptr = memory.malloc(4);
       expect(() => memory.copyFromWASM(ptr, 0)).toThrow(MemoryError);
       expect(() => memory.copyFromWASM(ptr, -1)).toThrow(MemoryError);
       memory.free(ptr);
     });
 
-    test('copyFromWASM throws for out-of-bounds read', () => {
+    test('copyFromWASM throws for out-of-bounds read', async () => {
+      using pdfium = await initPdfium();
+      const memory = pdfium[INTERNAL].memory;
       const ptr = memory.malloc(4);
       const heapSize = memory.heapU8.length;
       expect(() => memory.copyFromWASM(asPointer(heapSize - 2), 4)).toThrow(MemoryError);
       memory.free(ptr);
     });
 
-    test('readInt32 throws for misaligned pointer', () => {
+    test('readInt32 throws for misaligned pointer', async () => {
+      using pdfium = await initPdfium();
+      const memory = pdfium[INTERNAL].memory;
       expect(() => memory.readInt32(asPointer(1))).toThrow(MemoryError);
       expect(() => memory.readInt32(asPointer(3))).toThrow(MemoryError);
     });
 
-    test('writeInt32 throws for misaligned pointer', () => {
+    test('writeInt32 throws for misaligned pointer', async () => {
+      using pdfium = await initPdfium();
+      const memory = pdfium[INTERNAL].memory;
       expect(() => memory.writeInt32(asPointer(1), 42)).toThrow(MemoryError);
       expect(() => memory.writeInt32(asPointer(3), 42)).toThrow(MemoryError);
     });
 
-    test('readUTF16LE throws for negative charCount', () => {
+    test('readUTF16LE throws for negative charCount', async () => {
+      using pdfium = await initPdfium();
+      const memory = pdfium[INTERNAL].memory;
       const ptr = memory.malloc(4);
       expect(() => memory.readUTF16LE(ptr, -1)).toThrow(MemoryError);
       memory.free(ptr);
     });
 
-    test('readUTF16LE returns empty string for zero charCount', () => {
+    test('readUTF16LE returns empty string for zero charCount', async () => {
+      using pdfium = await initPdfium();
+      const memory = pdfium[INTERNAL].memory;
       const ptr = memory.malloc(4);
       expect(memory.readUTF16LE(ptr, 0)).toBe('');
       memory.free(ptr);
     });
 
-    test('readUTF16LE throws for out-of-bounds read', () => {
+    test('readUTF16LE throws for out-of-bounds read', async () => {
+      using pdfium = await initPdfium();
+      const memory = pdfium[INTERNAL].memory;
       const heapSize = memory.heapU8.length;
       expect(() => memory.readUTF16LE(asPointer(heapSize - 2), 4)).toThrow(MemoryError);
     });
 
-    test('readInt32 and writeInt32 work with aligned pointers', () => {
+    test('readInt32 and writeInt32 work with aligned pointers', async () => {
+      using pdfium = await initPdfium();
+      const memory = pdfium[INTERNAL].memory;
       const ptr = memory.malloc(4);
       memory.writeInt32(ptr, 0xdeadbeef);
       // readInt32 returns signed value; 0xDEADBEEF as signed 32-bit = -559038737

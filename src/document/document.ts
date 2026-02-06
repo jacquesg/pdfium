@@ -6,14 +6,19 @@
 
 import { Disposable } from '../core/disposable.js';
 import { DocumentError, MemoryError, PageError, PDFiumErrorCode } from '../core/errors.js';
+import { EventEmitter } from '../core/events.js';
+import type { IDocumentReader } from '../core/interfaces.js';
 import {
-  AttachmentValueType,
   type Bookmark,
+  type Colour,
   DEFAULT_LIMITS,
   DocMDPPermission,
   type DocumentActionType,
   type DocumentMetadata,
+  DocumentPermission,
+  type DocumentPermissions,
   DuplexMode,
+  type FormFieldType,
   FormType,
   type ImportPagesOptions,
   type JavaScriptAction,
@@ -36,6 +41,16 @@ import {
   UTF16LE_BYTES_PER_CHAR,
   UTF16LE_NULL_TERMINATOR_BYTES,
 } from '../internal/constants.js';
+import {
+  docMDPPermissionMap,
+  documentActionTypeMap,
+  duplexModeMap,
+  formFieldTypeMap,
+  formTypeMap,
+  fromNative,
+  pageModeMap,
+  toNative,
+} from '../internal/enum-maps.js';
 import type {
   AttachmentHandle,
   BookmarkHandle,
@@ -45,23 +60,29 @@ import type {
   WASMPointer,
 } from '../internal/handles.js';
 import { INTERNAL } from '../internal/symbols.js';
-import type { WASMAllocation } from '../wasm/allocation.js';
+import { WASMAllocation } from '../wasm/allocation.js';
 import type { PDFiumWASM } from '../wasm/bindings/index.js';
 import {
-  asciiDecoder,
   asHandle,
   encodeUTF16LE,
   NULL_PTR,
-  textDecoder,
+  ptrOffset,
   textEncoder,
   utf16leDecoder,
   type WASMMemoryManager,
 } from '../wasm/memory.js';
+import { getWasmBytes, getWasmInt32Array, getWasmStringUTF8, getWasmStringUTF16LE } from '../wasm/utils.js';
+import { PDFiumAttachmentWriter } from './attachment-writer.js';
 import { PDFiumPage } from './page.js';
 import { saveDocument } from './save-utils.js';
 
 /** Maximum recursion depth for bookmark tree traversal. */
 const MAX_BOOKMARK_DEPTH = 100;
+
+/** Convert a Colour to a PDFium ARGB integer. */
+function colourToARGB(c: Colour): number {
+  return ((c.a << 24) | (c.r << 16) | (c.g << 8) | c.b) >>> 0;
+}
 
 /**
  * Size of the FPDF_FORMFILLINFO structure.
@@ -70,6 +91,16 @@ const MAX_BOOKMARK_DEPTH = 100;
  * We need at least 140 bytes for the structure, allocate 256 to be safe.
  */
 const FORM_FILL_INFO_SIZE = 256;
+
+/**
+ * Events emitted by PDFiumDocument.
+ */
+export interface DocumentEvents extends Record<string, unknown> {
+  /** Emitted when a page is loaded. */
+  pageLoaded: { pageIndex: number };
+  /** Emitted before the document is saved. */
+  willSave: undefined;
+}
 
 /**
  * Represents a loaded PDF document.
@@ -88,15 +119,22 @@ const FORM_FILL_INFO_SIZE = 256;
  * }
  * ```
  */
-export class PDFiumDocument extends Disposable {
+export class PDFiumDocument extends Disposable implements IDocumentReader {
   readonly #module: PDFiumWASM;
   readonly #memory: WASMMemoryManager;
   readonly #documentHandle: DocumentHandle;
-  readonly #dataPtr: WASMPointer;
   readonly #limits: Readonly<Required<PDFiumLimits>>;
   readonly #pages = new Set<PDFiumPage>();
+  /** Event emitter for document events. */
+  readonly events = new EventEmitter<DocumentEvents>();
   #formHandle: FormHandle = NULL_FORM;
-  #formInfoPtr: WASMPointer = NULL_PTR;
+  #formInfo: FSFormFillInfo | undefined;
+  #dataAlloc: WASMAllocation;
+
+  // Cached properties
+  #cachedPageCount: number | undefined;
+  #cachedPermissions: number | undefined;
+  #cachedSecurityHandlerRevision: number | undefined;
 
   /** @internal */
   constructor(
@@ -104,13 +142,16 @@ export class PDFiumDocument extends Disposable {
     memory: WASMMemoryManager,
     documentHandle: DocumentHandle,
     dataPtr: WASMPointer,
+    dataSize: number,
     limits?: Readonly<Required<PDFiumLimits>>,
   ) {
     super('PDFiumDocument', PDFiumErrorCode.DOC_ALREADY_CLOSED);
     this.#module = module;
     this.#memory = memory;
     this.#documentHandle = documentHandle;
-    this.#dataPtr = dataPtr;
+    // Wrap data pointer in RAII allocation for automatic cleanup
+    this.#dataAlloc = new WASMAllocation(dataPtr, dataSize, memory);
+
     this.#limits = limits ?? DEFAULT_LIMITS;
 
     // Initialise form fill environment
@@ -128,9 +169,11 @@ export class PDFiumDocument extends Disposable {
         this.#module._FPDFDOC_ExitFormFillEnvironment(this.#formHandle);
       }
       this.#module._FPDF_CloseDocument(this.#documentHandle);
-      this.#memory.free(this.#dataPtr);
-      if (this.#formInfoPtr !== NULL_PTR) {
-        this.#memory.free(this.#formInfoPtr);
+
+      this.#dataAlloc[Symbol.dispose]();
+
+      if (this.#formInfo) {
+        this.#formInfo[Symbol.dispose]();
       }
     });
   }
@@ -139,37 +182,22 @@ export class PDFiumDocument extends Disposable {
    * Initialise the form fill environment for rendering interactive form fields.
    */
   #initFormFillEnvironment(): void {
-    using formInfo = this.#tryAllocFormInfo();
-    if (formInfo === undefined) {
-      return;
-    }
-
-    // Zero out the structure (required - callback pointers must be null)
-    this.#memory.heapU8.fill(0, formInfo.ptr, formInfo.ptr + FORM_FILL_INFO_SIZE);
-
-    // Set version to 2 (supports XFA and other features)
-    const FORM_FILL_INFO_VERSION = 2;
-    this.#memory.writeInt32(formInfo.ptr, FORM_FILL_INFO_VERSION);
-
-    // Initialise form fill environment
-    this.#formHandle = this.#module._FPDFDOC_InitFormFillEnvironment(this.#documentHandle, formInfo.ptr);
-
-    // If initialisation failed, formInfo auto-freed at scope exit
-    if (this.#formHandle === NULL_FORM) {
-      return;
-    }
-
-    // Transfer ownership to instance
-    this.#formInfoPtr = formInfo.take();
-  }
-
-  #tryAllocFormInfo(): WASMAllocation | undefined {
     try {
-      return this.#memory.alloc(FORM_FILL_INFO_SIZE);
+      // Create RAII wrapper
+      this.#formInfo = new FSFormFillInfo(this.#memory);
+
+      // Initialise form fill environment
+      this.#formHandle = this.#module._FPDFDOC_InitFormFillEnvironment(this.#documentHandle, this.#formInfo.ptr);
+
+      if (this.#formHandle === NULL_FORM) {
+        // Failed, cleanup
+        this.#formInfo[Symbol.dispose]();
+        this.#formInfo = undefined;
+      }
     } catch (error) {
       // Form fill is optional - continue without it if allocation fails
       if (error instanceof MemoryError) {
-        return undefined;
+        return;
       }
       throw error;
     }
@@ -180,7 +208,10 @@ export class PDFiumDocument extends Disposable {
    */
   get pageCount(): number {
     this.ensureNotDisposed();
-    return this.#module._FPDF_GetPageCount(this.#documentHandle);
+    if (this.#cachedPageCount === undefined) {
+      this.#cachedPageCount = this.#module._FPDF_GetPageCount(this.#documentHandle);
+    }
+    return this.#cachedPageCount;
   }
 
   /**
@@ -239,6 +270,7 @@ export class PDFiumDocument extends Disposable {
       (p: PDFiumPage) => this.#pages.delete(p),
     );
     this.#pages.add(page);
+    this.events.emit('pageLoaded', { pageIndex });
     return page;
   }
 
@@ -255,7 +287,7 @@ export class PDFiumDocument extends Disposable {
    * }
    * ```
    */
-  *pages(): Generator<PDFiumPage> {
+  *pages(): IterableIterator<PDFiumPage> {
     this.ensureNotDisposed();
     const count = this.pageCount;
     for (let i = 0; i < count; i++) {
@@ -291,12 +323,12 @@ export class PDFiumDocument extends Disposable {
    * }
    * ```
    */
-  *bookmarks(): Generator<Bookmark> {
+  *bookmarks(): IterableIterator<Bookmark> {
     this.ensureNotDisposed();
     yield* this.#yieldBookmarkChildren(NULL_BOOKMARK);
   }
 
-  *#yieldBookmarkChildren(parent: BookmarkHandle, depth = 0): Generator<Bookmark> {
+  *#yieldBookmarkChildren(parent: BookmarkHandle, depth = 0): IterableIterator<Bookmark> {
     if (depth > MAX_BOOKMARK_DEPTH) {
       throw new DocumentError(
         PDFiumErrorCode.DOC_FORMAT_INVALID,
@@ -389,7 +421,7 @@ export class PDFiumDocument extends Disposable {
    * }
    * ```
    */
-  *attachments(): Generator<PDFAttachment> {
+  *attachments(): IterableIterator<PDFAttachment> {
     this.ensureNotDisposed();
     const count = this.#module._FPDFDoc_GetAttachmentCount(this.#documentHandle);
     for (let i = 0; i < count; i++) {
@@ -457,20 +489,23 @@ export class PDFiumDocument extends Disposable {
    * Add a new attachment to the document.
    *
    * @param name - The name of the attachment
-   * @returns The attachment handle or null if failed
+   * @returns An attachment writer for setting file contents and metadata, or null if failed
    */
-  addAttachment(name: string): AttachmentHandle | null {
+  addAttachment(name: string): PDFiumAttachmentWriter | null {
     this.ensureNotDisposed();
-    const fn = this.#module._FPDFDoc_AddAttachment;
-    if (typeof fn !== 'function') {
-      return null;
-    }
 
     // Encode name as UTF-16LE with null terminator
     const nameBytes = encodeUTF16LE(name);
     using nameBuffer = this.#memory.allocFrom(nameBytes);
-    const handle = fn(this.#documentHandle, nameBuffer.ptr);
-    return handle === NULL_ATTACHMENT ? null : handle;
+    const handle = this.#module._FPDFDoc_AddAttachment(this.#documentHandle, nameBuffer.ptr);
+    if (handle === NULL_ATTACHMENT) return null;
+    return new PDFiumAttachmentWriter({
+      module: this.#module,
+      memory: this.#memory,
+      handle,
+      documentHandle: this.#documentHandle,
+      ensureDocumentValid: () => this.ensureNotDisposed(),
+    });
   }
 
   /**
@@ -481,126 +516,7 @@ export class PDFiumDocument extends Disposable {
    */
   deleteAttachment(index: number): boolean {
     this.ensureNotDisposed();
-    const fn = this.#module._FPDFDoc_DeleteAttachment;
-    if (typeof fn !== 'function') {
-      return false;
-    }
-    return fn(this.#documentHandle, index) !== 0;
-  }
-
-  /**
-   * Set the file contents of an attachment.
-   *
-   * @param attachment - The attachment handle
-   * @param contents - The file contents
-   * @returns True if successful
-   */
-  setAttachmentFile(attachment: AttachmentHandle, contents: Uint8Array): boolean {
-    this.ensureNotDisposed();
-    const fn = this.#module._FPDFAttachment_SetFile;
-    if (typeof fn !== 'function') {
-      return false;
-    }
-
-    // Handle empty content case
-    if (contents.length === 0) {
-      return fn(attachment, this.#documentHandle, NULL_PTR, 0) !== 0;
-    }
-
-    using contentBuffer = this.#memory.alloc(contents.length);
-    this.#memory.heapU8.set(contents, contentBuffer.ptr);
-    return fn(attachment, this.#documentHandle, contentBuffer.ptr, contents.length) !== 0;
-  }
-
-  /**
-   * Check if an attachment has a specific key.
-   *
-   * @param attachment - The attachment handle
-   * @param key - The key to check
-   * @returns True if the key exists
-   */
-  attachmentHasKey(attachment: AttachmentHandle, key: string): boolean {
-    this.ensureNotDisposed();
-    const fn = this.#module._FPDFAttachment_HasKey;
-    if (typeof fn !== 'function') {
-      return false;
-    }
-
-    using keyBuffer = this.#memory.allocString(key);
-    return fn(attachment, keyBuffer.ptr) !== 0;
-  }
-
-  /**
-   * Get the value type of an attachment key.
-   *
-   * @param attachment - The attachment handle
-   * @param key - The key to check
-   * @returns The value type
-   */
-  getAttachmentValueType(attachment: AttachmentHandle, key: string): AttachmentValueType {
-    this.ensureNotDisposed();
-    const fn = this.#module._FPDFAttachment_GetValueType;
-    if (typeof fn !== 'function') {
-      return AttachmentValueType.Unknown;
-    }
-
-    using keyBuffer = this.#memory.allocString(key);
-    const result = fn(attachment, keyBuffer.ptr);
-    if (result < 0 || result > 8) {
-      return AttachmentValueType.Unknown;
-    }
-    return result as AttachmentValueType;
-  }
-
-  /**
-   * Get a string value from an attachment.
-   *
-   * @param attachment - The attachment handle
-   * @param key - The key to get
-   * @returns The string value or undefined if not found
-   */
-  getAttachmentStringValue(attachment: AttachmentHandle, key: string): string | undefined {
-    this.ensureNotDisposed();
-    const fn = this.#module._FPDFAttachment_GetStringValue;
-    if (typeof fn !== 'function') {
-      return undefined;
-    }
-
-    using keyBuffer = this.#memory.allocString(key);
-
-    // First call to get required buffer size
-    const requiredBytes = fn(attachment, keyBuffer.ptr, NULL_PTR, 0);
-    if (requiredBytes <= UTF16LE_NULL_TERMINATOR_BYTES) {
-      return undefined;
-    }
-
-    using valueBuffer = this.#memory.alloc(requiredBytes);
-    fn(attachment, keyBuffer.ptr, valueBuffer.ptr, requiredBytes);
-
-    // UTF-16LE: 2 bytes per char, subtract null terminator bytes
-    const charCount = (requiredBytes - UTF16LE_NULL_TERMINATOR_BYTES) / UTF16LE_BYTES_PER_CHAR;
-    return this.#memory.readUTF16LE(valueBuffer.ptr, charCount);
-  }
-
-  /**
-   * Set a string value on an attachment.
-   *
-   * @param attachment - The attachment handle
-   * @param key - The key to set
-   * @param value - The string value
-   * @returns True if successful
-   */
-  setAttachmentStringValue(attachment: AttachmentHandle, key: string, value: string): boolean {
-    this.ensureNotDisposed();
-    const fn = this.#module._FPDFAttachment_SetStringValue;
-    if (typeof fn !== 'function') {
-      return false;
-    }
-
-    using keyBuffer = this.#memory.allocString(key);
-    const valueBytes = encodeUTF16LE(value);
-    using valueBuffer = this.#memory.allocFrom(valueBytes);
-    return fn(attachment, keyBuffer.ptr, valueBuffer.ptr) !== 0;
+    return this.#module._FPDFDoc_DeleteAttachment(this.#documentHandle, index) !== 0;
   }
 
   /**
@@ -661,23 +577,9 @@ export class PDFiumDocument extends Disposable {
     this.ensureNotDisposed();
 
     using tagAlloc = this.#memory.allocString(tag);
-
-    // First call to get required buffer size (in bytes, including null terminator)
-    const requiredBytes = this.#module._FPDF_GetMetaText(this.#documentHandle, tagAlloc.ptr, NULL_PTR, 0);
-
-    // No metadata or empty string (null terminator only in UTF-16LE)
-    if (requiredBytes <= UTF16LE_NULL_TERMINATOR_BYTES) {
-      return undefined;
-    }
-
-    using buffer = this.#memory.alloc(requiredBytes);
-    this.#module._FPDF_GetMetaText(this.#documentHandle, tagAlloc.ptr, buffer.ptr, requiredBytes);
-
-    // UTF-16LE: 2 bytes per char, subtract null terminator bytes
-    const charCount = (requiredBytes - UTF16LE_NULL_TERMINATOR_BYTES) / UTF16LE_BYTES_PER_CHAR;
-    const value = this.#memory.readUTF16LE(buffer.ptr, charCount);
-
-    return value.length > 0 ? value : undefined;
+    return getWasmStringUTF16LE(this.#memory, (buf, len) =>
+      this.#module._FPDF_GetMetaText(this.#documentHandle, tagAlloc.ptr, buf, len),
+    );
   }
 
   /**
@@ -700,20 +602,55 @@ export class PDFiumDocument extends Disposable {
   }
 
   /**
-   * Get the document permissions bitmask.
+   * Get the raw document permissions bitmask.
    *
    * Returns the raw permissions value from the document's encryption dictionary.
-   * Use bitwise operations with `DocumentPermission` enum to check specific permissions.
+   * Use bitwise operations with `DocumentPermission` enum to check specific permissions,
+   * or use {@link getPermissions} for a structured object.
    *
    * @example
    * ```typescript
-   * const perms = document.permissions;
+   * const perms = document.rawPermissions;
    * const canPrint = (perms & DocumentPermission.Print) !== 0;
    * ```
    */
-  get permissions(): number {
+  get rawPermissions(): number {
     this.ensureNotDisposed();
-    return this.#module._FPDF_GetDocPermissions(this.#documentHandle);
+    if (this.#cachedPermissions === undefined) {
+      this.#cachedPermissions = this.#module._FPDF_GetDocPermissions(this.#documentHandle);
+    }
+    return this.#cachedPermissions;
+  }
+
+  /**
+   * Get structured document permissions with named boolean fields.
+   *
+   * This decodes the raw permissions bitmask into a typed object
+   * with a named boolean field for each permission.
+   *
+   * @returns Structured permissions object
+   *
+   * @example
+   * ```typescript
+   * const perms = document.getPermissions();
+   * if (perms.canPrint) {
+   *   console.log('Printing is allowed');
+   * }
+   * ```
+   */
+  getPermissions(): DocumentPermissions {
+    const raw = this.rawPermissions;
+    return {
+      raw,
+      canPrint: (raw & DocumentPermission.Print) !== 0,
+      canModifyContents: (raw & DocumentPermission.ModifyContents) !== 0,
+      canCopyOrExtract: (raw & DocumentPermission.CopyOrExtract) !== 0,
+      canAddOrModifyAnnotations: (raw & DocumentPermission.AddOrModifyAnnotations) !== 0,
+      canFillForms: (raw & DocumentPermission.FillForms) !== 0,
+      canExtractForAccessibility: (raw & DocumentPermission.ExtractForAccessibility) !== 0,
+      canAssemble: (raw & DocumentPermission.Assemble) !== 0,
+      canPrintHighQuality: (raw & DocumentPermission.PrintHighQuality) !== 0,
+    };
   }
 
   /**
@@ -736,7 +673,7 @@ export class PDFiumDocument extends Disposable {
     this.ensureNotDisposed();
     const mode = this.#module._FPDFDoc_GetPageMode(this.#documentHandle);
     // PDFium returns -1 for unknown, map to UseNone
-    return mode >= 0 && mode <= 5 ? mode : PageMode.UseNone;
+    return fromNative(pageModeMap.fromNative, mode, PageMode.UseNone);
   }
 
   /**
@@ -747,7 +684,10 @@ export class PDFiumDocument extends Disposable {
    */
   get securityHandlerRevision(): number {
     this.ensureNotDisposed();
-    return this.#module._FPDF_GetSecurityHandlerRevision(this.#documentHandle);
+    if (this.#cachedSecurityHandlerRevision === undefined) {
+      this.#cachedSecurityHandlerRevision = this.#module._FPDF_GetSecurityHandlerRevision(this.#documentHandle);
+    }
+    return this.#cachedSecurityHandlerRevision;
   }
 
   /**
@@ -784,8 +724,7 @@ export class PDFiumDocument extends Disposable {
 
     const result: number[] = [];
     for (let i = 0; i < actualCount; i++) {
-      const offset = buffer.ptr + i * 4;
-      result.push(this.#memory.readInt32(offset as WASMPointer));
+      result.push(this.#memory.readInt32(ptrOffset(buffer.ptr, i * 4)));
     }
 
     return result;
@@ -809,22 +748,9 @@ export class PDFiumDocument extends Disposable {
       return undefined;
     }
 
-    // First call to get required buffer size
-    const requiredBytes = this.#module._FPDF_GetPageLabel(this.#documentHandle, pageIndex, NULL_PTR, 0);
-
-    // No label or empty (null terminator only in UTF-16LE)
-    if (requiredBytes <= UTF16LE_NULL_TERMINATOR_BYTES) {
-      return undefined;
-    }
-
-    using buffer = this.#memory.alloc(requiredBytes);
-    this.#module._FPDF_GetPageLabel(this.#documentHandle, pageIndex, buffer.ptr, requiredBytes);
-
-    // UTF-16LE: 2 bytes per char, subtract null terminator bytes
-    const charCount = (requiredBytes - UTF16LE_NULL_TERMINATOR_BYTES) / UTF16LE_BYTES_PER_CHAR;
-    const label = this.#memory.readUTF16LE(buffer.ptr, charCount);
-
-    return label.length > 0 ? label : undefined;
+    return getWasmStringUTF16LE(this.#memory, (buf, len) =>
+      this.#module._FPDF_GetPageLabel(this.#documentHandle, pageIndex, buf, len),
+    );
   }
 
   /**
@@ -853,16 +779,10 @@ export class PDFiumDocument extends Disposable {
   getViewerPreferences(): ViewerPreferences {
     this.ensureNotDisposed();
 
-    const printScalingFn = this.#module._FPDF_VIEWERREF_GetPrintScaling;
-    const numCopiesFn = this.#module._FPDF_VIEWERREF_GetNumCopies;
-    const duplexFn = this.#module._FPDF_VIEWERREF_GetDuplex;
-
-    const printScaling = typeof printScalingFn === 'function' ? printScalingFn(this.#documentHandle) !== 0 : true;
-
-    const numCopies = typeof numCopiesFn === 'function' ? numCopiesFn(this.#documentHandle) : 1;
-
-    const duplexValue = typeof duplexFn === 'function' ? duplexFn(this.#documentHandle) : 0;
-    const duplexMode = duplexValue >= 0 && duplexValue <= 3 ? (duplexValue as DuplexMode) : DuplexMode.Undefined;
+    const printScaling = this.#module._FPDF_VIEWERREF_GetPrintScaling(this.#documentHandle) !== 0;
+    const numCopies = this.#module._FPDF_VIEWERREF_GetNumCopies(this.#documentHandle);
+    const duplexValue = this.#module._FPDF_VIEWERREF_GetDuplex(this.#documentHandle);
+    const duplexMode = fromNative(duplexModeMap.fromNative, duplexValue, DuplexMode.Undefined);
 
     return {
       printScaling,
@@ -878,13 +798,7 @@ export class PDFiumDocument extends Disposable {
    */
   get printScaling(): boolean {
     this.ensureNotDisposed();
-
-    const fn = this.#module._FPDF_VIEWERREF_GetPrintScaling;
-    if (typeof fn !== 'function') {
-      return true; // Default is to use print scaling
-    }
-
-    return fn(this.#documentHandle) !== 0;
+    return this.#module._FPDF_VIEWERREF_GetPrintScaling(this.#documentHandle) !== 0;
   }
 
   /**
@@ -894,13 +808,7 @@ export class PDFiumDocument extends Disposable {
    */
   get numCopies(): number {
     this.ensureNotDisposed();
-
-    const fn = this.#module._FPDF_VIEWERREF_GetNumCopies;
-    if (typeof fn !== 'function') {
-      return 1;
-    }
-
-    const copies = fn(this.#documentHandle);
+    const copies = this.#module._FPDF_VIEWERREF_GetNumCopies(this.#documentHandle);
     return copies > 0 ? copies : 1;
   }
 
@@ -911,14 +819,8 @@ export class PDFiumDocument extends Disposable {
    */
   get duplexMode(): DuplexMode {
     this.ensureNotDisposed();
-
-    const fn = this.#module._FPDF_VIEWERREF_GetDuplex;
-    if (typeof fn !== 'function') {
-      return DuplexMode.Undefined;
-    }
-
-    const value = fn(this.#documentHandle);
-    return value >= 0 && value <= 3 ? (value as DuplexMode) : DuplexMode.Undefined;
+    const value = this.#module._FPDF_VIEWERREF_GetDuplex(this.#documentHandle);
+    return fromNative(duplexModeMap.fromNative, value, DuplexMode.Undefined);
   }
 
   /**
@@ -929,31 +831,19 @@ export class PDFiumDocument extends Disposable {
   getPrintPageRanges(): number[] | undefined {
     this.ensureNotDisposed();
 
-    const getPageRangeFn = this.#module._FPDF_VIEWERREF_GetPrintPageRange;
-    const getCountFn = this.#module._FPDF_VIEWERREF_GetPrintPageRangeCount;
-    const getElementFn = this.#module._FPDF_VIEWERREF_GetPrintPageRangeElement;
-
-    if (
-      typeof getPageRangeFn !== 'function' ||
-      typeof getCountFn !== 'function' ||
-      typeof getElementFn !== 'function'
-    ) {
-      return undefined;
-    }
-
-    const pageRange = getPageRangeFn(this.#documentHandle);
+    const pageRange = this.#module._FPDF_VIEWERREF_GetPrintPageRange(this.#documentHandle);
     if (pageRange === 0) {
       return undefined;
     }
 
-    const count = getCountFn(pageRange);
+    const count = this.#module._FPDF_VIEWERREF_GetPrintPageRangeCount(pageRange);
     if (count <= 0) {
       return undefined;
     }
 
     const pages: number[] = [];
     for (let i = 0; i < count; i++) {
-      const element = getElementFn(pageRange, i);
+      const element = this.#module._FPDF_VIEWERREF_GetPrintPageRangeElement(pageRange, i);
       if (element >= 0) {
         pages.push(element);
       }
@@ -971,33 +861,14 @@ export class PDFiumDocument extends Disposable {
   getViewerPreference(key: string): string | undefined {
     this.ensureNotDisposed();
 
-    const fn = this.#module._FPDF_VIEWERREF_GetName;
-    if (typeof fn !== 'function') {
-      return undefined;
-    }
-
     // Encode key as ASCII
     const keyBytes = textEncoder.encode(`${key}\0`);
     using keyBuffer = this.#memory.alloc(keyBytes.length);
     this.#memory.heapU8.set(keyBytes, keyBuffer.ptr);
 
-    // First call to get required buffer size
-    const requiredBytes = fn(this.#documentHandle, keyBuffer.ptr, NULL_PTR, 0);
-    if (requiredBytes <= 0) {
-      return undefined;
-    }
-
-    // Allocate buffer and get value
-    using valueBuffer = this.#memory.alloc(requiredBytes);
-    const actualBytes = fn(this.#documentHandle, keyBuffer.ptr, valueBuffer.ptr, requiredBytes);
-
-    if (actualBytes <= 0) {
-      return undefined;
-    }
-
-    // Decode UTF-8 string
-    const bytes = this.#memory.heapU8.subarray(valueBuffer.ptr, valueBuffer.ptr + actualBytes - 1);
-    return textDecoder.decode(bytes);
+    return getWasmStringUTF8(this.#memory, (buf, len) =>
+      this.#module._FPDF_VIEWERREF_GetName(this.#documentHandle, keyBuffer.ptr, buf, len),
+    );
   }
 
   // ============================================================================
@@ -1011,13 +882,7 @@ export class PDFiumDocument extends Disposable {
    */
   get namedDestinationCount(): number {
     this.ensureNotDisposed();
-
-    const fn = this.#module._FPDF_CountNamedDests;
-    if (typeof fn !== 'function') {
-      return 0;
-    }
-
-    return fn(this.#documentHandle);
+    return this.#module._FPDF_CountNamedDests(this.#documentHandle);
   }
 
   /**
@@ -1029,23 +894,17 @@ export class PDFiumDocument extends Disposable {
   getNamedDestinationByName(name: string): NamedDestination | undefined {
     this.ensureNotDisposed();
 
-    const fn = this.#module._FPDF_GetNamedDestByName;
-    const getPageIndexFn = this.#module._FPDFDest_GetDestPageIndex;
-    if (typeof fn !== 'function' || typeof getPageIndexFn !== 'function') {
-      return undefined;
-    }
-
     // Encode name as ASCII
     const nameBytes = textEncoder.encode(`${name}\0`);
     using nameBuffer = this.#memory.alloc(nameBytes.length);
     this.#memory.heapU8.set(nameBytes, nameBuffer.ptr);
 
-    const dest = fn(this.#documentHandle, nameBuffer.ptr);
+    const dest = this.#module._FPDF_GetNamedDestByName(this.#documentHandle, nameBuffer.ptr);
     if (dest === NULL_DEST || dest === 0) {
       return undefined;
     }
 
-    const pageIndex = getPageIndexFn(this.#documentHandle, dest);
+    const pageIndex = this.#module._FPDFDest_GetDestPageIndex(this.#documentHandle, dest);
     return {
       name,
       pageIndex: pageIndex >= 0 ? pageIndex : 0,
@@ -1060,15 +919,7 @@ export class PDFiumDocument extends Disposable {
   getNamedDestinations(): NamedDestination[] {
     this.ensureNotDisposed();
 
-    const countFn = this.#module._FPDF_CountNamedDests;
-    const getDestFn = this.#module._FPDF_GetNamedDest;
-    const getPageIndexFn = this.#module._FPDFDest_GetDestPageIndex;
-
-    if (typeof countFn !== 'function' || typeof getDestFn !== 'function' || typeof getPageIndexFn !== 'function') {
-      return [];
-    }
-
-    const count = countFn(this.#documentHandle);
+    const count = this.#module._FPDF_CountNamedDests(this.#documentHandle);
     if (count <= 0) {
       return [];
     }
@@ -1081,7 +932,7 @@ export class PDFiumDocument extends Disposable {
       const int32View = new Int32Array(this.#memory.heapU8.buffer, buflenPtr.ptr, 1);
       int32View[0] = 0;
 
-      getDestFn(this.#documentHandle, i, NULL_PTR, buflenPtr.ptr);
+      this.#module._FPDF_GetNamedDest(this.#documentHandle, i, NULL_PTR, buflenPtr.ptr);
       const requiredLen = int32View[0] ?? 0;
       if (requiredLen <= 0) {
         continue;
@@ -1090,7 +941,7 @@ export class PDFiumDocument extends Disposable {
       // Second call: read the name into a correctly-sized buffer
       int32View[0] = requiredLen;
       using nameBuffer = this.#memory.alloc(requiredLen);
-      const dest = getDestFn(this.#documentHandle, i, nameBuffer.ptr, buflenPtr.ptr);
+      const dest = this.#module._FPDF_GetNamedDest(this.#documentHandle, i, nameBuffer.ptr, buflenPtr.ptr);
 
       if (dest !== NULL_DEST && dest !== 0) {
         const actualLen = int32View[0] ?? 0;
@@ -1101,7 +952,7 @@ export class PDFiumDocument extends Disposable {
             nameBuffer.ptr + actualLen - UTF16LE_NULL_TERMINATOR_BYTES,
           );
           const name = utf16leDecoder.decode(bytes);
-          const pageIndex = getPageIndexFn(this.#documentHandle, dest);
+          const pageIndex = this.#module._FPDFDest_GetDestPageIndex(this.#documentHandle, dest);
 
           destinations.push({
             name,
@@ -1128,13 +979,7 @@ export class PDFiumDocument extends Disposable {
    */
   get javaScriptActionCount(): number {
     this.ensureNotDisposed();
-
-    const fn = this.#module._FPDFDoc_GetJavaScriptActionCount;
-    if (typeof fn !== 'function') {
-      return 0;
-    }
-
-    return fn(this.#documentHandle);
+    return this.#module._FPDFDoc_GetJavaScriptActionCount(this.#documentHandle);
   }
 
   /**
@@ -1155,57 +1000,27 @@ export class PDFiumDocument extends Disposable {
   getJavaScriptAction(index: number): JavaScriptAction | undefined {
     this.ensureNotDisposed();
 
-    const getActionFn = this.#module._FPDFDoc_GetJavaScriptAction;
-    const getNameFn = this.#module._FPDFJavaScriptAction_GetName;
-    const getScriptFn = this.#module._FPDFJavaScriptAction_GetScript;
-    const closeFn = this.#module._FPDFJavaScriptAction_Close;
-
-    if (
-      typeof getActionFn !== 'function' ||
-      typeof getNameFn !== 'function' ||
-      typeof getScriptFn !== 'function' ||
-      typeof closeFn !== 'function'
-    ) {
-      return undefined;
-    }
-
-    const handle = getActionFn(this.#documentHandle, index);
+    const handle = this.#module._FPDFDoc_GetJavaScriptAction(this.#documentHandle, index);
     if (handle === NULL_JAVASCRIPT || handle === 0) {
       return undefined;
     }
 
     try {
       // Get name
-      const nameSize = getNameFn(handle, NULL_PTR, 0);
-      let name = '';
-      if (nameSize > 0) {
-        using nameBuffer = this.#memory.alloc(nameSize);
-        getNameFn(handle, nameBuffer.ptr, nameSize);
-        // UTF-16LE encoded
-        const nameBytes = this.#memory.heapU8.subarray(
-          nameBuffer.ptr,
-          nameBuffer.ptr + nameSize - UTF16LE_NULL_TERMINATOR_BYTES,
-        );
-        name = utf16leDecoder.decode(nameBytes);
-      }
+      const name =
+        getWasmStringUTF16LE(this.#memory, (buf, len) =>
+          this.#module._FPDFJavaScriptAction_GetName(handle, buf, len),
+        ) ?? '';
 
       // Get script
-      const scriptSize = getScriptFn(handle, NULL_PTR, 0);
-      let script = '';
-      if (scriptSize > 0) {
-        using scriptBuffer = this.#memory.alloc(scriptSize);
-        getScriptFn(handle, scriptBuffer.ptr, scriptSize);
-        // UTF-16LE encoded
-        const scriptBytes = this.#memory.heapU8.subarray(
-          scriptBuffer.ptr,
-          scriptBuffer.ptr + scriptSize - UTF16LE_NULL_TERMINATOR_BYTES,
-        );
-        script = utf16leDecoder.decode(scriptBytes);
-      }
+      const script =
+        getWasmStringUTF16LE(this.#memory, (buf, len) =>
+          this.#module._FPDFJavaScriptAction_GetScript(handle, buf, len),
+        ) ?? '';
 
       return { name, script };
     } finally {
-      closeFn(handle);
+      this.#module._FPDFDoc_CloseJavaScriptAction(handle);
     }
   }
 
@@ -1242,11 +1057,7 @@ export class PDFiumDocument extends Disposable {
    */
   get signatureCount(): number {
     this.ensureNotDisposed();
-    const fn = this.#module._FPDF_GetSignatureCount;
-    if (typeof fn !== 'function') {
-      return 0;
-    }
-    return fn(this.#documentHandle);
+    return this.#module._FPDF_GetSignatureCount(this.#documentHandle);
   }
 
   /**
@@ -1274,12 +1085,7 @@ export class PDFiumDocument extends Disposable {
       return undefined;
     }
 
-    const fn = this.#module._FPDF_GetSignatureObject;
-    if (typeof fn !== 'function') {
-      return undefined;
-    }
-
-    const handle = fn(this.#documentHandle, index);
+    const handle = this.#module._FPDF_GetSignatureObject(this.#documentHandle, index);
     if (handle === NULL_SIGNATURE) {
       return undefined;
     }
@@ -1300,7 +1106,7 @@ export class PDFiumDocument extends Disposable {
    * }
    * ```
    */
-  *signatures(): Generator<PDFSignature> {
+  *signatures(): IterableIterator<PDFSignature> {
     this.ensureNotDisposed();
     const count = this.signatureCount;
     for (let i = 0; i < count; i++) {
@@ -1343,130 +1149,30 @@ export class PDFiumDocument extends Disposable {
   }
 
   #getSignatureContents(handle: SignatureHandle): Uint8Array | undefined {
-    const fn = this.#module._FPDFSignatureObj_GetContents;
-    if (typeof fn !== 'function') {
-      return undefined;
-    }
-
-    // First call to get required size
-    const requiredSize = fn(handle, NULL_PTR, 0);
-    if (requiredSize <= 0) {
-      return undefined;
-    }
-
-    using buffer = this.#memory.alloc(requiredSize);
-    const written = fn(handle, buffer.ptr, requiredSize);
-    if (written <= 0) {
-      return undefined;
-    }
-
-    // Copy the contents
-    return this.#memory.heapU8.slice(buffer.ptr, buffer.ptr + written);
+    return getWasmBytes(this.#memory, (ptr, size) => this.#module._FPDFSignatureObj_GetContents(handle, ptr, size));
   }
 
   #getSignatureByteRange(handle: SignatureHandle): number[] | undefined {
-    const fn = this.#module._FPDFSignatureObj_GetByteRange;
-    if (typeof fn !== 'function') {
-      return undefined;
-    }
-
-    // First call to get count (returns number of elements, not bytes)
-    const count = fn(handle, NULL_PTR, 0);
-    if (count <= 0) {
-      return undefined;
-    }
-
-    // Allocate buffer for int32 array
-    using buffer = this.#memory.alloc(count * 4);
-    const written = fn(handle, buffer.ptr, count);
-    if (written <= 0) {
-      return undefined;
-    }
-
-    // Read the integers
-    const intView = new Int32Array(this.#memory.heapU8.buffer, buffer.ptr, written);
-    return Array.from(intView);
+    return getWasmInt32Array(this.#memory, (ptr, count) =>
+      this.#module._FPDFSignatureObj_GetByteRange(handle, ptr, count),
+    );
   }
 
   #getSignatureSubFilter(handle: SignatureHandle): string | undefined {
-    const fn = this.#module._FPDFSignatureObj_GetSubFilter;
-    if (typeof fn !== 'function') {
-      return undefined;
-    }
-
-    // First call to get required size
-    const requiredSize = fn(handle, NULL_PTR, 0);
-    if (requiredSize <= 0) {
-      return undefined;
-    }
-
-    using buffer = this.#memory.alloc(requiredSize);
-    const written = fn(handle, buffer.ptr, requiredSize);
-    if (written <= 0) {
-      return undefined;
-    }
-
-    // ASCII string, null-terminated
-    const dataView = this.#memory.heapU8.subarray(buffer.ptr, buffer.ptr + written - 1);
-    return asciiDecoder.decode(dataView);
+    return getWasmStringUTF8(this.#memory, (buf, len) => this.#module._FPDFSignatureObj_GetSubFilter(handle, buf, len));
   }
 
   #getSignatureReason(handle: SignatureHandle): string | undefined {
-    const fn = this.#module._FPDFSignatureObj_GetReason;
-    if (typeof fn !== 'function') {
-      return undefined;
-    }
-
-    // First call to get required size
-    const requiredSize = fn(handle, NULL_PTR, 0);
-    if (requiredSize <= UTF16LE_NULL_TERMINATOR_BYTES) {
-      return undefined;
-    }
-
-    using buffer = this.#memory.alloc(requiredSize);
-    const written = fn(handle, buffer.ptr, requiredSize);
-    if (written <= UTF16LE_NULL_TERMINATOR_BYTES) {
-      return undefined;
-    }
-
-    // UTF-16LE string
-    const dataView = this.#memory.heapU8.subarray(buffer.ptr, buffer.ptr + written - UTF16LE_NULL_TERMINATOR_BYTES);
-    return utf16leDecoder.decode(dataView);
+    return getWasmStringUTF16LE(this.#memory, (buf, len) => this.#module._FPDFSignatureObj_GetReason(handle, buf, len));
   }
 
   #getSignatureTime(handle: SignatureHandle): string | undefined {
-    const fn = this.#module._FPDFSignatureObj_GetTime;
-    if (typeof fn !== 'function') {
-      return undefined;
-    }
-
-    // First call to get required size
-    const requiredSize = fn(handle, NULL_PTR, 0);
-    if (requiredSize <= 0) {
-      return undefined;
-    }
-
-    using buffer = this.#memory.alloc(requiredSize);
-    const written = fn(handle, buffer.ptr, requiredSize);
-    if (written <= 0) {
-      return undefined;
-    }
-
-    // ASCII string, null-terminated
-    const dataView = this.#memory.heapU8.subarray(buffer.ptr, buffer.ptr + written - 1);
-    return asciiDecoder.decode(dataView);
+    return getWasmStringUTF8(this.#memory, (buf, len) => this.#module._FPDFSignatureObj_GetTime(handle, buf, len));
   }
 
   #getSignatureDocMDPPermission(handle: SignatureHandle): DocMDPPermission {
-    const fn = this.#module._FPDFSignatureObj_GetDocMDPPermission;
-    if (typeof fn !== 'function') {
-      return DocMDPPermission.None;
-    }
-    const perm = fn(handle);
-    if (perm >= 0 && perm <= 3) {
-      return perm as DocMDPPermission;
-    }
-    return DocMDPPermission.None;
+    const perm = this.#module._FPDFSignatureObj_GetDocMDPPermission(handle);
+    return fromNative(docMDPPermissionMap.fromNative, perm, DocMDPPermission.None);
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -1480,15 +1186,8 @@ export class PDFiumDocument extends Disposable {
    */
   get formType(): FormType {
     this.ensureNotDisposed();
-    const fn = this.#module._FPDF_GetFormType;
-    if (typeof fn !== 'function') {
-      return FormType.None;
-    }
-    const type = fn(this.#documentHandle);
-    if (type >= 0 && type <= 3) {
-      return type as FormType;
-    }
-    return FormType.None;
+    const type = this.#module._FPDF_GetFormType(this.#documentHandle);
+    return fromNative(formTypeMap.fromNative, type, FormType.None);
   }
 
   /**
@@ -1525,29 +1224,25 @@ export class PDFiumDocument extends Disposable {
     if (this.#formHandle === NULL_FORM) {
       return false;
     }
-    const fn = this.#module._FORM_ForceToKillFocus;
-    if (typeof fn !== 'function') {
-      return false;
-    }
-    return fn(this.#formHandle) !== 0;
+    return this.#module._FORM_ForceToKillFocus(this.#formHandle) !== 0;
   }
 
   /**
    * Set the highlight colour for form fields.
    *
-   * @param fieldType - Form field type to highlight (0 for all)
-   * @param colour - ARGB colour value
+   * @param fieldType - Form field type to highlight
+   * @param colour - Colour value for the highlight
    */
-  setFormFieldHighlightColour(fieldType: number, colour: number): void {
+  setFormFieldHighlightColour(fieldType: FormFieldType, colour: Colour): void {
     this.ensureNotDisposed();
     if (this.#formHandle === NULL_FORM) {
       return;
     }
-    const fn = this.#module._FPDF_SetFormFieldHighlightColor;
-    if (typeof fn !== 'function') {
-      return;
-    }
-    fn(this.#formHandle, fieldType, colour);
+    this.#module._FPDF_SetFormFieldHighlightColor(
+      this.#formHandle,
+      toNative(formFieldTypeMap.toNative, fieldType),
+      colourToARGB(colour),
+    );
   }
 
   /**
@@ -1560,11 +1255,7 @@ export class PDFiumDocument extends Disposable {
     if (this.#formHandle === NULL_FORM) {
       return;
     }
-    const fn = this.#module._FPDF_SetFormFieldHighlightAlpha;
-    if (typeof fn !== 'function') {
-      return;
-    }
-    fn(this.#formHandle, alpha);
+    this.#module._FPDF_SetFormFieldHighlightAlpha(this.#formHandle, alpha);
   }
 
   /**
@@ -1576,6 +1267,7 @@ export class PDFiumDocument extends Disposable {
    */
   save(options: SaveOptions = {}): Uint8Array {
     this.ensureNotDisposed();
+    this.events.emit('willSave', undefined);
     return saveDocument(this.#module, this.#memory, this.#documentHandle, options);
   }
 
@@ -1616,11 +1308,6 @@ export class PDFiumDocument extends Disposable {
     this.ensureNotDisposed();
     source.ensureNotDisposed();
 
-    const fn = this.#module._FPDF_ImportPages;
-    if (typeof fn !== 'function') {
-      throw new DocumentError(PDFiumErrorCode.DOC_LOAD_UNKNOWN, 'FPDF_ImportPages is not available in this WASM build');
-    }
-
     const insertIndex = options.insertIndex ?? this.pageCount;
     const sourceHandle = source[INTERNAL].handle;
 
@@ -1628,10 +1315,10 @@ export class PDFiumDocument extends Disposable {
     if (options.pageRange !== undefined && options.pageRange !== '') {
       // Import specific pages by range string
       using rangeBuffer = this.#memory.allocString(options.pageRange);
-      result = fn(this.#documentHandle, sourceHandle, rangeBuffer.ptr, insertIndex);
+      result = this.#module._FPDF_ImportPages(this.#documentHandle, sourceHandle, rangeBuffer.ptr, insertIndex);
     } else {
       // Import all pages (null page range)
-      result = fn(this.#documentHandle, sourceHandle, NULL_PTR, insertIndex);
+      result = this.#module._FPDF_ImportPages(this.#documentHandle, sourceHandle, NULL_PTR, insertIndex);
     }
 
     if (result === 0) {
@@ -1640,6 +1327,8 @@ export class PDFiumDocument extends Disposable {
         `Failed to import pages${options.pageRange ? ` (range: ${options.pageRange})` : ''}`,
       );
     }
+
+    this.#cachedPageCount = undefined;
   }
 
   /**
@@ -1659,17 +1348,9 @@ export class PDFiumDocument extends Disposable {
    * document.importPagesByIndex(sourceDoc, [0, 1], 0);
    * ```
    */
-  importPagesByIndex(source: PDFiumDocument, pageIndices: number[], insertIndex?: number): void {
+  importPagesByIndex(source: PDFiumDocument, pageIndices: readonly number[], insertIndex?: number): void {
     this.ensureNotDisposed();
     source.ensureNotDisposed();
-
-    const fn = this.#module._FPDF_ImportPagesByIndex;
-    if (typeof fn !== 'function') {
-      throw new DocumentError(
-        PDFiumErrorCode.DOC_LOAD_UNKNOWN,
-        'FPDF_ImportPagesByIndex is not available in this WASM build',
-      );
-    }
 
     if (pageIndices.length === 0) {
       return; // Nothing to import
@@ -1685,13 +1366,21 @@ export class PDFiumDocument extends Disposable {
       intView[i] = pageIndices[i] ?? 0;
     }
 
-    const result = fn(this.#documentHandle, sourceHandle, indicesBuffer.ptr, pageIndices.length, targetInsertIndex);
+    const result = this.#module._FPDF_ImportPagesByIndex(
+      this.#documentHandle,
+      sourceHandle,
+      indicesBuffer.ptr,
+      pageIndices.length,
+      targetInsertIndex,
+    );
     if (result === 0) {
       throw new DocumentError(
         PDFiumErrorCode.DOC_FORMAT_INVALID,
         `Failed to import pages by index (indices: [${pageIndices.join(', ')}])`,
       );
     }
+
+    this.#cachedPageCount = undefined;
   }
 
   /**
@@ -1706,13 +1395,8 @@ export class PDFiumDocument extends Disposable {
     this.ensureNotDisposed();
     source.ensureNotDisposed();
 
-    const fn = this.#module._FPDF_CopyViewerPreferences;
-    if (typeof fn !== 'function') {
-      return false;
-    }
-
     const sourceHandle = source[INTERNAL].handle;
-    return fn(this.#documentHandle, sourceHandle) !== 0;
+    return this.#module._FPDF_CopyViewerPreferences(this.#documentHandle, sourceHandle) !== 0;
   }
 
   /**
@@ -1740,12 +1424,7 @@ export class PDFiumDocument extends Disposable {
   createNUpDocument(options: NUpLayoutOptions): PDFiumDocument | undefined {
     this.ensureNotDisposed();
 
-    const fn = this.#module._FPDF_ImportNPagesToOne;
-    if (typeof fn !== 'function') {
-      return undefined;
-    }
-
-    const newDocHandle = fn(
+    const newDocHandle = this.#module._FPDF_ImportNPagesToOne(
       this.#documentHandle,
       options.outputWidth,
       options.outputHeight,
@@ -1759,7 +1438,7 @@ export class PDFiumDocument extends Disposable {
 
     // The N-up document doesn't need the original data buffer
     // Create with NULL_PTR for dataPtr since it has no associated buffer
-    return new PDFiumDocument(this.#module, this.#memory, newDocHandle, NULL_PTR, this.#limits);
+    return new PDFiumDocument(this.#module, this.#memory, newDocHandle, NULL_PTR, 0, this.#limits);
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -1785,10 +1464,7 @@ export class PDFiumDocument extends Disposable {
       return;
     }
 
-    const fn = this.#module._FORM_DoDocumentAAction;
-    if (typeof fn === 'function') {
-      fn(this.#formHandle, actionType);
-    }
+    this.#module._FORM_DoDocumentAAction(this.#formHandle, toNative(documentActionTypeMap.toNative, actionType));
   }
 
   /**
@@ -1802,10 +1478,7 @@ export class PDFiumDocument extends Disposable {
       return;
     }
 
-    const fn = this.#module._FORM_DoDocumentJSAction;
-    if (typeof fn === 'function') {
-      fn(this.#formHandle);
-    }
+    this.#module._FORM_DoDocumentJSAction(this.#formHandle);
   }
 
   /**
@@ -1820,10 +1493,7 @@ export class PDFiumDocument extends Disposable {
       return;
     }
 
-    const fn = this.#module._FORM_DoDocumentOpenAction;
-    if (typeof fn === 'function') {
-      fn(this.#formHandle);
-    }
+    this.#module._FORM_DoDocumentOpenAction(this.#formHandle);
   }
 
   protected disposeInternal(): void {
@@ -1840,15 +1510,41 @@ export class PDFiumDocument extends Disposable {
     }
 
     // Free form info structure
-    if (this.#formInfoPtr !== NULL_PTR) {
-      this.#memory.free(this.#formInfoPtr);
-      this.#formInfoPtr = NULL_PTR;
+    if (this.#formInfo) {
+      this.#formInfo[Symbol.dispose]();
+      this.#formInfo = undefined;
     }
 
     // Close the document
     this.#module._FPDF_CloseDocument(this.#documentHandle);
 
     // Free the document data buffer
-    this.#memory.free(this.#dataPtr);
+    this.#dataAlloc[Symbol.dispose]();
+  }
+}
+
+/**
+ * RAII wrapper for FPDF_FORMFILLINFO struct.
+ * Handles allocation and version initialisation.
+ */
+class FSFormFillInfo {
+  readonly #allocation: WASMAllocation;
+
+  constructor(memory: WASMMemoryManager) {
+    this.#allocation = memory.alloc(FORM_FILL_INFO_SIZE);
+
+    // Zero out the structure (required - callback pointers must be null)
+    memory.heapU8.fill(0, this.#allocation.ptr, this.#allocation.ptr + FORM_FILL_INFO_SIZE);
+
+    // Set version to 2 (supports XFA and other features)
+    memory.writeInt32(this.#allocation.ptr, 2);
+  }
+
+  get ptr(): WASMPointer {
+    return this.#allocation.ptr;
+  }
+
+  [Symbol.dispose](): void {
+    this.#allocation[Symbol.dispose]();
   }
 }

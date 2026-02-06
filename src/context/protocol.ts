@@ -34,6 +34,7 @@ export type WorkerRequest =
   | { type: 'GET_PAGE_SIZE'; id: string; payload: { pageId: string } }
   | { type: 'RENDER_PAGE'; id: string; payload: RenderPagePayload }
   | { type: 'GET_TEXT'; id: string; payload: { pageId: string } }
+  | { type: 'GET_TEXT_LAYOUT'; id: string; payload: { pageId: string } }
   | { type: 'PING'; id: string; payload?: DestroyPayload }
   | { type: 'DESTROY'; id: string; payload?: DestroyPayload };
 
@@ -52,6 +53,7 @@ export type WorkerRequestPayloadMap = {
   GET_PAGE_SIZE: { pageId: string };
   RENDER_PAGE: RenderPagePayload;
   GET_TEXT: { pageId: string };
+  GET_TEXT_LAYOUT: { pageId: string };
   PING: Record<string, never>;
   DESTROY: Record<string, never>;
 };

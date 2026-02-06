@@ -4,9 +4,14 @@
  * @module pdfium
  */
 
+import { WorkerPDFium } from './context/worker-client.js';
+import { getConfig } from './core/config.js';
 import { Disposable } from './core/disposable.js';
+import { isNodeEnvironment } from './core/env.js';
 import { DocumentError, InitialisationError, PDFiumErrorCode } from './core/errors.js';
-import { DEFAULT_LIMITS, type OpenDocumentOptions, type PDFiumInitOptions, type PDFiumLimits } from './core/types.js';
+import { getLogger, setLogger } from './core/logger.js';
+import { getPlugins } from './core/plugin.js';
+import type { OpenDocumentOptions, PDFiumInitOptions, PDFiumLimits } from './core/types.js';
 import { PDFiumDocumentBuilder } from './document/builder.js';
 import { PDFiumDocument } from './document/document.js';
 import { NativePDFiumInstance } from './document/native-instance.js';
@@ -16,6 +21,108 @@ import { INTERNAL } from './internal/symbols.js';
 import type { WASMAllocation } from './wasm/allocation.js';
 import { loadWASM, PDFiumNativeErrorCode, type PDFiumWASM, type WASMLoadOptions } from './wasm/index.js';
 import { asHandle, NULL_PTR, WASMMemoryManager } from './wasm/memory.js';
+
+/** WASM binary magic number: \0asm */
+const WASM_MAGIC = new Uint8Array([0x00, 0x61, 0x73, 0x6d]);
+
+function validateWasmBinary(binary: ArrayBuffer): void {
+  if (binary.byteLength < 4) {
+    throw new InitialisationError(
+      PDFiumErrorCode.INIT_INVALID_OPTIONS,
+      `Invalid WASM binary: expected at least 4 bytes, got ${binary.byteLength}`,
+    );
+  }
+
+  const header = new Uint8Array(binary, 0, 4);
+  if (
+    header[0] !== WASM_MAGIC[0] ||
+    header[1] !== WASM_MAGIC[1] ||
+    header[2] !== WASM_MAGIC[2] ||
+    header[3] !== WASM_MAGIC[3]
+  ) {
+    throw new InitialisationError(
+      PDFiumErrorCode.INIT_INVALID_OPTIONS,
+      'Invalid WASM binary: missing magic number (\\0asm)',
+    );
+  }
+}
+
+async function resolveWorkerWasmBinary(options: PDFiumInitOptions): Promise<ArrayBuffer> {
+  if (options.wasmBinary !== undefined) {
+    validateWasmBinary(options.wasmBinary);
+    return options.wasmBinary;
+  }
+
+  if (options.wasmUrl !== undefined) {
+    const response = await fetch(options.wasmUrl);
+    if (!response.ok) {
+      throw new InitialisationError(
+        PDFiumErrorCode.INIT_WASM_LOAD_FAILED,
+        `Failed to fetch WASM binary from ${options.wasmUrl}: HTTP ${String(response.status)}`,
+      );
+    }
+    const binary = await response.arrayBuffer();
+    validateWasmBinary(binary);
+    return binary;
+  }
+
+  if (isNodeEnvironment()) {
+    try {
+      const { readFile } = await import('node:fs/promises');
+      const { fileURLToPath } = await import('node:url');
+      const wasmPath = fileURLToPath(new URL('./vendor/pdfium.wasm', import.meta.url));
+      const bytes = await readFile(wasmPath);
+      const binary = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+      validateWasmBinary(binary);
+      return binary;
+    } catch (error) {
+      throw new InitialisationError(
+        PDFiumErrorCode.INIT_WASM_LOAD_FAILED,
+        'Failed to load bundled WASM binary for worker mode',
+        { cause: error },
+      );
+    }
+  }
+
+  throw new InitialisationError(
+    PDFiumErrorCode.INIT_INVALID_OPTIONS,
+    'Worker mode requires wasmBinary or wasmUrl in browser environments.',
+  );
+}
+
+async function fileUrlExists(url: URL): Promise<boolean> {
+  if (url.protocol !== 'file:') {
+    return false;
+  }
+
+  try {
+    const [{ access }, { fileURLToPath }] = await Promise.all([import('node:fs/promises'), import('node:url')]);
+    await access(fileURLToPath(url));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function resolveWorkerScriptUrl(options: PDFiumInitOptions): Promise<string | URL> {
+  if (options.workerUrl !== undefined) {
+    return options.workerUrl;
+  }
+
+  const defaultJsWorkerUrl = new URL('./worker.js', import.meta.url);
+  if (!isNodeEnvironment()) {
+    return defaultJsWorkerUrl;
+  }
+
+  if (await fileUrlExists(defaultJsWorkerUrl)) {
+    return defaultJsWorkerUrl;
+  }
+
+  throw new InitialisationError(
+    PDFiumErrorCode.INIT_INVALID_OPTIONS,
+    'Could not resolve default worker script. Build the package or provide workerUrl explicitly for worker mode.',
+  );
+}
 
 /**
  * Main PDFium library class.
@@ -36,45 +143,15 @@ export class PDFium extends Disposable {
   readonly #limits: Readonly<Required<PDFiumLimits>>;
   #libraryInitialised = false;
 
-  private constructor(module: PDFiumWASM, limits?: PDFiumLimits) {
+  private constructor(module: PDFiumWASM, limits?: PDFiumLimits, memory?: WASMMemoryManager) {
     super('PDFium');
     this.#module = module;
-    this.#memory = new WASMMemoryManager(module);
-
-    if (limits !== undefined) {
-      if (
-        limits.maxDocumentSize !== undefined &&
-        (!Number.isSafeInteger(limits.maxDocumentSize) || limits.maxDocumentSize <= 0)
-      ) {
-        throw new InitialisationError(
-          PDFiumErrorCode.INIT_INVALID_OPTIONS,
-          'maxDocumentSize must be a positive integer',
-        );
-      }
-      if (
-        limits.maxRenderDimension !== undefined &&
-        (!Number.isSafeInteger(limits.maxRenderDimension) || limits.maxRenderDimension <= 0)
-      ) {
-        throw new InitialisationError(
-          PDFiumErrorCode.INIT_INVALID_OPTIONS,
-          'maxRenderDimension must be a positive integer',
-        );
-      }
-      if (
-        limits.maxTextCharCount !== undefined &&
-        (!Number.isSafeInteger(limits.maxTextCharCount) || limits.maxTextCharCount <= 0)
-      ) {
-        throw new InitialisationError(
-          PDFiumErrorCode.INIT_INVALID_OPTIONS,
-          'maxTextCharCount must be a positive integer',
-        );
-      }
-    }
+    this.#memory = memory ?? new WASMMemoryManager(module);
 
     this.#limits = {
-      maxDocumentSize: limits?.maxDocumentSize ?? DEFAULT_LIMITS.maxDocumentSize,
-      maxRenderDimension: limits?.maxRenderDimension ?? DEFAULT_LIMITS.maxRenderDimension,
-      maxTextCharCount: limits?.maxTextCharCount ?? DEFAULT_LIMITS.maxTextCharCount,
+      maxDocumentSize: limits?.maxDocumentSize ?? getConfig().limits.maxDocumentSize,
+      maxRenderDimension: limits?.maxRenderDimension ?? getConfig().limits.maxRenderDimension,
+      maxTextCharCount: limits?.maxTextCharCount ?? getConfig().limits.maxTextCharCount,
     };
     this.setFinalizerCleanup(() => {
       if (this.#libraryInitialised) {
@@ -96,16 +173,52 @@ export class PDFium extends Disposable {
    * @returns The PDFium or NativePDFiumInstance
    * @throws {InitialisationError} If initialisation fails or options conflict
    */
+  static async init(options: PDFiumInitOptions & { useWorker: true }): Promise<WorkerPDFium>;
   static async init(options: PDFiumInitOptions & { forceWasm: true }): Promise<PDFium>;
   static async init(options: PDFiumInitOptions & { useNative: true }): Promise<PDFium | NativePDFiumInstance>;
   static async init(options?: PDFiumInitOptions): Promise<PDFium>;
-  static async init(options: PDFiumInitOptions = {}): Promise<PDFium | NativePDFiumInstance> {
+  static async init(options: PDFiumInitOptions = {}): Promise<PDFium | NativePDFiumInstance | WorkerPDFium> {
     // Validate conflicting options
     if (options.forceWasm && options.useNative) {
       throw new InitialisationError(
         PDFiumErrorCode.INIT_INVALID_OPTIONS,
         'Cannot use forceWasm and useNative together.',
       );
+    }
+    if (options.useWorker && options.useNative) {
+      throw new InitialisationError(
+        PDFiumErrorCode.INIT_INVALID_OPTIONS,
+        'Cannot use useWorker and useNative together.',
+      );
+    }
+
+    if (options.logger) {
+      setLogger(options.logger);
+    }
+
+    if (options.useWorker) {
+      const wasmBinary = await resolveWorkerWasmBinary(options);
+      const workerUrl = await resolveWorkerScriptUrl(options);
+      const workerOptions: {
+        workerUrl: string | URL;
+        wasmBinary: ArrayBuffer;
+        timeout?: number;
+        renderTimeout?: number;
+        destroyTimeout?: number;
+      } = {
+        workerUrl,
+        wasmBinary,
+      };
+      if (options.workerTimeout !== undefined) {
+        workerOptions.timeout = options.workerTimeout;
+      }
+      if (options.workerRenderTimeout !== undefined) {
+        workerOptions.renderTimeout = options.workerRenderTimeout;
+      }
+      if (options.workerDestroyTimeout !== undefined) {
+        workerOptions.destroyTimeout = options.workerDestroyTimeout;
+      }
+      return WorkerPDFium.create(workerOptions);
     }
 
     if (options.useNative && !options.forceWasm) {
@@ -120,6 +233,39 @@ export class PDFium extends Disposable {
     const loadOptions: WASMLoadOptions = {};
     if (options.wasmBinary !== undefined) {
       loadOptions.wasmBinary = options.wasmBinary;
+    }
+    if (options.wasmUrl !== undefined) {
+      loadOptions.wasmUrl = options.wasmUrl;
+    }
+
+    if (options.limits !== undefined) {
+      if (
+        options.limits.maxDocumentSize !== undefined &&
+        (!Number.isSafeInteger(options.limits.maxDocumentSize) || options.limits.maxDocumentSize <= 0)
+      ) {
+        throw new InitialisationError(
+          PDFiumErrorCode.INIT_INVALID_OPTIONS,
+          'maxDocumentSize must be a positive integer',
+        );
+      }
+      if (
+        options.limits.maxRenderDimension !== undefined &&
+        (!Number.isSafeInteger(options.limits.maxRenderDimension) || options.limits.maxRenderDimension <= 0)
+      ) {
+        throw new InitialisationError(
+          PDFiumErrorCode.INIT_INVALID_OPTIONS,
+          'maxRenderDimension must be a positive integer',
+        );
+      }
+      if (
+        options.limits.maxTextCharCount !== undefined &&
+        (!Number.isSafeInteger(options.limits.maxTextCharCount) || options.limits.maxTextCharCount <= 0)
+      ) {
+        throw new InitialisationError(
+          PDFiumErrorCode.INIT_INVALID_OPTIONS,
+          'maxTextCharCount must be a positive integer',
+        );
+      }
     }
 
     const module = await loadWASM(loadOptions);
@@ -231,7 +377,18 @@ export class PDFium extends Disposable {
 
     onProgress?.(1.0);
 
-    return new PDFiumDocument(this.#module, this.#memory, documentHandle, dataPtr, this.#limits);
+    const doc = new PDFiumDocument(this.#module, this.#memory, documentHandle, dataPtr, bytes.length, this.#limits);
+
+    // Notify plugins
+    for (const plugin of getPlugins()) {
+      try {
+        plugin.onDocumentOpened?.(doc);
+      } catch (error) {
+        getLogger().warn(`Plugin "${plugin.name}" failed in onDocumentOpened:`, error);
+      }
+    }
+
+    return doc;
   }
 
   #allocDocumentData(bytes: Uint8Array): WASMAllocation {
@@ -246,7 +403,7 @@ export class PDFium extends Disposable {
 
   #allocPassword(password: string): WASMAllocation {
     try {
-      return this.#memory.allocString(password);
+      return this.#memory.allocString(password, true);
     } catch (error) {
       throw new DocumentError(PDFiumErrorCode.DOC_LOAD_UNKNOWN, 'Failed to allocate memory for password', {
         cause: error,

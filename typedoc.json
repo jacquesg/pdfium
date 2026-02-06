@@ -1,0 +1,24 @@
+{
+  "$schema": "https://typedoc.org/schema.json",
+  "entryPoints": ["src/index.ts"],
+  "out": "docs/src/content/docs/api",
+  "plugin": ["typedoc-plugin-markdown", "typedoc-plugin-frontmatter"],
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "excludeInternal": true,
+  "cleanOutputDir": true,
+  "validation": {
+    "invalidLink": true
+  },
+  "parametersFormat": "table",
+  "enumMembersFormat": "table",
+  "typeDeclarationFormat": "table",
+  "indexFormat": "table",
+  "sanitizeComments": true,
+  "hideBreadcrumbs": true,
+  "hidePageTitle": true,
+  "entryPointStrategy": "resolve",
+  "skipErrorChecking": true,
+  "treatWarningsAsErrors": true,
+  "treatValidationWarningsAsErrors": true
+}

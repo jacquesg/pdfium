@@ -17,7 +17,7 @@ PDFium.init()
     │       │       ├── render()
     │       │       ├── getText()
     │       │       ├── findText()
-    │       │       ├── getObjects()
+    │       │       ├── getObjects() / objects()
     │       │       └── getAnnotations()
     │       │       │
     │       │       └── page.dispose()
@@ -227,6 +227,33 @@ const bytes = builder.save();
   }
 }
 ```
+
+## Document Events
+
+`PDFiumDocument` exposes an `events` emitter for lifecycle hooks:
+
+```typescript
+using document = await pdfium.openDocument(data);
+
+document.events.on('pageLoaded', ({ pageIndex }) => {
+  console.log(`Page ${pageIndex} loaded`);
+});
+
+document.events.on('willSave', () => {
+  console.log('Document is about to be saved');
+});
+```
+
+### Available Events
+
+| Event | Payload | Triggered When |
+|-------|---------|----------------|
+| `pageLoaded` | `{ pageIndex: number }` | A page is loaded via `getPage()` or `pages()` |
+| `willSave` | `undefined` | Immediately before `save()` writes the document |
+
+:::note
+Event listeners are **not** automatically removed when the document is disposed. If you subscribe from a long-lived object, remove the listener manually to avoid retaining references to the disposed document.
+:::
 
 ## Error Handling and Cleanup
 

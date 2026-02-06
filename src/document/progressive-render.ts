@@ -6,8 +6,9 @@
 
 import { Disposable } from '../core/disposable.js';
 import { PDFiumErrorCode, RenderError } from '../core/errors.js';
-import { ProgressiveRenderStatus, type RenderResult } from '../core/types.js';
+import { type IProgressiveRenderContext, ProgressiveRenderStatus, type RenderResult } from '../core/types.js';
 import { NULL_BITMAP } from '../internal/constants.js';
+import { fromNative, progressiveRenderStatusMap } from '../internal/enum-maps.js';
 import type { BitmapHandle, PageHandle } from '../internal/handles.js';
 import { convertBgraToRgba } from '../internal/pixel-conversion.js';
 import type { WASMAllocation } from '../wasm/allocation.js';
@@ -35,7 +36,7 @@ import { NULL_PTR, type WASMMemoryManager } from '../wasm/memory.js';
  * }
  * ```
  */
-export class ProgressiveRenderContext extends Disposable {
+export class ProgressiveRenderContext extends Disposable implements IProgressiveRenderContext {
   readonly #module: PDFiumWASM;
   readonly #memory: WASMMemoryManager;
   readonly #pageHandle: PageHandle;
@@ -116,8 +117,7 @@ export class ProgressiveRenderContext extends Disposable {
     }
 
     const rawStatus = fn(this.#pageHandle, NULL_PTR);
-    this.#status =
-      rawStatus >= 0 && rawStatus <= 3 ? (rawStatus as ProgressiveRenderStatus) : ProgressiveRenderStatus.Failed;
+    this.#status = fromNative(progressiveRenderStatusMap.fromNative, rawStatus, ProgressiveRenderStatus.Failed);
     return this.#status;
   }
 

@@ -23,4 +23,4 @@ export const VERSION = __PACKAGE_VERSION__;
 export const WASM_HASH = __WASM_HASH__;
 
 // Set up the worker message handler
-setupWorker();
+await setupWorker();

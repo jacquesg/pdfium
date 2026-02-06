@@ -20,13 +20,13 @@ export interface FontBindings {
   _FPDFFont_GetFamilyName: (font: FontHandle, buffer: WASMPointer, length: number) => number;
 
   /**
-   * Gets the full name of a font.
+   * Gets the base font name (PostScript name).
    * @param font - Font handle
    * @param buffer - Buffer to receive the font name (UTF-8)
    * @param length - Buffer length
    * @returns Required buffer length including null terminator
    */
-  _FPDFFont_GetFontName: (font: FontHandle, buffer: WASMPointer, length: number) => number;
+  _FPDFFont_GetBaseFontName: (font: FontHandle, buffer: WASMPointer, length: number) => number;
 
   /**
    * Gets the raw font data.

@@ -4,28 +4,15 @@
  * Tests the FPDF_GetSignature* and FPDFSignatureObj_* functions.
  */
 
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { DocMDPPermission } from '../../src/core/types.js';
-import type { PDFiumDocument } from '../../src/document/document.js';
-import type { PDFium } from '../../src/pdfium.js';
 import { initPdfium, loadTestDocument } from '../utils/helpers.js';
 
 describe('Digital Signatures API', () => {
-  let pdfium: PDFium;
-  let document: PDFiumDocument;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-    document = await loadTestDocument(pdfium, 'test_1.pdf');
-  });
-
-  afterAll(() => {
-    document?.dispose();
-    pdfium?.dispose();
-  });
-
   describe('signatureCount', () => {
-    test('should return non-negative number', () => {
+    test('should return non-negative number', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       const count = document.signatureCount;
       expect(typeof count).toBe('number');
       expect(count).toBeGreaterThanOrEqual(0);
@@ -33,12 +20,16 @@ describe('Digital Signatures API', () => {
   });
 
   describe('hasSignatures', () => {
-    test('should return boolean', () => {
+    test('should return boolean', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       const hasSigs = document.hasSignatures();
       expect(typeof hasSigs).toBe('boolean');
     });
 
-    test('should be consistent with signatureCount', () => {
+    test('should be consistent with signatureCount', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       const count = document.signatureCount;
       const hasSigs = document.hasSignatures();
       expect(hasSigs).toBe(count > 0);
@@ -46,18 +37,24 @@ describe('Digital Signatures API', () => {
   });
 
   describe('getSignature', () => {
-    test('should return undefined for negative index', () => {
+    test('should return undefined for negative index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       const sig = document.getSignature(-1);
       expect(sig).toBeUndefined();
     });
 
-    test('should return undefined for out of bounds index', () => {
+    test('should return undefined for out of bounds index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       const count = document.signatureCount;
       const sig = document.getSignature(count + 10);
       expect(sig).toBeUndefined();
     });
 
-    test('should return signature with valid structure if present', () => {
+    test('should return signature with valid structure if present', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       const count = document.signatureCount;
       if (count > 0) {
         const sig = document.getSignature(0);
@@ -65,13 +62,15 @@ describe('Digital Signatures API', () => {
         if (sig !== undefined) {
           expect(typeof sig.index).toBe('number');
           expect(sig.index).toBe(0);
-          expect(typeof sig.docMDPPermission).toBe('number');
-          expect([0, 1, 2, 3]).toContain(sig.docMDPPermission);
+          expect(typeof sig.docMDPPermission).toBe('string');
+          expect(Object.values(DocMDPPermission)).toContain(sig.docMDPPermission);
         }
       }
     });
 
-    test('should not throw for any valid index', () => {
+    test('should not throw for any valid index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       const count = document.signatureCount;
       for (let i = 0; i < Math.min(count, 10); i++) {
         expect(() => document.getSignature(i)).not.toThrow();
@@ -80,19 +79,25 @@ describe('Digital Signatures API', () => {
   });
 
   describe('signatures() generator', () => {
-    test('signatures() returns a generator', () => {
+    test('signatures() returns a generator', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       const gen = document.signatures();
       expect(gen[Symbol.iterator]).toBeDefined();
       expect(typeof gen.next).toBe('function');
     });
 
-    test('signatures() yields same signatures as getSignatures()', () => {
+    test('signatures() yields same signatures as getSignatures()', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       const fromGenerator = [...document.signatures()];
       const fromArray = document.getSignatures();
       expect(fromGenerator).toEqual(fromArray);
     });
 
-    test('signatures() is lazy - can break early', () => {
+    test('signatures() is lazy - can break early', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       const gen = document.signatures();
       const first = gen.next();
       // Test that we can iterate without exhausting
@@ -104,23 +109,29 @@ describe('Digital Signatures API', () => {
   });
 
   describe('getSignatures', () => {
-    test('should return array', () => {
+    test('should return array', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       const signatures = document.getSignatures();
       expect(Array.isArray(signatures)).toBe(true);
     });
 
-    test('should return array with length matching count', () => {
+    test('should return array with length matching count', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       const count = document.signatureCount;
       const signatures = document.getSignatures();
       expect(signatures.length).toBeLessThanOrEqual(count);
     });
 
-    test('should return signatures with valid structure', () => {
+    test('should return signatures with valid structure', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       const signatures = document.getSignatures();
       for (const sig of signatures) {
         expect(typeof sig.index).toBe('number');
         expect(sig.index).toBeGreaterThanOrEqual(0);
-        expect(typeof sig.docMDPPermission).toBe('number');
+        expect(typeof sig.docMDPPermission).toBe('string');
 
         // Optional fields should have correct types if present
         if (sig.contents !== undefined) {
@@ -147,26 +158,17 @@ describe('Digital Signatures API', () => {
 
   describe('DocMDPPermission enum', () => {
     test('should have expected values', () => {
-      expect(DocMDPPermission.None).toBe(0);
-      expect(DocMDPPermission.NoChanges).toBe(1);
-      expect(DocMDPPermission.FillAndSign).toBe(2);
-      expect(DocMDPPermission.FillSignAnnotate).toBe(3);
+      expect(DocMDPPermission.None).toBe('None');
+      expect(DocMDPPermission.NoChanges).toBe('NoChanges');
+      expect(DocMDPPermission.FillAndSign).toBe('FillAndSign');
+      expect(DocMDPPermission.FillSignAnnotate).toBe('FillSignAnnotate');
     });
   });
 });
 
 describe('Digital Signatures with different PDFs', () => {
-  let pdfium: PDFium;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-  });
-
-  afterAll(() => {
-    pdfium?.dispose();
-  });
-
   test('should handle test_3_with_images.pdf', async () => {
+    using pdfium = await initPdfium();
     using doc = await loadTestDocument(pdfium, 'test_3_with_images.pdf');
 
     expect(() => doc.signatureCount).not.toThrow();
@@ -176,43 +178,38 @@ describe('Digital Signatures with different PDFs', () => {
 });
 
 describe('Digital Signatures with signed PDF', () => {
-  let pdfium: PDFium;
-  let document: PDFiumDocument;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-    document = await loadTestDocument(pdfium, 'test_8_with_signature.pdf');
-  });
-
-  afterAll(() => {
-    document?.dispose();
-    pdfium?.dispose();
-  });
-
-  test('should detect signatures in signed PDF', () => {
+  test('should detect signatures in signed PDF', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_8_with_signature.pdf');
     const count = document.signatureCount;
     expect(typeof count).toBe('number');
     // This PDF should have at least one signature
     expect(count).toBeGreaterThanOrEqual(0);
   });
 
-  test('hasSignatures reflects signature presence', () => {
+  test('hasSignatures reflects signature presence', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_8_with_signature.pdf');
     const hasSigs = document.hasSignatures();
     expect(typeof hasSigs).toBe('boolean');
     expect(hasSigs).toBe(document.signatureCount > 0);
   });
 
-  test('getSignature returns signature data if present', () => {
+  test('getSignature returns signature data if present', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_8_with_signature.pdf');
     const count = document.signatureCount;
     if (count > 0) {
       const sig = document.getSignature(0);
       expect(sig).toBeDefined();
       expect(sig!.index).toBe(0);
-      expect(typeof sig!.docMDPPermission).toBe('number');
+      expect(typeof sig!.docMDPPermission).toBe('string');
     }
   });
 
-  test('signature has expected optional fields if present', () => {
+  test('signature has expected optional fields if present', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_8_with_signature.pdf');
     const sigs = document.getSignatures();
     for (const sig of sigs) {
       // All these fields are optional but should have correct types
@@ -235,7 +232,9 @@ describe('Digital Signatures with signed PDF', () => {
     }
   });
 
-  test('signatures generator works with signed PDF', () => {
+  test('signatures generator works with signed PDF', async () => {
+    using pdfium = await initPdfium();
+    using document = await loadTestDocument(pdfium, 'test_8_with_signature.pdf');
     const fromGenerator = [...document.signatures()];
     const fromArray = document.getSignatures();
     expect(fromGenerator.length).toBe(fromArray.length);
@@ -247,36 +246,30 @@ describe('Digital Signatures with signed PDF', () => {
 });
 
 describe('Digital Signatures post-dispose guards', () => {
-  let pdfium: PDFium;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-  });
-
-  afterAll(() => {
-    pdfium?.dispose();
-  });
-
   test('should throw on signatureCount after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+    using pdfium = await initPdfium();
+    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     doc.dispose();
     expect(() => doc.signatureCount).toThrow();
   });
 
   test('should throw on hasSignatures after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+    using pdfium = await initPdfium();
+    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     doc.dispose();
     expect(() => doc.hasSignatures()).toThrow();
   });
 
   test('should throw on getSignature after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+    using pdfium = await initPdfium();
+    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     doc.dispose();
     expect(() => doc.getSignature(0)).toThrow();
   });
 
   test('should throw on getSignatures after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+    using pdfium = await initPdfium();
+    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     doc.dispose();
     expect(() => doc.getSignatures()).toThrow();
   });

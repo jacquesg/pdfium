@@ -63,9 +63,8 @@ describe('Multi-page Rendering', () => {
   });
 
   bench('open and render single page', () => {
-    const page = document.getPage(0);
+    using page = document.getPage(0);
     page.render({ scale: 1 });
-    page.dispose();
   });
 
   bench('batch render all pages', () => {

@@ -1,10 +1,11 @@
 # @scaryterry/pdfium
 
-Universal PDFium WASM wrapper for Browser and Node.js with modern TypeScript patterns.
+High-Performance Universal PDFium bindings for Browser and Node.js.
 
 ## Features
 
-- **Zero dependencies** - PDFium compiled to WebAssembly and bundled with the package
+- **Hybrid Architecture** - Use **Native** bindings (C++) on Node.js for maximum speed, or **WASM** on browsers for portability.
+- **Zero dependencies** - PDFium WASM is bundled; Native bindings are optional.
 - **Type-safe** - Full TypeScript support with branded types and strict mode
 - **Automatic resource cleanup** - `Symbol.dispose` support (`using` keyword)
 - **Typed exceptions** - Error subclasses with error codes for precise handling
@@ -93,6 +94,8 @@ Represents a loaded PDF document.
 | `document.getBookmarks()` | `Bookmark[]` | Extract the bookmark tree |
 | `document.attachmentCount` | `number` | Number of file attachments |
 | `document.getAttachments()` | `PDFAttachment[]` | Extract file attachments |
+| `document.importPages(source, options?)` | `void` | Import pages from another document |
+| `document.createNUpDocument(options)` | `PDFiumDocument` | Create N-up layout document |
 
 ### `PDFiumPage`
 
@@ -110,12 +113,14 @@ Represents a single page in a PDF document.
 | `page.render(options?)` | `RenderResult` | Render to RGBA bitmap |
 | `page.getText()` | `string` | Extract all text content |
 | `page.getObjects()` | `PageObject[]` | Get page objects (text, images, paths) |
+| `page.objects()` | `IterableIterator<PageObject>` | Lazy page object iterator |
 | `page.getAnnotation(index)` | `Annotation` | Get annotation by index |
 | `page.getAnnotations()` | `Annotation[]` | Get all annotations |
 | `page.findText(query, flags?)` | `Generator<TextSearchResult>` | Search for text with positions |
 | `page.getCharBox(charIndex)` | `CharBox \| undefined` | Get character bounding box |
 | `page.getCharIndexAtPos(x, y)` | `number` | Get character index at position |
 | `page.getTextInRect(l, t, r, b)` | `string` | Get text within a rectangle |
+| `page.getCharacterInfo(index)` | `CharacterInfo` | Get detailed character info |
 | `page.getStructureTree()` | `StructureElement[] \| undefined` | Get accessibility structure tree |
 
 ### `PDFiumDocumentBuilder`
@@ -211,7 +216,12 @@ In browser environments, provide the WASM binary explicitly:
 ```typescript
 import { PDFium } from '@scaryterry/pdfium';
 
-// Fetch from a URL
+// Option 1: Load from URL (recommended)
+using pdfium = await PDFium.init({
+  wasmUrl: '/pdfium.wasm'
+});
+
+// Option 2: Pre-load binary
 const wasmResponse = await fetch('/pdfium.wasm');
 const wasmBinary = await wasmResponse.arrayBuffer();
 
@@ -223,12 +233,18 @@ using pdfium = await PDFium.init({ wasmBinary });
 For off-main-thread processing:
 
 ```typescript
-import { WorkerProxy } from '@scaryterry/pdfium';
+import { PDFium } from '@scaryterry/pdfium';
 
-using proxy = await WorkerProxy.create('/worker.js', wasmBinary);
-const { documentId, pageCount } = await proxy.openDocument(pdfArrayBuffer);
-// All operations happen in the worker thread
+await using pdfium = await PDFium.init({
+  useWorker: true,
+  workerUrl: '/worker.js',
+  wasmUrl: '/pdfium.wasm',
+});
+await using document = await pdfium.openDocument(pdfArrayBuffer);
+const result = await document.renderPage(0, { scale: 2 });
 ```
+
+Need low-level control? Use `WorkerProxy` directly with `openDocument() -> loadPage() -> renderPage() -> closePage()`.
 
 ## Native Backend (Node.js)
 
@@ -258,21 +274,6 @@ The native backend provides faster performance by eliminating WASM marshalling o
 - **Node.js**: >= 22 LTS
 - **Browsers**: Chrome 117+, Firefox 104+, Safari 16.4+
 - **Module format**: ESM only
-
-## Migration from @hyzyla/pdfium
-
-See [MIGRATION.md](MIGRATION.md) for a detailed migration guide.
-
-| @hyzyla/pdfium v2 | @scaryterry/pdfium v3 |
-|-------------------|---------------------|
-| `PDFiumLibrary.init()` | `PDFium.init()` |
-| `library.loadDocument(buff)` | `pdfium.openDocument(data)` |
-| `document.destroy()` | `document.dispose()` or `using` |
-| `document.getPage(i)` | `document.getPage(i)` |
-| `document.getPageCount()` | `document.pageCount` |
-| `page.render({ scale, render })` | `page.render({ scale })` |
-| `page.getText()` | `page.getText()` |
-| Throws exceptions | Throws typed exceptions |
 
 ## Licence
 

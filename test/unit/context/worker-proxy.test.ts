@@ -361,4 +361,58 @@ describe('WorkerProxy', () => {
       });
     });
   });
+
+  test('node worker fallback should use worker_threads with isolated execArgv', async () => {
+    vi.unstubAllGlobals();
+    vi.resetModules();
+
+    let capturedOptions: { execArgv?: string[] } | undefined;
+    let terminated = false;
+
+    vi.doMock('node:worker_threads', () => {
+      class MockNodeWorker {
+        readonly #listeners = new Map<string, (payload: unknown) => void>();
+
+        constructor(_: string | URL, options?: { execArgv?: string[] }) {
+          capturedOptions = options;
+        }
+
+        on(event: string, listener: (payload: unknown) => void): this {
+          this.#listeners.set(event, listener);
+          return this;
+        }
+
+        postMessage(data: { type: string; id: string }): void {
+          if (data.type === 'INIT') {
+            this.#listeners.get('message')?.({
+              type: 'SUCCESS',
+              id: data.id,
+              payload: undefined,
+            });
+          }
+          if (data.type === 'DESTROY') {
+            this.#listeners.get('message')?.({
+              type: 'SUCCESS',
+              id: data.id,
+              payload: undefined,
+            });
+          }
+        }
+
+        terminate(): Promise<number> {
+          terminated = true;
+          return Promise.resolve(0);
+        }
+      }
+
+      return { Worker: MockNodeWorker };
+    });
+
+    const { WorkerProxy } = await import('../../../src/context/worker-proxy.js');
+    const proxy = await WorkerProxy.create(new URL('file:///tmp/pdfium-worker.mjs'), new ArrayBuffer(8));
+    await proxy.dispose();
+
+    expect(capturedOptions).toEqual({ execArgv: [] });
+    expect(terminated).toBe(true);
+  });
 });

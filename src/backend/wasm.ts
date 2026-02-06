@@ -6,6 +6,7 @@
 
 import type { PDFiumWASM } from '../wasm/bindings/index.js';
 import { NULL_PTR, ptrOffset, type WASMMemoryManager } from '../wasm/memory.js';
+import { FSRectF } from '../wasm/structs.js';
 import type { BackendAnnotation, BackendBookmark, BackendLink, PDFiumBackend } from './types.js';
 
 /** UTF-16LE null terminator size in bytes. */
@@ -180,11 +181,11 @@ export class WasmBackend implements PDFiumBackend {
   }
 
   getCharRenderMode(textPageHandle: number, charIndex: number): number {
-    const fn = this.#module._FPDFText_GetTextRenderMode;
-    if (typeof fn !== 'function') {
-      return 0; // TextRenderMode.Fill
+    const pageObj = this.#module._FPDFText_GetTextObject(textPageHandle as never, charIndex);
+    if (!pageObj) {
+      return 0;
     }
-    return fn(textPageHandle as never, charIndex);
+    return this.#module._FPDFTextObj_GetTextRenderMode(pageObj);
   }
 
   getCharUnicode(textPageHandle: number, charIndex: number): number {
@@ -640,20 +641,19 @@ export class WasmBackend implements PDFiumBackend {
         continue;
       }
 
-      // Bounds (FS_RECTF = 4 x f32)
+      // FS_RECTF struct layout per fpdfview.h: { left, top, right, bottom }
       let left = 0;
-      let bottom = 0;
-      let right = 0;
       let top = 0;
+      let right = 0;
+      let bottom = 0;
       {
-        using rectAlloc = this.#memory.alloc(16);
+        using rectAlloc = new FSRectF(this.#memory);
         const hasRect = this.#module._FPDFLink_GetAnnotRect(linkHandle as never, rectAlloc.ptr);
         if (hasRect) {
-          const floats = new Float32Array(this.#memory.heapU8.buffer, rectAlloc.ptr, 4);
-          left = floats[0] ?? 0;
-          bottom = floats[1] ?? 0;
-          right = floats[2] ?? 0;
-          top = floats[3] ?? 0;
+          left = rectAlloc.left;
+          top = rectAlloc.top;
+          right = rectAlloc.right;
+          bottom = rectAlloc.bottom;
         }
       }
 
@@ -1073,11 +1073,7 @@ export class WasmBackend implements PDFiumBackend {
   }
 
   getSignatureCount(docHandle: number): number {
-    const fn_ = this.#module._FPDF_GetSignatureCount;
-    if (typeof fn_ !== 'function') {
-      return 0;
-    }
-    return fn_(docHandle as never);
+    return this.#module._FPDF_GetSignatureCount(docHandle as never);
   }
 
   getSignature(
@@ -1091,12 +1087,7 @@ export class WasmBackend implements PDFiumBackend {
     time?: string;
     docMDPPermission: number;
   } | null {
-    const getObj = this.#module._FPDF_GetSignatureObject;
-    if (typeof getObj !== 'function') {
-      return null;
-    }
-
-    const handle = getObj(docHandle as never, index);
+    const handle = this.#module._FPDF_GetSignatureObject(docHandle as never, index);
     if ((handle as number) === 0) {
       return null;
     }
@@ -1111,79 +1102,61 @@ export class WasmBackend implements PDFiumBackend {
     } = { docMDPPermission: 0 };
 
     // Contents
-    const getContents = this.#module._FPDFSignatureObj_GetContents;
-    if (typeof getContents === 'function') {
-      const size = getContents(handle, NULL_PTR, 0);
-      if (size > 0) {
-        using buf = this.#memory.alloc(size);
-        const written = getContents(handle, buf.ptr, size);
-        if (written > 0) {
-          result.contents = this.#memory.heapU8.slice(buf.ptr, buf.ptr + written);
-        }
+    const size = this.#module._FPDFSignatureObj_GetContents(handle, NULL_PTR, 0);
+    if (size > 0) {
+      using buf = this.#memory.alloc(size);
+      const written = this.#module._FPDFSignatureObj_GetContents(handle, buf.ptr, size);
+      if (written > 0) {
+        result.contents = this.#memory.heapU8.slice(buf.ptr, buf.ptr + written);
       }
     }
 
     // Byte range
-    const getByteRange = this.#module._FPDFSignatureObj_GetByteRange;
-    if (typeof getByteRange === 'function') {
-      const count = getByteRange(handle, NULL_PTR, 0);
-      if (count > 0) {
-        using buf = this.#memory.alloc(count * 4);
-        const written = getByteRange(handle, buf.ptr, count);
-        if (written > 0) {
-          result.byteRange = Array.from(new Int32Array(this.#memory.heapU8.buffer, buf.ptr, written));
-        }
+    const count = this.#module._FPDFSignatureObj_GetByteRange(handle, NULL_PTR, 0);
+    if (count > 0) {
+      using buf = this.#memory.alloc(count * 4);
+      const written = this.#module._FPDFSignatureObj_GetByteRange(handle, buf.ptr, count);
+      if (written > 0) {
+        result.byteRange = Array.from(new Int32Array(this.#memory.heapU8.buffer, buf.ptr, written));
       }
     }
 
     // Sub-filter (ASCII)
-    const getSubFilter = this.#module._FPDFSignatureObj_GetSubFilter;
-    if (typeof getSubFilter === 'function') {
-      const size = getSubFilter(handle, NULL_PTR, 0);
-      if (size > 1) {
-        using buf = this.#memory.alloc(size);
-        const written = getSubFilter(handle, buf.ptr, size);
-        if (written > 1) {
-          const bytes = this.#memory.heapU8.subarray(buf.ptr, buf.ptr + written - 1);
-          result.subFilter = new TextDecoder('ascii').decode(bytes);
-        }
+    const subFilterSize = this.#module._FPDFSignatureObj_GetSubFilter(handle, NULL_PTR, 0);
+    if (subFilterSize > 1) {
+      using buf = this.#memory.alloc(subFilterSize);
+      const written = this.#module._FPDFSignatureObj_GetSubFilter(handle, buf.ptr, subFilterSize);
+      if (written > 1) {
+        const bytes = this.#memory.heapU8.subarray(buf.ptr, buf.ptr + written - 1);
+        result.subFilter = new TextDecoder('ascii').decode(bytes);
       }
     }
 
     // Reason (UTF-16LE)
-    const getReason = this.#module._FPDFSignatureObj_GetReason;
-    if (typeof getReason === 'function') {
-      const size = getReason(handle, NULL_PTR, 0);
-      if (size > UTF16LE_NULL_BYTES) {
-        using buf = this.#memory.alloc(size);
-        const written = getReason(handle, buf.ptr, size);
-        if (written > UTF16LE_NULL_BYTES) {
-          const charCount = (written - UTF16LE_NULL_BYTES) / UTF16LE_BYTES_PER_CHAR;
-          result.reason = this.#memory.readUTF16LE(buf.ptr, charCount);
-        }
+    const reasonSize = this.#module._FPDFSignatureObj_GetReason(handle, NULL_PTR, 0);
+    if (reasonSize > UTF16LE_NULL_BYTES) {
+      using buf = this.#memory.alloc(reasonSize);
+      const written = this.#module._FPDFSignatureObj_GetReason(handle, buf.ptr, reasonSize);
+      if (written > UTF16LE_NULL_BYTES) {
+        const charCount = (written - UTF16LE_NULL_BYTES) / UTF16LE_BYTES_PER_CHAR;
+        result.reason = this.#memory.readUTF16LE(buf.ptr, charCount);
       }
     }
 
     // Time (ASCII)
-    const getTime = this.#module._FPDFSignatureObj_GetTime;
-    if (typeof getTime === 'function') {
-      const size = getTime(handle, NULL_PTR, 0);
-      if (size > 1) {
-        using buf = this.#memory.alloc(size);
-        const written = getTime(handle, buf.ptr, size);
-        if (written > 1) {
-          const bytes = this.#memory.heapU8.subarray(buf.ptr, buf.ptr + written - 1);
-          result.time = new TextDecoder('ascii').decode(bytes);
-        }
+    const timeSize = this.#module._FPDFSignatureObj_GetTime(handle, NULL_PTR, 0);
+    if (timeSize > 1) {
+      using buf = this.#memory.alloc(timeSize);
+      const written = this.#module._FPDFSignatureObj_GetTime(handle, buf.ptr, timeSize);
+      if (written > 1) {
+        const bytes = this.#memory.heapU8.subarray(buf.ptr, buf.ptr + written - 1);
+        result.time = new TextDecoder('ascii').decode(bytes);
       }
     }
 
     // DocMDP permission
-    const getDocMDP = this.#module._FPDFSignatureObj_GetDocMDPPermission;
-    if (typeof getDocMDP === 'function') {
-      const perm = getDocMDP(handle);
-      result.docMDPPermission = perm >= 0 && perm <= 3 ? perm : 0;
-    }
+    const perm = this.#module._FPDFSignatureObj_GetDocMDPPermission(handle);
+    result.docMDPPermission = perm >= 0 && perm <= 3 ? perm : 0;
 
     return result;
   }
@@ -1266,17 +1239,12 @@ export class WasmBackend implements PDFiumBackend {
   }
 
   importPages(destHandle: number, srcHandle: number, pageRange: string | null, insertIndex: number): void {
-    const fn_ = this.#module._FPDF_ImportPages;
-    if (typeof fn_ !== 'function') {
-      throw new Error('FPDF_ImportPages is not available');
-    }
-
     let result: number;
     if (pageRange !== null) {
       using rangeAlloc = this.#memory.allocString(pageRange);
-      result = fn_(destHandle as never, srcHandle as never, rangeAlloc.ptr, insertIndex);
+      result = this.#module._FPDF_ImportPages(destHandle as never, srcHandle as never, rangeAlloc.ptr, insertIndex);
     } else {
-      result = fn_(destHandle as never, srcHandle as never, NULL_PTR, insertIndex);
+      result = this.#module._FPDF_ImportPages(destHandle as never, srcHandle as never, NULL_PTR, insertIndex);
     }
 
     if (result === 0) {
@@ -1285,11 +1253,6 @@ export class WasmBackend implements PDFiumBackend {
   }
 
   importPagesByIndex(destHandle: number, srcHandle: number, pageIndices: number[], insertIndex: number): void {
-    const fn_ = this.#module._FPDF_ImportPagesByIndex;
-    if (typeof fn_ !== 'function') {
-      throw new Error('FPDF_ImportPagesByIndex is not available');
-    }
-
     if (pageIndices.length === 0) {
       return;
     }
@@ -1300,7 +1263,13 @@ export class WasmBackend implements PDFiumBackend {
       intView[i] = pageIndices[i] ?? 0;
     }
 
-    const result = fn_(destHandle as never, srcHandle as never, indicesAlloc.ptr, pageIndices.length, insertIndex);
+    const result = this.#module._FPDF_ImportPagesByIndex(
+      destHandle as never,
+      srcHandle as never,
+      indicesAlloc.ptr,
+      pageIndices.length,
+      insertIndex,
+    );
 
     if (result === 0) {
       throw new Error('Failed to import pages by index');
@@ -1314,20 +1283,16 @@ export class WasmBackend implements PDFiumBackend {
     pagesPerRow: number,
     pagesPerColumn: number,
   ): number {
-    const fn_ = this.#module._FPDF_ImportNPagesToOne;
-    if (typeof fn_ !== 'function') {
-      return 0;
-    }
-
-    return fn_(srcHandle as never, outputWidth, outputHeight, pagesPerRow, pagesPerColumn) as number;
+    return this.#module._FPDF_ImportNPagesToOne(
+      srcHandle as never,
+      outputWidth,
+      outputHeight,
+      pagesPerRow,
+      pagesPerColumn,
+    ) as number;
   }
 
   copyViewerPreferences(destHandle: number, srcHandle: number): boolean {
-    const fn_ = this.#module._FPDF_CopyViewerPreferences;
-    if (typeof fn_ !== 'function') {
-      return false;
-    }
-
-    return fn_(destHandle as never, srcHandle as never) !== 0;
+    return this.#module._FPDF_CopyViewerPreferences(destHandle as never, srcHandle as never) !== 0;
   }
 }

@@ -6,7 +6,9 @@
  * @module context/worker-script
  */
 
+import { isNodeEnvironment } from '../core/env.js';
 import { PDFiumError, PDFiumErrorCode } from '../core/errors.js';
+import { getLogger } from '../core/logger.js';
 import type { SerialisedError } from '../core/types.js';
 import type { PDFiumDocument } from '../document/document.js';
 import type { PDFiumPage } from '../document/page.js';
@@ -25,6 +27,17 @@ const DEFAULT_MAX_DOCUMENTS = 10;
 
 /** Default maximum number of open pages. */
 const DEFAULT_MAX_PAGES = 100;
+
+type TransferList = readonly unknown[];
+type MessageToMainThread = (response: WorkerResponse, transfer?: TransferList) => void;
+
+interface BrowserWorkerScope {
+  postMessage: (message: WorkerResponse, options?: { transfer?: Transferable[] }) => void;
+  onmessage: ((event: MessageEvent<WorkerRequest>) => void) | null;
+  location?: {
+    origin?: string;
+  };
+}
 
 /**
  * Encapsulated worker state.
@@ -58,13 +71,39 @@ class WorkerState {
 }
 
 const state = new WorkerState();
+let postToMainThread: MessageToMainThread | null = null;
+let expectedMessageOrigin: string | undefined;
+
+function getBrowserWorkerScope(): BrowserWorkerScope | null {
+  const scopeCandidate = (globalThis as { self?: unknown }).self ?? globalThis;
+  if (scopeCandidate === null || typeof scopeCandidate !== 'object') {
+    return null;
+  }
+
+  const scope = scopeCandidate as Partial<BrowserWorkerScope>;
+  if (typeof scope.postMessage !== 'function') {
+    return null;
+  }
+  if (!('onmessage' in scope)) {
+    return null;
+  }
+
+  return scope as BrowserWorkerScope;
+}
+
+function post(response: WorkerResponse, transfer: TransferList = []): void {
+  if (postToMainThread === null) {
+    throw new Error('Worker message transport has not been initialised');
+  }
+  postToMainThread(response, transfer);
+}
 
 /**
  * Post a success response to the main thread.
  */
-function postSuccess(id: string, payload: unknown, transfer: Transferable[] = []): void {
+function postSuccess(id: string, payload: unknown, transfer: TransferList = []): void {
   const response: WorkerResponse = { type: 'SUCCESS', id, payload };
-  self.postMessage(response, { transfer });
+  post(response, transfer);
 }
 
 /**
@@ -99,7 +138,7 @@ function postError(id: string, error: Error | SerialisedError): void {
   }
 
   const response: WorkerResponse = { type: 'ERROR', id, error: serialised };
-  self.postMessage(response);
+  post(response);
 }
 
 /**
@@ -343,6 +382,24 @@ function handleGetText(id: string, pageId: string): void {
 }
 
 /**
+ * Handle get text rects request.
+ */
+function handleGetTextLayout(id: string, pageId: string): void {
+  const page = state.pages.get(pageId);
+  if (page === undefined) {
+    postError(id, {
+      name: 'PageError',
+      message: `Page ${pageId} not found`,
+      code: PDFiumErrorCode.PAGE_ALREADY_CLOSED,
+    });
+    return;
+  }
+
+  const { text, rects } = page.getTextLayout();
+  postSuccess(id, { text, rects }, [rects.buffer]);
+}
+
+/**
  * Handle destroy request.
  */
 function handleDestroy(id: string): void {
@@ -373,21 +430,61 @@ function handleDestroy(id: string): void {
  * Call this from the worker entry point to initialise
  * message handling for off-main-thread PDF processing.
  */
-export function setupWorker(): void {
-  self.onmessage = handleMessage;
+export async function setupWorker(): Promise<void> {
+  const browserScope = getBrowserWorkerScope();
+  if (browserScope !== null) {
+    expectedMessageOrigin = browserScope.location?.origin;
+    postToMainThread = (response, transfer = []) => {
+      if (transfer.length > 0) {
+        browserScope.postMessage(response, { transfer: [...transfer] as Transferable[] });
+        return;
+      }
+      browserScope.postMessage(response);
+    };
+    browserScope.onmessage = (event) => {
+      void handleMessage(event.data, event.origin);
+    };
+    return;
+  }
+
+  if (isNodeEnvironment()) {
+    const { parentPort } = await import('node:worker_threads');
+    if (parentPort === null) {
+      throw new Error('Node worker_threads parentPort is not available');
+    }
+
+    postToMainThread = (response, transfer = []) => {
+      if (transfer.length > 0) {
+        parentPort.postMessage(response, transfer as []);
+        return;
+      }
+      parentPort.postMessage(response);
+    };
+
+    parentPort.on('message', (message: unknown) => {
+      void handleMessage(message as WorkerRequest);
+    });
+    return;
+  }
+
+  throw new Error('Unsupported worker runtime: expected browser worker or Node worker_threads');
 }
 
 /**
  * Handle incoming messages from the main thread.
  */
-async function handleMessage(event: MessageEvent<WorkerRequest>): Promise<void> {
+async function handleMessage(request: WorkerRequest, origin?: string): Promise<void> {
   // Defence-in-depth: validate message origin
-  if (event.origin !== '' && event.origin !== self.location.origin) {
-    console.warn('[PDFium Worker] Rejected message from unexpected origin:', event.origin);
+  if (
+    origin !== undefined &&
+    expectedMessageOrigin !== undefined &&
+    origin !== '' &&
+    origin !== expectedMessageOrigin
+  ) {
+    getLogger().warn('Worker rejected message from unexpected origin:', origin);
     return;
   }
 
-  const request = event.data;
   const { type, id } = request;
 
   try {
@@ -430,6 +527,10 @@ async function handleMessage(event: MessageEvent<WorkerRequest>): Promise<void> 
 
       case 'GET_TEXT':
         handleGetText(id, request.payload.pageId);
+        break;
+
+      case 'GET_TEXT_LAYOUT':
+        handleGetTextLayout(id, request.payload.pageId);
         break;
 
       case 'PING':

@@ -70,19 +70,17 @@ describe('Multi-page Text Extraction', () => {
 
   bench('extract text from all pages', () => {
     for (let i = 0; i < document.pageCount; i++) {
-      const page = document.getPage(i);
+      using page = document.getPage(i);
       page.getText();
-      page.dispose();
     }
   });
 
   bench('find text across all pages', () => {
     for (let i = 0; i < document.pageCount; i++) {
-      const page = document.getPage(i);
+      using page = document.getPage(i);
       for (const _result of page.findText('test')) {
         // Iterate through all matches
       }
-      page.dispose();
     }
   });
 });

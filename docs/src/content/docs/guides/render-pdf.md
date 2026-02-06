@@ -123,3 +123,9 @@ async function main() {
 
 main();
 ```
+
+## See Also
+
+- [Advanced Rendering](/pdfium/guides/advanced-rendering/) — Clip rects, progress callbacks, and progressive rendering
+- [Performance Guide](/pdfium/concepts/performance/) — Optimising scale, memory, and batch rendering
+- [Worker Mode](/pdfium/guides/worker-mode/) — Off-main-thread rendering

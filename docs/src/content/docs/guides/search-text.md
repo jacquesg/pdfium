@@ -395,7 +395,7 @@ Total matches: 4
 
 ## See Also
 
-- [PDFiumPage](/pdfium/api/classes/pdfium-page/) — Page API reference
-- [TextSearchFlags Enum](/pdfium/api/enums/text-search-flags/) — Search flags
+- [PDFiumPage](/pdfium/api/classes/pdfiumpage/) — Page API reference
+- [TextSearchFlags Enum](/pdfium/api/enumerations/textsearchflags/) — Search flags
 - [Extract Text Guide](/pdfium/guides/extract-text/) — Text extraction
 - [Character Positioning Guide](/pdfium/guides/character-positioning/) — Character bounds

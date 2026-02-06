@@ -181,3 +181,4 @@ export async function cleanupExtracted(baseDir: string): Promise<void> {
     await fs.rm(`${baseDir}/${file}`, { force: true });
   }
 }
+

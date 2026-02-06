@@ -27,73 +27,73 @@ describe('Form Modification API - Mouse Events', () => {
     pdfium?.dispose();
   });
 
-  describe('formOnMouseMove', () => {
+  describe('formMouseMove', () => {
     test('should return boolean', () => {
-      const result = page.formOnMouseMove(0, 100, 100);
+      const result = page.formMouseMove(0, 100, 100);
       expect(typeof result).toBe('boolean');
     });
 
     test('should handle different coordinates', () => {
-      expect(() => page.formOnMouseMove(0, 0, 0)).not.toThrow();
-      expect(() => page.formOnMouseMove(0, 500, 500)).not.toThrow();
+      expect(() => page.formMouseMove(0, 0, 0)).not.toThrow();
+      expect(() => page.formMouseMove(0, 500, 500)).not.toThrow();
     });
 
     test('should accept modifier flags', () => {
-      expect(() => page.formOnMouseMove(1, 100, 100)).not.toThrow(); // Shift
-      expect(() => page.formOnMouseMove(2, 100, 100)).not.toThrow(); // Ctrl
+      expect(() => page.formMouseMove(1, 100, 100)).not.toThrow(); // Shift
+      expect(() => page.formMouseMove(2, 100, 100)).not.toThrow(); // Ctrl
     });
   });
 
-  describe('formOnMouseWheel', () => {
+  describe('formMouseWheel', () => {
     test('should return boolean', () => {
-      const result = page.formOnMouseWheel(0, 100, 100, 0, 10);
+      const result = page.formMouseWheel(0, 100, 100, 0, 10);
       expect(typeof result).toBe('boolean');
     });
 
     test('should handle scroll delta values', () => {
-      expect(() => page.formOnMouseWheel(0, 100, 100, -10, 0)).not.toThrow();
-      expect(() => page.formOnMouseWheel(0, 100, 100, 0, -10)).not.toThrow();
+      expect(() => page.formMouseWheel(0, 100, 100, -10, 0)).not.toThrow();
+      expect(() => page.formMouseWheel(0, 100, 100, 0, -10)).not.toThrow();
     });
   });
 
-  describe('formOnFocus', () => {
+  describe('formFocus', () => {
     test('should return boolean', () => {
-      const result = page.formOnFocus(0, 100, 100);
+      const result = page.formFocus(0, 100, 100);
       expect(typeof result).toBe('boolean');
     });
   });
 
-  describe('formOnLButtonDown', () => {
+  describe('formMouseDown', () => {
     test('should return boolean', () => {
-      const result = page.formOnLButtonDown(0, 100, 100);
+      const result = page.formMouseDown('left', 0, 100, 100);
       expect(typeof result).toBe('boolean');
     });
   });
 
-  describe('formOnRButtonDown', () => {
+  describe('formMouseDown', () => {
     test('should return boolean', () => {
-      const result = page.formOnRButtonDown(0, 100, 100);
+      const result = page.formMouseDown('right', 0, 100, 100);
       expect(typeof result).toBe('boolean');
     });
   });
 
-  describe('formOnLButtonUp', () => {
+  describe('formMouseUp', () => {
     test('should return boolean', () => {
-      const result = page.formOnLButtonUp(0, 100, 100);
+      const result = page.formMouseUp('left', 0, 100, 100);
       expect(typeof result).toBe('boolean');
     });
   });
 
-  describe('formOnRButtonUp', () => {
+  describe('formMouseUp', () => {
     test('should return boolean', () => {
-      const result = page.formOnRButtonUp(0, 100, 100);
+      const result = page.formMouseUp('right', 0, 100, 100);
       expect(typeof result).toBe('boolean');
     });
   });
 
-  describe('formOnLButtonDoubleClick', () => {
+  describe('formDoubleClick', () => {
     test('should return boolean', () => {
-      const result = page.formOnLButtonDoubleClick(0, 100, 100);
+      const result = page.formDoubleClick(0, 100, 100);
       expect(typeof result).toBe('boolean');
     });
   });
@@ -116,40 +116,40 @@ describe('Form Modification API - Keyboard Events', () => {
     pdfium?.dispose();
   });
 
-  describe('formOnKeyDown', () => {
+  describe('formKeyDown', () => {
     test('should return boolean', () => {
-      const result = page.formOnKeyDown(65, 0); // 'A' key
+      const result = page.formKeyDown(65, 0); // 'A' key
       expect(typeof result).toBe('boolean');
     });
 
     test('should handle different key codes', () => {
-      expect(() => page.formOnKeyDown(13, 0)).not.toThrow(); // Enter
-      expect(() => page.formOnKeyDown(27, 0)).not.toThrow(); // Escape
-      expect(() => page.formOnKeyDown(9, 0)).not.toThrow(); // Tab
+      expect(() => page.formKeyDown(13, 0)).not.toThrow(); // Enter
+      expect(() => page.formKeyDown(27, 0)).not.toThrow(); // Escape
+      expect(() => page.formKeyDown(9, 0)).not.toThrow(); // Tab
     });
 
     test('should accept modifier flags', () => {
-      expect(() => page.formOnKeyDown(65, 1)).not.toThrow(); // Shift+A
-      expect(() => page.formOnKeyDown(65, 2)).not.toThrow(); // Ctrl+A
+      expect(() => page.formKeyDown(65, 1)).not.toThrow(); // Shift+A
+      expect(() => page.formKeyDown(65, 2)).not.toThrow(); // Ctrl+A
     });
   });
 
-  describe('formOnKeyUp', () => {
+  describe('formKeyUp', () => {
     test('should return boolean', () => {
-      const result = page.formOnKeyUp(65, 0); // 'A' key
+      const result = page.formKeyUp(65, 0); // 'A' key
       expect(typeof result).toBe('boolean');
     });
   });
 
-  describe('formOnChar', () => {
+  describe('formChar', () => {
     test('should return boolean', () => {
-      const result = page.formOnChar(65, 0); // 'A' character
+      const result = page.formChar(65, 0); // 'A' character
       expect(typeof result).toBe('boolean');
     });
 
     test('should handle different characters', () => {
-      expect(() => page.formOnChar(32, 0)).not.toThrow(); // Space
-      expect(() => page.formOnChar(48, 0)).not.toThrow(); // '0'
+      expect(() => page.formChar(32, 0)).not.toThrow(); // Space
+      expect(() => page.formChar(48, 0)).not.toThrow(); // '0'
     });
   });
 });
@@ -213,13 +213,6 @@ describe('Form Modification API - Focus and Selection', () => {
     pdfium?.dispose();
   });
 
-  describe('setFormFocusedAnnotation', () => {
-    test('should return boolean for invalid handle', () => {
-      const result = page.setFormFocusedAnnotation(0 as never);
-      expect(typeof result).toBe('boolean');
-    });
-  });
-
   describe('setFormIndexSelected', () => {
     test('should return boolean', () => {
       const result = page.setFormIndexSelected(0, true);
@@ -260,8 +253,8 @@ describe('Form Modification with different PDFs', () => {
     using doc = await loadTestDocument(pdfium, 'test_3_with_images.pdf');
     using page = doc.getPage(0);
 
-    expect(() => page.formOnMouseMove(0, 100, 100)).not.toThrow();
-    expect(() => page.formOnKeyDown(65, 0)).not.toThrow();
+    expect(() => page.formMouseMove(0, 100, 100)).not.toThrow();
+    expect(() => page.formKeyDown(65, 0)).not.toThrow();
     expect(() => page.formSelectAllText()).not.toThrow();
   });
 });
@@ -277,139 +270,115 @@ describe('Form Modification post-dispose guards', () => {
     pdfium?.dispose();
   });
 
-  test('should throw on formOnMouseMove after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+  test('should throw on formMouseMove after dispose', async () => {
+    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = doc.getPage(0);
     page.dispose();
-    expect(() => page.formOnMouseMove(0, 100, 100)).toThrow();
-    doc.dispose();
+    expect(() => page.formMouseMove(0, 100, 100)).toThrow();
   });
 
-  test('should throw on formOnMouseWheel after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+  test('should throw on formMouseWheel after dispose', async () => {
+    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = doc.getPage(0);
     page.dispose();
-    expect(() => page.formOnMouseWheel(0, 100, 100, 0, 10)).toThrow();
-    doc.dispose();
+    expect(() => page.formMouseWheel(0, 100, 100, 0, 10)).toThrow();
   });
 
-  test('should throw on formOnFocus after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+  test('should throw on formFocus after dispose', async () => {
+    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = doc.getPage(0);
     page.dispose();
-    expect(() => page.formOnFocus(0, 100, 100)).toThrow();
-    doc.dispose();
+    expect(() => page.formFocus(0, 100, 100)).toThrow();
   });
 
-  test('should throw on formOnLButtonDown after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+  test('should throw on formMouseDown after dispose', async () => {
+    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = doc.getPage(0);
     page.dispose();
-    expect(() => page.formOnLButtonDown(0, 100, 100)).toThrow();
-    doc.dispose();
+    expect(() => page.formMouseDown('left', 0, 100, 100)).toThrow();
   });
 
-  test('should throw on formOnRButtonDown after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+  test('should throw on formMouseDown after dispose', async () => {
+    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = doc.getPage(0);
     page.dispose();
-    expect(() => page.formOnRButtonDown(0, 100, 100)).toThrow();
-    doc.dispose();
+    expect(() => page.formMouseDown('right', 0, 100, 100)).toThrow();
   });
 
-  test('should throw on formOnLButtonUp after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+  test('should throw on formMouseUp after dispose', async () => {
+    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = doc.getPage(0);
     page.dispose();
-    expect(() => page.formOnLButtonUp(0, 100, 100)).toThrow();
-    doc.dispose();
+    expect(() => page.formMouseUp('left', 0, 100, 100)).toThrow();
   });
 
-  test('should throw on formOnRButtonUp after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+  test('should throw on formMouseUp after dispose', async () => {
+    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = doc.getPage(0);
     page.dispose();
-    expect(() => page.formOnRButtonUp(0, 100, 100)).toThrow();
-    doc.dispose();
+    expect(() => page.formMouseUp('right', 0, 100, 100)).toThrow();
   });
 
-  test('should throw on formOnLButtonDoubleClick after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+  test('should throw on formDoubleClick after dispose', async () => {
+    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = doc.getPage(0);
     page.dispose();
-    expect(() => page.formOnLButtonDoubleClick(0, 100, 100)).toThrow();
-    doc.dispose();
+    expect(() => page.formDoubleClick(0, 100, 100)).toThrow();
   });
 
-  test('should throw on formOnKeyDown after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+  test('should throw on formKeyDown after dispose', async () => {
+    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = doc.getPage(0);
     page.dispose();
-    expect(() => page.formOnKeyDown(65, 0)).toThrow();
-    doc.dispose();
+    expect(() => page.formKeyDown(65, 0)).toThrow();
   });
 
-  test('should throw on formOnKeyUp after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+  test('should throw on formKeyUp after dispose', async () => {
+    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = doc.getPage(0);
     page.dispose();
-    expect(() => page.formOnKeyUp(65, 0)).toThrow();
-    doc.dispose();
+    expect(() => page.formKeyUp(65, 0)).toThrow();
   });
 
-  test('should throw on formOnChar after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+  test('should throw on formChar after dispose', async () => {
+    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = doc.getPage(0);
     page.dispose();
-    expect(() => page.formOnChar(65, 0)).toThrow();
-    doc.dispose();
+    expect(() => page.formChar(65, 0)).toThrow();
   });
 
   test('should throw on getFormFocusedText after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = doc.getPage(0);
     page.dispose();
     expect(() => page.getFormFocusedText()).toThrow();
-    doc.dispose();
   });
 
   test('should throw on replaceFormSelectionAndKeep after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = doc.getPage(0);
     page.dispose();
     expect(() => page.replaceFormSelectionAndKeep('test')).toThrow();
-    doc.dispose();
   });
 
   test('should throw on formSelectAllText after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = doc.getPage(0);
     page.dispose();
     expect(() => page.formSelectAllText()).toThrow();
-    doc.dispose();
-  });
-
-  test('should throw on setFormFocusedAnnotation after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
-    using page = doc.getPage(0);
-    page.dispose();
-    expect(() => page.setFormFocusedAnnotation(0 as never)).toThrow();
-    doc.dispose();
   });
 
   test('should throw on setFormIndexSelected after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = doc.getPage(0);
     page.dispose();
     expect(() => page.setFormIndexSelected(0, true)).toThrow();
-    doc.dispose();
   });
 
   test('should throw on isFormIndexSelected after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     using page = doc.getPage(0);
     page.dispose();
     expect(() => page.isFormIndexSelected(0)).toThrow();
-    doc.dispose();
   });
 });

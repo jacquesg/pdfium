@@ -15,9 +15,38 @@ const triples: Record<string, string> = {
   'darwin-arm64': '@scaryterry/pdfium-darwin-arm64',
   'darwin-x64': '@scaryterry/pdfium-darwin-x64',
   'linux-x64': '@scaryterry/pdfium-linux-x64-gnu',
+  'linux-x64-musl': '@scaryterry/pdfium-linux-x64-musl',
   'linux-arm64': '@scaryterry/pdfium-linux-arm64-gnu',
   'win32-x64': '@scaryterry/pdfium-win32-x64-msvc',
 };
+
+function isLinuxMusl(): boolean {
+  if (process.platform !== 'linux') {
+    return false;
+  }
+  try {
+    // In glibc environments this field is set. In musl it's undefined.
+    const report = process.report?.getReport() as { header?: { glibcVersionRuntime?: string } } | undefined;
+    const glibcVersionRuntime = report?.header?.glibcVersionRuntime;
+    return glibcVersionRuntime === undefined;
+  } catch {
+    return false;
+  }
+}
+
+function getPackageCandidates(): string[] {
+  const key = `${process.platform}-${process.arch}`;
+
+  if (key === 'linux-x64') {
+    if (isLinuxMusl()) {
+      return [triples['linux-x64-musl'], triples['linux-x64']].filter((v): v is string => v !== undefined);
+    }
+    return [triples['linux-x64'], triples['linux-x64-musl']].filter((v): v is string => v !== undefined);
+  }
+
+  const single = triples[key];
+  return single ? [single] : [];
+}
 
 function isNativeBinding(value: unknown): value is NativePdfiumBinding {
   return (
@@ -60,28 +89,27 @@ function resolveLibraryPath(req: ReturnType<typeof createRequire>, packageName: 
 export function loadNativeBinding(): NativePdfium | null {
   try {
     const req = createRequire(import.meta.url);
-    const key = `${process.platform}-${process.arch}`;
-    const packageName = triples[key];
+    const candidates = getPackageCandidates();
 
     let binding: unknown;
     let usedPackage: string | undefined;
 
-    if (packageName) {
+    if (candidates.length > 0) {
       try {
-        binding = req(packageName);
-        usedPackage = packageName;
-      } catch {
-        // On Linux, fall back to musl if glibc package isn't available
-        if (process.platform === 'linux') {
+        for (const candidate of candidates) {
           try {
-            binding = req('@scaryterry/pdfium-linux-x64-musl');
-            usedPackage = '@scaryterry/pdfium-linux-x64-musl';
+            binding = req(candidate);
+            usedPackage = candidate;
+            break;
           } catch {
-            return null;
+            // Try next candidate
           }
-        } else {
+        }
+        if (!usedPackage) {
           return null;
         }
+      } catch {
+        return null;
       }
     } else {
       return null;

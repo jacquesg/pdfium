@@ -330,7 +330,7 @@ convertPDFVersions('./input', './output', 17);
 
 ## See Also
 
-- [PDFiumDocument](/pdfium/api/classes/pdfium-document/) — Document API reference
-- [PDFiumDocumentBuilder](/pdfium/api/classes/pdfium-document-builder/) — Creating documents
-- [SaveFlags Enum](/pdfium/api/enums/save-flags/) — Save flags reference
+- [PDFiumDocument](/pdfium/api/classes/pdfiumdocument/) — Document API reference
+- [PDFiumDocumentBuilder](/pdfium/api/classes/pdfiumdocumentbuilder/) — Creating documents
+- [SaveFlags Enum](/pdfium/api/enumerations/saveflags/) — Save flags reference
 - [Open Document Guide](/pdfium/guides/open-document/) — Loading documents

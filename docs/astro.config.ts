@@ -18,7 +18,6 @@ export default defineConfig({
             { label: 'Installation', slug: 'installation' },
             { label: 'Quick Start', slug: 'quick-start' },
             { label: 'TypeScript Setup', slug: 'typescript-setup' },
-            { label: 'Upgrade Guide', slug: 'upgrade-guide' },
           ],
         },
         {
@@ -30,7 +29,8 @@ export default defineConfig({
             { label: 'Coordinate Systems', slug: 'concepts/coordinates' },
             { label: 'Memory Management', slug: 'concepts/memory' },
             { label: 'Error Handling', slug: 'concepts/error-handling' },
-            { label: 'Browser vs Node.js', slug: 'concepts/environments' },
+            { label: 'Backends & Environments', slug: 'concepts/environments' },
+            { label: 'Native vs WASM', slug: 'concepts/backends' },
             { label: 'Performance', slug: 'concepts/performance' },
           ],
         },
@@ -81,9 +81,26 @@ export default defineConfig({
               ],
             },
             {
+              label: 'Forms & Manipulation',
+              items: [
+                { label: 'Interactive Forms', slug: 'guides/forms' },
+                { label: 'Merging & Layouts', slug: 'guides/merging-layouts' },
+              ],
+            },
+            {
               label: 'Advanced',
               items: [
+                { label: 'Advanced Rendering', slug: 'guides/advanced-rendering' },
                 { label: 'Worker Mode', slug: 'guides/worker-mode' },
+                { label: 'Digital Signatures & JS', slug: 'guides/advanced-features' },
+                { label: 'Security', slug: 'guides/security' },
+              ],
+            },
+            {
+              label: 'Troubleshooting',
+              items: [
+                { label: 'Common Issues', slug: 'guides/troubleshooting' },
+                { label: 'Native Backend', slug: 'guides/native-troubleshooting' },
               ],
             },
           ],
@@ -91,34 +108,23 @@ export default defineConfig({
         {
           label: 'API Reference',
           items: [
+            { label: 'Overview', slug: 'api' },
             {
               label: 'Classes',
-              items: [
-                { label: 'PDFium', slug: 'api/classes/pdfium' },
-                { label: 'PDFiumDocument', slug: 'api/classes/pdfium-document' },
-                { label: 'PDFiumPage', slug: 'api/classes/pdfium-page' },
-                { label: 'PDFiumDocumentBuilder', slug: 'api/classes/pdfium-document-builder' },
-                { label: 'PDFiumPageBuilder', slug: 'api/classes/pdfium-page-builder' },
-                { label: 'ProgressivePDFLoader', slug: 'api/classes/progressive-pdf-loader' },
-                { label: 'WorkerProxy', slug: 'api/classes/worker-proxy' },
-              ],
+              autogenerate: { directory: 'api/classes' },
+            },
+            {
+              label: 'Interfaces',
+              autogenerate: { directory: 'api/interfaces' },
             },
             {
               label: 'Enums',
-              items: [
-                { label: 'PageRotation', slug: 'api/enums/page-rotation' },
-                { label: 'PageObjectType', slug: 'api/enums/page-object-type' },
-                { label: 'AnnotationType', slug: 'api/enums/annotation-type' },
-                { label: 'TextSearchFlags', slug: 'api/enums/text-search-flags' },
-                { label: 'FontType', slug: 'api/enums/font-type' },
-                { label: 'SaveFlags', slug: 'api/enums/save-flags' },
-                { label: 'PDFiumErrorCode', slug: 'api/enums/pdfium-error-code' },
-                { label: 'DocumentAvailability', slug: 'api/enums/document-availability' },
-                { label: 'LinearisationStatus', slug: 'api/enums/linearisation-status' },
-              ],
+              autogenerate: { directory: 'api/enumerations' },
             },
-            { label: 'Interfaces', slug: 'api/interfaces' },
-            { label: 'Types', slug: 'api/types' },
+            {
+              label: 'Types',
+              autogenerate: { directory: 'api/type-aliases' },
+            },
           ],
         },
         {

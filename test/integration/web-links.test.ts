@@ -4,31 +4,15 @@
  * These tests verify automatic URL detection in page text content.
  */
 
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import type { PDFiumDocument } from '../../src/document/document.js';
-import type { PDFiumPage } from '../../src/document/page.js';
-import type { PDFium } from '../../src/pdfium.js';
+import { describe, expect, test } from 'vitest';
 import { initPdfium, loadTestDocument } from '../utils/helpers.js';
 
 describe('Web Links', () => {
-  let pdfium: PDFium;
-  let document: PDFiumDocument;
-  let page: PDFiumPage;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-    document = await loadTestDocument(pdfium, 'test_1.pdf');
-    page = document.getPage(0);
-  });
-
-  afterAll(() => {
-    page?.dispose();
-    document?.dispose();
-    pdfium?.dispose();
-  });
-
   describe('webLinkCount', () => {
-    test('should return number of detected web links', () => {
+    test('should return number of detected web links', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       const count = page.webLinkCount;
       expect(typeof count).toBe('number');
       expect(count).toBeGreaterThanOrEqual(0);
@@ -36,12 +20,18 @@ describe('Web Links', () => {
   });
 
   describe('getWebLinks', () => {
-    test('should return array of WebLink objects', () => {
+    test('should return array of WebLink objects', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       const webLinks = page.getWebLinks();
       expect(Array.isArray(webLinks)).toBe(true);
     });
 
-    test('should return WebLink objects with required properties', () => {
+    test('should return WebLink objects with required properties', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       const webLinks = page.getWebLinks();
 
       for (const link of webLinks) {
@@ -69,7 +59,10 @@ describe('Web Links', () => {
       }
     });
 
-    test('should return URLs that look like web links', () => {
+    test('should return URLs that look like web links', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       const webLinks = page.getWebLinks();
 
       for (const link of webLinks) {
@@ -88,7 +81,10 @@ describe('Web Links', () => {
       }
     });
 
-    test('should return consistent count with webLinkCount', () => {
+    test('should return consistent count with webLinkCount', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       const count = page.webLinkCount;
       const webLinks = page.getWebLinks();
       expect(webLinks.length).toBe(count);
@@ -96,7 +92,10 @@ describe('Web Links', () => {
   });
 
   describe('WebLink structure', () => {
-    test('should have sequential indices', () => {
+    test('should have sequential indices', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       const webLinks = page.getWebLinks();
 
       for (let i = 0; i < webLinks.length; i++) {
@@ -108,7 +107,10 @@ describe('Web Links', () => {
       }
     });
 
-    test('should have non-empty rects for valid links', () => {
+    test('should have non-empty rects for valid links', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+      using page = document.getPage(0);
       const webLinks = page.getWebLinks();
 
       for (const link of webLinks) {

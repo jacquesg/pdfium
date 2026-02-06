@@ -43,13 +43,11 @@ describe('Backend Comparison: WASM', () => {
 
   describe('Document Loading', () => {
     bench('load small PDF (339 KB)', async () => {
-      const doc = await pdfium.openDocument(smallPdf);
-      doc.dispose();
+      using _doc = await pdfium.openDocument(smallPdf);
     });
 
     bench('load large PDF (1.6 MB)', async () => {
-      const doc = await pdfium.openDocument(largePdf);
-      doc.dispose();
+      using _doc = await pdfium.openDocument(largePdf);
     });
   });
 
@@ -133,13 +131,11 @@ describe.skipIf(!hasNative)('Backend Comparison: Native', () => {
 
   describe('Document Loading', () => {
     bench('load small PDF (339 KB)', () => {
-      const doc = pdfium.openDocument(smallPdf);
-      doc.dispose();
+      using _doc = pdfium.openDocument(smallPdf);
     });
 
     bench('load large PDF (1.6 MB)', () => {
-      const doc = pdfium.openDocument(largePdf);
-      doc.dispose();
+      using _doc = pdfium.openDocument(largePdf);
     });
   });
 
@@ -212,11 +208,9 @@ describe('Memory Usage Comparison', () => {
 
     bench('load, render, dispose cycle (small PDF)', async () => {
       const data = await loadTestPdfData('test_1.pdf');
-      const doc = await pdfium.openDocument(data);
-      const page = doc.getPage(0);
+      using doc = await pdfium.openDocument(data);
+      using page = doc.getPage(0);
       page.render({ scale: 1 });
-      page.dispose();
-      doc.dispose();
     });
   });
 
@@ -235,11 +229,9 @@ describe('Memory Usage Comparison', () => {
 
     bench('load, render, dispose cycle (small PDF)', async () => {
       const data = await loadTestPdfData('test_1.pdf');
-      const doc = pdfium.openDocument(data);
-      const page = doc.getPage(0);
+      using doc = pdfium.openDocument(data);
+      using page = doc.getPage(0);
       page.render({ scale: 1 });
-      page.dispose();
-      doc.dispose();
     });
   });
 });
@@ -266,17 +258,15 @@ describe('Multi-page Processing', () => {
 
     bench('iterate and extract text from all pages', () => {
       for (let i = 0; i < document.pageCount; i++) {
-        const page = document.getPage(i);
+        using page = document.getPage(i);
         page.getText();
-        page.dispose();
       }
     });
 
     bench('iterate and render all pages at 0.5x', () => {
       for (let i = 0; i < document.pageCount; i++) {
-        const page = document.getPage(i);
+        using page = document.getPage(i);
         page.render({ scale: 0.5 });
-        page.dispose();
       }
     });
   });
@@ -300,17 +290,15 @@ describe('Multi-page Processing', () => {
 
     bench('iterate and extract text from all pages', () => {
       for (let i = 0; i < document.pageCount; i++) {
-        const page = document.getPage(i);
+        using page = document.getPage(i);
         page.getText();
-        page.dispose();
       }
     });
 
     bench('iterate and render all pages at 0.5x', () => {
       for (let i = 0; i < document.pageCount; i++) {
-        const page = document.getPage(i);
+        using page = document.getPage(i);
         page.render({ scale: 0.5 });
-        page.dispose();
       }
     });
   });

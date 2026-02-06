@@ -291,6 +291,6 @@ analyseAndLoadPDF('document.pdf').catch(console.error);
 ## See Also
 
 - [Open Document Guide](/pdfium/guides/open-document/) — Standard document loading
-- [ProgressivePDFLoader](/pdfium/api/classes/progressive-pdf-loader/) — API reference
-- [LinearisationStatus](/pdfium/api/enums/linearisation-status/) — Status enum
-- [DocumentAvailability](/pdfium/api/enums/document-availability/) — Availability enum
+- [ProgressivePDFLoader](/pdfium/api/classes/progressivepdfloader/) — API reference
+- [LinearisationStatus](/pdfium/api/enumerations/linearisationstatus/) — Status enum
+- [DocumentAvailability](/pdfium/api/enumerations/documentavailability/) — Availability enum

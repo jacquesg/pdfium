@@ -15,32 +15,28 @@ import { promises as fs } from 'fs';
 
 async function processWithNative() {
   // Prefer native backend (falls back to WASM if unavailable)
-  const pdfium = await PDFium.init({ useNative: true });
+  using pdfium = await PDFium.init({ useNative: true });
 
   // Check which backend is being used
   const isNative = pdfium instanceof NativePDFiumInstance;
   console.log(`Backend: ${isNative ? 'Native' : 'WASM'}`);
 
-  try {
-    const data = await fs.readFile('document.pdf');
+  const data = await fs.readFile('document.pdf');
 
-    if (isNative) {
-      // Native API (synchronous document loading)
-      using doc = pdfium.openDocument(data);
-      for (const page of doc.pages()) {
-        using p = page;
-        console.log(p.getText());
-      }
-    } else {
-      // WASM API (async document loading)
-      using doc = await (pdfium as PDFium).openDocument(data);
-      for (const page of doc.pages()) {
-        using p = page;
-        console.log(p.getText());
-      }
+  if (isNative) {
+    // Native API (synchronous document loading)
+    using doc = pdfium.openDocument(data);
+    for (const page of doc.pages()) {
+      using p = page;
+      console.log(p.getText());
     }
-  } finally {
-    pdfium.dispose();
+  } else {
+    // WASM API (async document loading)
+    using doc = await (pdfium as PDFium).openDocument(data);
+    for (const page of doc.pages()) {
+      using p = page;
+      console.log(p.getText());
+    }
   }
 }
 

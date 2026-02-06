@@ -30,7 +30,7 @@ if (existsSync('src/vendor/pdfium.wasm')) {
 console.log('Downloading PDFium WASM for development...');
 
 try {
-  execSync('npx tsx scripts/download-pdfium.ts --target wasm', { stdio: 'inherit' });
+  execSync('node --import tsx scripts/download-pdfium.ts --target wasm', { stdio: 'inherit' });
 } catch (error) {
   console.error('Failed to download PDFium WASM:', error instanceof Error ? error.message : error);
   console.error('You can manually run: pnpm download:pdfium --target wasm');

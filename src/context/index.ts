@@ -13,4 +13,11 @@ export type {
   WorkerRequest,
   WorkerResponse,
 } from './protocol.js';
-export { WorkerProxy } from './worker-proxy.js';
+export { WorkerPDFium, WorkerPDFiumDocument, type WorkerPDFiumOptions, WorkerPDFiumPage } from './worker-client.js';
+export {
+  type WorkerErrorEvent,
+  type WorkerMessageEvent,
+  WorkerProxy,
+  type WorkerProxyOptions,
+  type WorkerTransport,
+} from './worker-proxy.js';

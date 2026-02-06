@@ -22,7 +22,9 @@ All library errors extend `PDFiumError`:
 import {
   PDFiumError,
   InitialisationError,
+  NetworkError,        // extends InitialisationError
   DocumentError,
+  PermissionsError,    // extends DocumentError
   PageError,
   RenderError,
   MemoryError,
@@ -35,7 +37,9 @@ import {
 ```
 PDFiumError (base)
 ├── InitialisationError  — WASM/library init failures
+│   └── NetworkError     — Network fetch failures (e.g. WASM URL unreachable)
 ├── DocumentError        — Document loading/saving
+│   └── PermissionsError — Document permission restrictions
 ├── PageError            — Page access issues
 ├── RenderError          — Rendering failures
 ├── MemoryError          — WASM memory issues

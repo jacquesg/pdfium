@@ -1,13 +1,17 @@
 /**
  * Shared type definitions for the @scaryterry/pdfium library.
  *
+ * ## Return value conventions
+ *
+ * - **throw**: Programming errors — invalid arguments, disposed resources, out-of-bounds indices.
+ * - **null**: "No value" — the C function succeeded but there is no data (e.g., no colour set, no handle).
+ * - **undefined**: "Key not found" — dictionary lookups where the key doesn't exist.
+ *
  * @module core/types
  */
 
-import type { PageObjectHandle } from '../internal/handles.js';
-
-// Re-export handle type for public API usage
-export type { PageObjectHandle };
+import type { Logger } from './logger.js';
+export type { Logger };
 
 /**
  * Information about a JavaScript action in a PDF document.
@@ -42,10 +46,10 @@ export interface PageSize {
  * - 3 = 270 degrees clockwise (90 degrees counter-clockwise)
  */
 export enum PageRotation {
-  None = 0,
-  Clockwise90 = 1,
-  Rotate180 = 2,
-  CounterClockwise90 = 3,
+  None = 'None',
+  Clockwise90 = 'Clockwise90',
+  Rotate180 = 'Rotate180',
+  CounterClockwise90 = 'CounterClockwise90',
 }
 
 /**
@@ -56,11 +60,11 @@ export enum PageRotation {
  */
 export enum FlattenResult {
   /** Flattening failed. */
-  Fail = 0,
+  Fail = 'Fail',
   /** Flattening succeeded. */
-  Success = 1,
+  Success = 'Success',
   /** Nothing to flatten (no annotations or forms). */
-  NothingToDo = 2,
+  NothingToDo = 'NothingToDo',
 }
 
 /**
@@ -68,35 +72,35 @@ export enum FlattenResult {
  */
 export enum FlattenFlags {
   /** Flatten all content. */
-  NormalDisplay = 0,
+  NormalDisplay = 'NormalDisplay',
   /** Flatten for printing. */
-  Print = 1,
+  Print = 'Print',
 }
 
 /**
- * Path segment types returned by FPDFPathSegment_GetType.
+ * Path segment types in a PDF path object.
  */
 export enum PathSegmentType {
   /** Unknown segment type. */
-  Unknown = -1,
+  Unknown = 'Unknown',
   /** Line to operation. */
-  LineTo = 0,
+  LineTo = 'LineTo',
   /** Bezier curve to operation. */
-  BezierTo = 1,
+  BezierTo = 'BezierTo',
   /** Move to operation. */
-  MoveTo = 2,
+  MoveTo = 'MoveTo',
 }
 
 /**
- * Path fill mode flags for FPDFPath_SetDrawMode.
+ * Path fill mode flags for path drawing operations.
  */
 export enum PathFillMode {
   /** No fill. */
-  None = 0,
+  None = 'None',
   /** Alternate fill mode (even-odd rule). */
-  Alternate = 1,
+  Alternate = 'Alternate',
   /** Winding fill mode (non-zero winding rule). */
-  Winding = 2,
+  Winding = 'Winding',
 }
 
 /**
@@ -111,15 +115,29 @@ export enum PathFillMode {
  */
 export enum PageBoxType {
   /** Physical page boundaries (required) */
-  MediaBox = 0,
+  MediaBox = 'MediaBox',
   /** Visible region after cropping (defaults to MediaBox) */
-  CropBox = 1,
+  CropBox = 'CropBox',
   /** Bleed area for printing (defaults to CropBox) */
-  BleedBox = 2,
+  BleedBox = 'BleedBox',
   /** Final trimmed page dimensions (defaults to CropBox) */
-  TrimBox = 3,
+  TrimBox = 'TrimBox',
   /** Meaningful content boundaries (defaults to CropBox) */
-  ArtBox = 4,
+  ArtBox = 'ArtBox',
+}
+
+/**
+ * A bounding rectangle in page coordinates (points, origin at bottom-left).
+ *
+ * Used for annotation bounds, text search results, link regions, page object
+ * bounds, and clip rectangles. For page-level boxes (MediaBox, CropBox, etc.),
+ * see {@link PageBox}. For per-character bounds, see {@link CharBox}.
+ */
+export interface Rect {
+  readonly left: number;
+  readonly top: number;
+  readonly right: number;
+  readonly bottom: number;
 }
 
 /**
@@ -164,7 +182,7 @@ export interface RenderOptions {
    *
    * Coordinates are in PDF page points (1/72 inch).
    */
-  clipRect?: { left: number; top: number; right: number; bottom: number };
+  clipRect?: Rect;
   /** Progress callback (0.0 to 1.0). */
   onProgress?: ProgressCallback;
 }
@@ -190,13 +208,29 @@ export interface RenderResult {
  */
 export enum ProgressiveRenderStatus {
   /** Rendering has not started yet. */
-  Ready = 0,
+  Ready = 'Ready',
   /** Rendering was paused and can be continued. */
-  ToBeContinued = 1,
+  ToBeContinued = 'ToBeContinued',
   /** Rendering is complete. */
-  Done = 2,
+  Done = 'Done',
   /** Rendering failed. */
-  Failed = 3,
+  Failed = 'Failed',
+}
+
+/**
+ * Interface for progressive rendering context.
+ */
+export interface IProgressiveRenderContext extends Disposable {
+  /** Current render status. */
+  readonly status: ProgressiveRenderStatus;
+  /** Rendered width in pixels. */
+  readonly width: number;
+  /** Rendered height in pixels. */
+  readonly height: number;
+  /** Continue the progressive render. */
+  continue(): ProgressiveRenderStatus;
+  /** Get the render result. */
+  getResult(): RenderResult;
 }
 
 /**
@@ -233,13 +267,24 @@ export const DEFAULT_LIMITS: Readonly<Required<PDFiumLimits>> = {
  */
 export interface PDFiumInitOptions {
   /** Path or URL to the WASM binary */
-  wasmUrl?: string;
+  readonly wasmUrl?: string;
   /** Pre-loaded WASM binary */
-  wasmBinary?: ArrayBuffer;
-  /** Enable worker mode for off-main-thread processing (default: false) */
-  useWorker?: boolean;
-  /** Custom worker script URL (only if useWorker is true) */
-  workerUrl?: string;
+  readonly wasmBinary?: ArrayBuffer;
+  /**
+   * Enable high-level worker mode for off-main-thread processing.
+   *
+   * When true, `PDFium.init()` returns a worker-backed instance that exposes
+   * ergonomic document/page APIs without manual worker protocol management.
+   */
+  readonly useWorker?: boolean;
+  /** Custom worker script URL (only if useWorker is true). */
+  readonly workerUrl?: string | URL;
+  /** Worker request timeout in milliseconds (default: 30000). */
+  readonly workerTimeout?: number;
+  /** Worker render timeout in milliseconds (default: 120000). */
+  readonly workerRenderTimeout?: number;
+  /** Worker destroy timeout in milliseconds (default: 5000). */
+  readonly workerDestroyTimeout?: number;
   /**
    * Try to use the native PDFium binding instead of WASM (Node.js only).
    *
@@ -248,7 +293,7 @@ export interface PDFiumInitOptions {
    *
    * Default: false (WASM is used unless explicitly opted in).
    */
-  useNative?: boolean;
+  readonly useNative?: boolean;
   /**
    * Force WASM backend even when native addon is available.
    *
@@ -261,9 +306,11 @@ export interface PDFiumInitOptions {
    *
    * Default: false.
    */
-  forceWasm?: boolean;
+  readonly forceWasm?: boolean;
   /** Resource limits for security and stability */
-  limits?: PDFiumLimits;
+  readonly limits?: PDFiumLimits;
+  /** Custom logger instance. */
+  readonly logger?: Logger;
 }
 
 /**
@@ -271,17 +318,17 @@ export interface PDFiumInitOptions {
  */
 export enum PageObjectType {
   /** Unknown or unrecognised object type. */
-  Unknown = 0,
+  Unknown = 'Unknown',
   /** Text content rendered with a font. */
-  Text = 1,
+  Text = 'Text',
   /** Vector path (lines, curves, rectangles). */
-  Path = 2,
+  Path = 'Path',
   /** Raster image (JPEG, PNG, etc.). */
-  Image = 3,
+  Image = 'Image',
   /** Shading pattern (gradient fill). */
-  Shading = 4,
+  Shading = 'Shading',
   /** Form XObject (reusable content group). */
-  Form = 5,
+  Form = 'Form',
 }
 
 /**
@@ -289,90 +336,74 @@ export enum PageObjectType {
  *
  * Page objects represent content elements on a PDF page such as text,
  * images, paths (shapes), shading, and form XObjects. Each object has
- * a type, bounding box, and a handle that can be used with low-level
- * manipulation methods.
+ * a type and bounding box.
  *
  * @example
  * ```typescript
- * const objects = page.getObjects();
- * for (const obj of objects) {
+ * for (const obj of page.objects()) {
  *   console.log(`${obj.type} at (${obj.bounds.left}, ${obj.bounds.bottom})`);
  *
- *   // Use handle with manipulation methods
- *   if (obj.type === PageObjectType.Text) {
- *     const font = page.getTextObjectFont(obj.handle);
- *     const mode = page.textObjGetRenderMode(obj.handle);
+ *   if (obj instanceof PDFiumTextObject) {
+ *     console.log(obj.text, obj.fontSize);
  *   }
  * }
  * ```
  */
 export interface PageObjectBase {
   /** The type of this page object. */
-  type: PageObjectType;
-  /**
-   * Native handle for use with low-level page object methods.
-   *
-   * Pass this handle to methods like `textObjGetRenderMode()`,
-   * `getTextObjectFont()`, `pageObjGetMarks()`, etc.
-   */
-  handle: PageObjectHandle;
+  readonly type: PageObjectType;
   /** Bounding box in page coordinates (points, origin at bottom-left). */
-  bounds: {
-    left: number;
-    top: number;
-    right: number;
-    bottom: number;
-  };
+  readonly bounds: Rect;
 }
 
 /**
  * Text object on a PDF page.
  */
 export interface TextObject extends PageObjectBase {
-  type: PageObjectType.Text;
+  readonly type: PageObjectType.Text;
   /** The text content */
-  text: string;
+  readonly text: string;
   /** Font size in points */
-  fontSize: number;
+  readonly fontSize: number;
 }
 
 /**
  * Image object on a PDF page.
  */
 export interface ImageObject extends PageObjectBase {
-  type: PageObjectType.Image;
+  readonly type: PageObjectType.Image;
   /** Image width in pixels */
-  width: number;
+  readonly width: number;
   /** Image height in pixels */
-  height: number;
+  readonly height: number;
 }
 
 /**
  * Path object on a PDF page.
  */
 export interface PathObject extends PageObjectBase {
-  type: PageObjectType.Path;
+  readonly type: PageObjectType.Path;
 }
 
 /**
  * Shading object on a PDF page.
  */
 export interface ShadingObject extends PageObjectBase {
-  type: PageObjectType.Shading;
+  readonly type: PageObjectType.Shading;
 }
 
 /**
  * Form object on a PDF page.
  */
 export interface FormObject extends PageObjectBase {
-  type: PageObjectType.Form;
+  readonly type: PageObjectType.Form;
 }
 
 /**
  * Unknown or unrecognised page object type.
  */
 export interface UnknownObject extends PageObjectBase {
-  type: PageObjectType.Unknown;
+  readonly type: PageObjectType.Unknown;
 }
 
 /**
@@ -387,70 +418,68 @@ export type PageObject = TextObject | ImageObject | PathObject | ShadingObject |
  */
 export enum AnnotationType {
   /** Unknown annotation type. */
-  Unknown = 0,
+  Unknown = 'Unknown',
   /** Text note (sticky note). */
-  Text = 1,
+  Text = 'Text',
   /** Hyperlink. */
-  Link = 2,
+  Link = 'Link',
   /** Free text (directly displayed on page). */
-  FreeText = 3,
+  FreeText = 'FreeText',
   /** Line annotation. */
-  Line = 4,
+  Line = 'Line',
   /** Rectangle annotation. */
-  Square = 5,
+  Square = 'Square',
   /** Ellipse annotation. */
-  Circle = 6,
+  Circle = 'Circle',
   /** Polygon annotation. */
-  Polygon = 7,
+  Polygon = 'Polygon',
   /** Text highlight markup. */
-  Highlight = 8,
+  Highlight = 'Highlight',
   /** Text underline markup. */
-  Underline = 9,
+  Underline = 'Underline',
   /** Text squiggly underline markup. */
-  Squiggly = 10,
+  Squiggly = 'Squiggly',
   /** Text strikeout markup. */
-  Strikeout = 11,
+  Strikeout = 'Strikeout',
   /** Rubber stamp annotation. */
-  Stamp = 13,
+  Stamp = 'Stamp',
   /** Caret (text insertion indicator). */
-  Caret = 14,
+  Caret = 'Caret',
   /** Ink (freehand drawing). */
-  Ink = 15,
+  Ink = 'Ink',
   /** Pop-up window for parent annotation. */
-  Popup = 16,
+  Popup = 'Popup',
   /** Embedded file attachment. */
-  FileAttachment = 17,
+  FileAttachment = 'FileAttachment',
   /** Sound annotation. */
-  Sound = 18,
+  Sound = 'Sound',
   /** Interactive form widget. */
-  Widget = 20,
+  Widget = 'Widget',
   /** Screen annotation (multimedia). */
-  Screen = 21,
+  Screen = 'Screen',
   /** Printer's mark annotation. */
-  PrinterMark = 22,
+  PrinterMark = 'PrinterMark',
   /** Trap network annotation. */
-  TrapNet = 23,
+  TrapNet = 'TrapNet',
   /** Watermark annotation. */
-  Watermark = 24,
+  Watermark = 'Watermark',
   /** 3D annotation. */
-  ThreeD = 25,
+  ThreeD = 'ThreeD',
   /** Rich media annotation. */
-  RichMedia = 26,
+  RichMedia = 'RichMedia',
   /** XFA widget annotation. */
-  XFAWidget = 27,
+  XFAWidget = 'XFAWidget',
   /** Redaction annotation. */
-  Redact = 28,
+  Redact = 'Redact',
 }
 
 /**
- * Bounding rectangle for an annotation.
+ * The colour channel of an annotation to get or set.
+ *
+ * - `'stroke'` — the stroke/fill colour (default)
+ * - `'interior'` — the interior/background colour
  */
-export interface AnnotationBounds {
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
-}
+export type AnnotationColourType = 'stroke' | 'interior';
 
 /**
  * RGBA colour value.
@@ -458,10 +487,10 @@ export interface AnnotationBounds {
  * Each channel is an integer in the range 0–255.
  */
 export interface Colour {
-  r: number;
-  g: number;
-  b: number;
-  a: number;
+  readonly r: number;
+  readonly g: number;
+  readonly b: number;
+  readonly a: number;
 }
 
 /**
@@ -469,25 +498,50 @@ export interface Colour {
  */
 export interface Annotation {
   /** Zero-based index of the annotation on its page. */
-  index: number;
+  readonly index: number;
   /** The annotation subtype. */
-  type: AnnotationType;
+  readonly type: AnnotationType;
   /** The bounding rectangle in page coordinates. */
-  bounds: AnnotationBounds;
-  /** The annotation colour, if set. */
-  colour?: Colour;
+  readonly bounds: Rect;
+  /** The annotation colour, or null if not set. */
+  readonly colour: Colour | null;
 }
+
+/**
+ * Well-known annotation dictionary keys.
+ *
+ * These are the most commonly used keys for `hasKey`, `getStringValue`, and
+ * `setStringValue`. Arbitrary string keys are also accepted.
+ */
+export type AnnotationDictionaryKey =
+  | 'Contents'
+  | 'Author'
+  | 'Subtype'
+  | 'CreationDate'
+  | 'ModDate'
+  | 'Name'
+  | 'Subject'
+  | 'T'
+  | 'NM';
+
+/**
+ * Key for annotation dictionary lookups.
+ *
+ * Accepts well-known {@link AnnotationDictionaryKey} values for autocomplete,
+ * as well as arbitrary string keys via the `string & {}` intersection pattern.
+ */
+export type DictionaryKey = AnnotationDictionaryKey | (string & {});
 
 /**
  * Represents a bookmark (outline entry) in a PDF document.
  */
 export interface Bookmark {
   /** The title text of the bookmark. */
-  title: string;
+  readonly title: string;
   /** The zero-based destination page index, or undefined for external destinations. */
-  pageIndex: number | undefined;
+  readonly pageIndex: number | undefined;
   /** Child bookmarks forming a tree structure. */
-  children: Bookmark[];
+  readonly children: readonly Bookmark[];
 }
 
 /**
@@ -506,21 +560,21 @@ export enum TextSearchFlags {
  */
 export enum TextRenderMode {
   /** Fill text. */
-  Fill = 0,
+  Fill = 'Fill',
   /** Stroke text. */
-  Stroke = 1,
+  Stroke = 'Stroke',
   /** Fill then stroke text. */
-  FillStroke = 2,
+  FillStroke = 'FillStroke',
   /** Invisible text. */
-  Invisible = 3,
+  Invisible = 'Invisible',
   /** Fill text and add to path for clipping. */
-  FillClip = 4,
+  FillClip = 'FillClip',
   /** Stroke text and add to path for clipping. */
-  StrokeClip = 5,
+  StrokeClip = 'StrokeClip',
   /** Fill then stroke text and add to path for clipping. */
-  FillStrokeClip = 6,
+  FillStrokeClip = 'FillStrokeClip',
   /** Add text to path for clipping. */
-  Clip = 7,
+  Clip = 'Clip',
 }
 
 /**
@@ -528,30 +582,26 @@ export enum TextRenderMode {
  */
 export enum PageObjectMarkValueType {
   /** Integer value. */
-  Int = 0,
+  Int = 'Int',
   /** String value. */
-  String = 2,
+  String = 'String',
   /** Blob (binary) value. */
-  Blob = 3,
+  Blob = 'Blob',
   /** Name value (PDF name object). */
-  Name = 4,
+  Name = 'Name',
 }
 
 /**
  * A parameter on a page object mark.
+ *
+ * Discriminated union keyed on `valueType`. Narrow via
+ * `if (param.valueType === PageObjectMarkValueType.Int)` to access `value`.
  */
-export interface PageObjectMarkParam {
-  /** Parameter key. */
-  key: string;
-  /** Parameter value type. */
-  valueType: PageObjectMarkValueType;
-  /** Integer value (if valueType is Int). */
-  intValue?: number;
-  /** String value (if valueType is String or Name). */
-  stringValue?: string;
-  /** Blob value (if valueType is Blob). */
-  blobValue?: Uint8Array;
-}
+export type PageObjectMarkParam =
+  | { readonly key: string; readonly valueType: PageObjectMarkValueType.Int; readonly value: number }
+  | { readonly key: string; readonly valueType: PageObjectMarkValueType.String; readonly value: string }
+  | { readonly key: string; readonly valueType: PageObjectMarkValueType.Name; readonly value: string }
+  | { readonly key: string; readonly valueType: PageObjectMarkValueType.Blob; readonly value: Uint8Array };
 
 /**
  * A content mark on a page object.
@@ -571,35 +621,35 @@ export interface PageObjectMark {
  */
 export interface CharacterInfo {
   /** Zero-based character index. */
-  index: number;
+  readonly index: number;
   /** Unicode code point of the character. */
-  unicode: number;
+  readonly unicode: number;
   /** The character as a string. */
-  char: string;
+  readonly char: string;
   /** Font size in points. */
-  fontSize: number;
+  readonly fontSize: number;
   /** Font weight (100-900, where 400 is normal and 700 is bold). */
-  fontWeight: number;
+  readonly fontWeight: number;
   /** Font name. */
-  fontName?: string;
+  readonly fontName?: string;
   /** Text rendering mode. */
-  renderMode: TextRenderMode;
+  readonly renderMode: TextRenderMode;
   /** Rotation angle in radians. */
-  angle: number;
+  readonly angle: number;
   /** Character origin X coordinate. */
-  originX: number;
+  readonly originX: number;
   /** Character origin Y coordinate. */
-  originY: number;
+  readonly originY: number;
   /** Whether this character was generated (not from the original PDF content). */
-  isGenerated: boolean;
+  readonly isGenerated: boolean;
   /** Whether this character is a hyphen that may indicate a word break. */
-  isHyphen: boolean;
+  readonly isHyphen: boolean;
   /** Whether there was an error mapping this character to Unicode. */
-  hasUnicodeMapError: boolean;
+  readonly hasUnicodeMapError: boolean;
   /** Fill colour (if available). */
-  fillColour?: Colour;
+  readonly fillColour?: Colour;
   /** Stroke colour (if available). */
-  strokeColour?: Colour;
+  readonly strokeColour?: Colour;
 }
 
 /**
@@ -607,23 +657,13 @@ export interface CharacterInfo {
  */
 export interface CharBox {
   /** Left edge of the character bounding box. */
-  left: number;
+  readonly left: number;
   /** Right edge of the character bounding box. */
-  right: number;
+  readonly right: number;
   /** Bottom edge of the character bounding box. */
-  bottom: number;
+  readonly bottom: number;
   /** Top edge of the character bounding box. */
-  top: number;
-}
-
-/**
- * A bounding rectangle in page coordinates.
- */
-export interface TextRect {
-  left: number;
-  top: number;
-  right: number;
-  bottom: number;
+  readonly top: number;
 }
 
 /**
@@ -631,11 +671,11 @@ export interface TextRect {
  */
 export interface TextSearchResult {
   /** The character index of the match start. */
-  charIndex: number;
+  readonly charIndex: number;
   /** The number of characters in the match. */
-  charCount: number;
+  readonly charCount: number;
   /** The bounding rectangles covering the matched text. */
-  rects: TextRect[];
+  readonly rects: Rect[];
 }
 
 /**
@@ -643,15 +683,15 @@ export interface TextSearchResult {
  */
 export interface StructureElement {
   /** The element type (e.g., "P", "H1", "Table", "Figure"). */
-  type: string;
+  readonly type: string;
   /** The title attribute, if present. */
-  title?: string;
+  readonly title?: string;
   /** Alternative text for accessibility, if present. */
-  altText?: string;
+  readonly altText?: string;
   /** The language attribute (e.g., "en-US"), if present. */
-  lang?: string;
+  readonly lang?: string;
   /** Child structure elements. */
-  children: StructureElement[];
+  readonly children: readonly StructureElement[];
 }
 
 /**
@@ -659,11 +699,11 @@ export interface StructureElement {
  */
 export interface PDFAttachment {
   /** Zero-based index of the attachment. */
-  index: number;
+  readonly index: number;
   /** The filename of the attachment. */
-  name: string;
+  readonly name: string;
   /** The raw file data. */
-  data: Uint8Array;
+  readonly data: Uint8Array;
 }
 
 /**
@@ -692,8 +732,8 @@ export interface ShapeStyle {
  * Font type for loading custom fonts.
  */
 export enum FontType {
-  Type1 = 1,
-  TrueType = 2,
+  Type1 = 'Type1',
+  TrueType = 'TrueType',
 }
 
 /**
@@ -752,7 +792,7 @@ export interface FontMetrics {
 }
 
 /**
- * Flags for FPDF_SaveAsCopy / FPDF_SaveWithVersion.
+ * Flags controlling how a document is saved.
  *
  * These flags control how the document is serialised. `Incremental` preserves
  * the original data and appends changes; `NoIncremental` rewrites the file
@@ -760,13 +800,13 @@ export interface FontMetrics {
  */
 export enum SaveFlags {
   /** No special flags. */
-  None = 0,
+  None = 'None',
   /** Incremental save. */
-  Incremental = 1,
+  Incremental = 'Incremental',
   /** Remove security (unencrypt). */
-  NoIncremental = 2,
+  NoIncremental = 'NoIncremental',
   /** Remove security. */
-  RemoveSecurity = 3,
+  RemoveSecurity = 'RemoveSecurity',
 }
 
 /**
@@ -780,30 +820,29 @@ export interface SaveOptions {
 }
 
 /**
- * Document availability status from FPDFAvail_IsDocAvail / FPDFAvail_IsPageAvail.
+ * Document availability status for progressive loading.
  */
 export enum DocumentAvailability {
   /** Data error occurred. */
-  DataError = -1,
+  DataError = 'DataError',
   /** Required data is not yet available. */
-  DataNotAvailable = 0,
+  DataNotAvailable = 'DataNotAvailable',
   /** Required data is available. */
-  DataAvailable = 1,
+  DataAvailable = 'DataAvailable',
   /** Linearisation status is unknown. */
-  LinearisationUnknown = 2,
+  LinearisationUnknown = 'LinearisationUnknown',
 }
 
 /**
- * Linearisation status from FPDFAvail_IsLinearized.
- *
+ * Linearisation status of a PDF document.
  */
 export enum LinearisationStatus {
   /** Not linearised. */
-  NotLinearised = 0,
+  NotLinearised = 'NotLinearised',
   /** Linearised. */
-  Linearised = 1,
+  Linearised = 'Linearised',
   /** Unknown (not enough data). */
-  Unknown = -1,
+  Unknown = 'Unknown',
 }
 
 /**
@@ -854,17 +893,17 @@ export interface DocumentMetadata {
  */
 export enum PageMode {
   /** Neither document outline nor thumbnails visible. */
-  UseNone = 0,
+  UseNone = 'UseNone',
   /** Document outline (bookmarks) visible. */
-  UseOutlines = 1,
+  UseOutlines = 'UseOutlines',
   /** Page thumbnails visible. */
-  UseThumbs = 2,
+  UseThumbs = 'UseThumbs',
   /** Full-screen mode, no menu bar, window controls, or other windows visible. */
-  FullScreen = 3,
+  FullScreen = 'FullScreen',
   /** Optional content group panel visible. */
-  UseOC = 4,
+  UseOC = 'UseOC',
   /** Attachments panel visible. */
-  UseAttachments = 5,
+  UseAttachments = 'UseAttachments',
 }
 
 /**
@@ -893,19 +932,46 @@ export enum DocumentPermission {
 }
 
 /**
+ * Structured document permissions decoded from the raw bitmask.
+ *
+ * Provides named boolean fields for each permission flag, as well as
+ * the raw bitmask value for advanced use cases.
+ */
+export interface DocumentPermissions {
+  /** The raw permissions bitmask. */
+  readonly raw: number;
+  /** Whether printing is allowed. */
+  readonly canPrint: boolean;
+  /** Whether modifying contents is allowed. */
+  readonly canModifyContents: boolean;
+  /** Whether copying or extracting text/graphics is allowed. */
+  readonly canCopyOrExtract: boolean;
+  /** Whether adding or modifying annotations is allowed. */
+  readonly canAddOrModifyAnnotations: boolean;
+  /** Whether filling forms is allowed. */
+  readonly canFillForms: boolean;
+  /** Whether extracting for accessibility is allowed. */
+  readonly canExtractForAccessibility: boolean;
+  /** Whether assembling the document is allowed. */
+  readonly canAssemble: boolean;
+  /** Whether high-quality printing is allowed. */
+  readonly canPrintHighQuality: boolean;
+}
+
+/**
  * Duplex printing mode for PDF viewer preferences.
  *
  * Defines how pages should be laid out when printing double-sided.
  */
 export enum DuplexMode {
   /** No duplex mode specified. */
-  Undefined = 0,
+  Undefined = 'Undefined',
   /** Print single-sided. */
-  Simplex = 1,
+  Simplex = 'Simplex',
   /** Flip on short edge (for portrait orientation). */
-  DuplexFlipShortEdge = 2,
+  DuplexFlipShortEdge = 'DuplexFlipShortEdge',
   /** Flip on long edge (for landscape orientation). */
-  DuplexFlipLongEdge = 3,
+  DuplexFlipLongEdge = 'DuplexFlipLongEdge',
 }
 
 /**
@@ -941,17 +1007,17 @@ export interface NamedDestination {
  */
 export enum ActionType {
   /** Unsupported action type. */
-  Unsupported = 0,
+  Unsupported = 'Unsupported',
   /** Go to a destination within the document. */
-  GoTo = 1,
+  GoTo = 'GoTo',
   /** Go to a destination in a remote document. */
-  RemoteGoTo = 2,
+  RemoteGoTo = 'RemoteGoTo',
   /** Open a URI (web link). */
-  URI = 3,
+  URI = 'URI',
   /** Launch an application or open a file. */
-  Launch = 4,
+  Launch = 'Launch',
   /** Go to an embedded document. */
-  EmbeddedGoTo = 5,
+  EmbeddedGoTo = 'EmbeddedGoTo',
 }
 
 /**
@@ -961,23 +1027,23 @@ export enum ActionType {
  */
 export enum DestinationFitType {
   /** Unknown or unsupported fit type. */
-  Unknown = 0,
+  Unknown = 'Unknown',
   /** Fit the entire page in the window. */
-  XYZ = 1,
+  XYZ = 'XYZ',
   /** Fit the entire page in the window. */
-  Fit = 2,
+  Fit = 'Fit',
   /** Fit the page width in the window. */
-  FitH = 3,
+  FitH = 'FitH',
   /** Fit the page height in the window. */
-  FitV = 4,
+  FitV = 'FitV',
   /** Fit the specified rectangle in the window. */
-  FitR = 5,
+  FitR = 'FitR',
   /** Fit the page's bounding box in the window. */
-  FitB = 6,
+  FitB = 'FitB',
   /** Fit the bounding box width in the window. */
-  FitBH = 7,
+  FitBH = 'FitBH',
   /** Fit the bounding box height in the window. */
-  FitBV = 8,
+  FitBV = 'FitBV',
 }
 
 /**
@@ -1003,7 +1069,7 @@ export interface PDFLink {
   /** Zero-based index of the link on its page. */
   index: number;
   /** Bounding rectangle in page coordinates. */
-  bounds: TextRect;
+  bounds: Rect;
   /** The action associated with this link. */
   action?: PDFAction;
   /** The destination for GoTo actions. */
@@ -1027,21 +1093,21 @@ export interface PDFAction {
  */
 export enum FormFieldType {
   /** Unknown form field type. */
-  Unknown = 0,
+  Unknown = 'Unknown',
   /** Push button (no persistent value). */
-  PushButton = 1,
+  PushButton = 'PushButton',
   /** Check box (boolean toggle). */
-  CheckBox = 2,
+  CheckBox = 'CheckBox',
   /** Radio button (mutually exclusive choice). */
-  RadioButton = 3,
+  RadioButton = 'RadioButton',
   /** Combo box (dropdown selection). */
-  ComboBox = 4,
+  ComboBox = 'ComboBox',
   /** List box (scrollable multi-select). */
-  ListBox = 5,
+  ListBox = 'ListBox',
   /** Text field (single- or multi-line text input). */
-  TextField = 6,
+  TextField = 'TextField',
   /** Signature field (digital signature placeholder). */
-  Signature = 7,
+  Signature = 'Signature',
 }
 
 /**
@@ -1109,39 +1175,44 @@ export enum FormFieldFlags {
 }
 
 /**
- * Annotation value types for dictionary entries.
+ * Keyboard modifier flags for form event methods.
+ *
+ * These flags indicate which modifier keys are held during an event.
+ * Combine with bitwise OR for multiple modifiers.
+ *
+ * @example
+ * ```typescript
+ * page.formMouseMove(FormModifierFlags.Shift | FormModifierFlags.Control, x, y);
+ * ```
  */
-export enum AnnotationValueType {
-  /** Unknown value type. */
-  Unknown = 0,
-  /** Boolean value. */
-  Boolean = 1,
-  /** Number value. */
-  Number = 2,
-  /** String value. */
-  String = 3,
-  /** Name value. */
-  Name = 4,
-  /** Array value. */
-  Array = 5,
-  /** Dictionary value. */
-  Dictionary = 6,
-  /** Stream value. */
-  Stream = 7,
-  /** Reference value. */
-  Reference = 8,
+export enum FormModifierFlags {
+  /** No modifier keys held. */
+  None = 0,
+  /** Shift key held. */
+  Shift = 1 << 0,
+  /** Control key held. */
+  Control = 1 << 1,
+  /** Alt key held. */
+  Alt = 1 << 2,
+  /** Meta (macOS Command) key held. */
+  MetaOrCommand = 1 << 3,
 }
+
+/**
+ * Mouse button identifier for form interaction methods.
+ */
+export type FormMouseButton = 'left' | 'right';
 
 /**
  * Appearance mode for annotation appearance streams.
  */
 export enum AnnotationAppearanceMode {
   /** Normal appearance. */
-  Normal = 0,
+  Normal = 'Normal',
   /** Rollover appearance (on hover). */
-  Rollover = 1,
+  Rollover = 'Rollover',
   /** Down appearance (on click). */
-  Down = 2,
+  Down = 'Down',
 }
 
 /**
@@ -1258,13 +1329,13 @@ export interface WidgetOption {
  */
 export enum FormType {
   /** No form. */
-  None = 0,
+  None = 'None',
   /** AcroForm (standard PDF forms). */
-  AcroForm = 1,
+  AcroForm = 'AcroForm',
   /** XFA full form (not supported by PDFium). */
-  XFAFull = 2,
+  XFAFull = 'XFAFull',
   /** XFA foreground form (partial XFA support). */
-  XFAForeground = 3,
+  XFAForeground = 'XFAForeground',
 }
 
 /**
@@ -1274,13 +1345,13 @@ export enum FormType {
  */
 export enum DocMDPPermission {
   /** No MDP permission specified. */
-  None = 0,
+  None = 'None',
   /** No changes allowed. */
-  NoChanges = 1,
+  NoChanges = 'NoChanges',
   /** Form filling and signing allowed. */
-  FillAndSign = 2,
+  FillAndSign = 'FillAndSign',
   /** Form filling, signing, and annotation allowed. */
-  FillSignAnnotate = 3,
+  FillSignAnnotate = 'FillSignAnnotate',
 }
 
 /**
@@ -1310,11 +1381,11 @@ export interface PDFSignature {
  */
 export enum LineCapStyle {
   /** Butt cap - stroke ends at the endpoint. */
-  Butt = 0,
+  Butt = 'Butt',
   /** Round cap - stroke ends with a semicircle. */
-  Round = 1,
+  Round = 'Round',
   /** Square cap - stroke extends half the line width past the endpoint. */
-  Square = 2,
+  Square = 'Square',
 }
 
 /**
@@ -1324,17 +1395,18 @@ export enum LineCapStyle {
  */
 export enum LineJoinStyle {
   /** Miter join - sharp corner. */
-  Miter = 0,
+  Miter = 'Miter',
   /** Round join - rounded corner. */
-  Round = 1,
+  Round = 'Round',
   /** Bevel join - bevelled corner. */
-  Bevel = 2,
+  Bevel = 'Bevel',
 }
 
 /**
  * Blend modes for page objects.
  *
  * These define how overlapping content is composited.
+ * Values match the PDF specification (ISO 32000-1:2008, Table 136).
  */
 export enum BlendMode {
   /** Normal blending. */
@@ -1349,9 +1421,19 @@ export enum BlendMode {
   Darken = 'Darken',
   /** Lighten blending. */
   Lighten = 'Lighten',
-  /** Colour dodge blending. */
+  /**
+   * Colour dodge blending.
+   *
+   * The member name uses American spelling ("Color") to match the PDF specification
+   * (ISO 32000-1:2008, Table 136) where the blend mode is defined as "ColorDodge".
+   */
   ColorDodge = 'ColorDodge',
-  /** Colour burn blending. */
+  /**
+   * Colour burn blending.
+   *
+   * The member name uses American spelling ("Color") to match the PDF specification
+   * (ISO 32000-1:2008, Table 136) where the blend mode is defined as "ColorBurn".
+   */
   ColorBurn = 'ColorBurn',
   /** Hard light blending. */
   HardLight = 'HardLight',
@@ -1393,7 +1475,7 @@ export interface TransformMatrix {
  */
 export interface DashPattern {
   /** The dash array (alternating dash and gap lengths). */
-  dashArray: number[];
+  dashArray: readonly number[];
   /** The phase offset to start the pattern. */
   phase: number;
 }
@@ -1403,29 +1485,29 @@ export interface DashPattern {
  */
 export enum ImageColourSpace {
   /** Unknown colour space. */
-  Unknown = 0,
+  Unknown = 'Unknown',
   /** DeviceGray. */
-  DeviceGray = 1,
+  DeviceGray = 'DeviceGray',
   /** DeviceRGB. */
-  DeviceRGB = 2,
+  DeviceRGB = 'DeviceRGB',
   /** DeviceCMYK. */
-  DeviceCMYK = 3,
+  DeviceCMYK = 'DeviceCMYK',
   /** CalGray. */
-  CalGray = 4,
+  CalGray = 'CalGray',
   /** CalRGB. */
-  CalRGB = 5,
+  CalRGB = 'CalRGB',
   /** Lab. */
-  Lab = 6,
+  Lab = 'Lab',
   /** ICCBased. */
-  ICCBased = 7,
+  ICCBased = 'ICCBased',
   /** Separation. */
-  Separation = 8,
+  Separation = 'Separation',
   /** DeviceN. */
-  DeviceN = 9,
+  DeviceN = 'DeviceN',
   /** Indexed. */
-  Indexed = 10,
+  Indexed = 'Indexed',
   /** Pattern. */
-  Pattern = 11,
+  Pattern = 'Pattern',
 }
 
 /**
@@ -1433,11 +1515,11 @@ export enum ImageColourSpace {
  */
 export enum ImageMarkedContentType {
   /** Not marked content. */
-  None = 0,
+  None = 'None',
   /** Artifact. */
-  Artifact = 1,
+  Artifact = 'Artifact',
   /** Tagged. */
-  Tagged = 2,
+  Tagged = 'Tagged',
 }
 
 /**
@@ -1465,23 +1547,23 @@ export interface ImageMetadata {
  */
 export enum AttachmentValueType {
   /** Unknown value type. */
-  Unknown = 0,
+  Unknown = 'Unknown',
   /** Boolean value. */
-  Boolean = 1,
+  Boolean = 'Boolean',
   /** Number value. */
-  Number = 2,
+  Number = 'Number',
   /** String value. */
-  String = 3,
+  String = 'String',
   /** Name value. */
-  Name = 4,
+  Name = 'Name',
   /** Array value. */
-  Array = 5,
+  Array = 'Array',
   /** Dictionary value. */
-  Dictionary = 6,
+  Dictionary = 'Dictionary',
   /** Stream value. */
-  Stream = 7,
+  Stream = 'Stream',
   /** Reference value. */
-  Reference = 8,
+  Reference = 'Reference',
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -1572,10 +1654,6 @@ export interface NUpLayoutOptions {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Web Links Types
-// ─────────────────────────────────────────────────────────────────────────────
-
-// ─────────────────────────────────────────────────────────────────────────────
 // Form Action Types
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -1586,15 +1664,15 @@ export interface NUpLayoutOptions {
  */
 export enum DocumentActionType {
   /** Executed before the document is closed. */
-  WillClose = 0,
+  WillClose = 'WillClose',
   /** Executed before the document is saved. */
-  WillSave = 1,
+  WillSave = 'WillSave',
   /** Executed after the document is saved. */
-  DidSave = 2,
+  DidSave = 'DidSave',
   /** Executed before the document is printed. */
-  WillPrint = 3,
+  WillPrint = 'WillPrint',
   /** Executed after the document is printed. */
-  DidPrint = 4,
+  DidPrint = 'DidPrint',
 }
 
 /**
@@ -1604,9 +1682,9 @@ export enum DocumentActionType {
  */
 export enum PageActionType {
   /** Executed when the page is opened. */
-  Open = 0,
+  Open = 'Open',
   /** Executed when the page is closed. */
-  Close = 1,
+  Close = 'Close',
 }
 
 /**
@@ -1621,7 +1699,7 @@ export interface WebLink {
   /** The URL string. */
   url: string;
   /** Bounding rectangles covering the link text. */
-  rects: TextRect[];
+  rects: Rect[];
   /** The text range in the page content. */
   textRange?: {
     /** Starting character index in the text page. */

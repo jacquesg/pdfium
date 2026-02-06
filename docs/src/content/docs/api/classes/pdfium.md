@@ -1,277 +1,325 @@
 ---
 title: PDFium
-description: Main entry point for the @scaryterry/pdfium library
 ---
 
-The `PDFium` class is the main entry point for the library. It manages the WASM module lifecycle and provides methods to open existing PDF documents or create new ones.
+[**@scaryterry/pdfium**](../README.md)
 
-## Import
+***
 
-```typescript
-import { PDFium } from '@scaryterry/pdfium';
-```
+Defined in: [src/pdfium.ts:140](https://github.com/jacquesg/pdfium/blob/aed06a44016ab347fbf6eacb7b40f47962218b9f/src/pdfium.ts#L140)
 
-## Static Methods
+Main PDFium library class.
 
-### init()
+Use `PDFium.init()` to create an instance. Resources are automatically
+cleaned up when disposed.
 
-Initialises the PDFium library and returns a ready-to-use instance.
-
-```typescript
-static async init(options?: PDFiumInitOptions): Promise<PDFium>
-```
-
-#### Parameters
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `options` | `PDFiumInitOptions` | Optional configuration |
-
-#### PDFiumInitOptions
-
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `wasmUrl` | `string \| URL` | — | URL to load the WASM binary from |
-| `wasmBinary` | `ArrayBuffer` | — | Pre-loaded WASM binary |
-| `limits` | `PDFiumLimits` | See below | Resource limits |
-
-#### PDFiumLimits
-
-| Property | Type | Default | Description |
-|----------|------|---------|-------------|
-| `maxDocumentSize` | `number` | `536870912` (512 MB) | Maximum document size in bytes |
-| `maxRenderDimension` | `number` | `32767` | Maximum render dimension in pixels |
-| `maxTextCharCount` | `number` | `10000000` | Maximum text characters to extract |
-
-#### Returns
-
-`Promise<PDFium>` — A ready-to-use PDFium instance.
-
-#### Throws
-
-- [`InitialisationError`](/pdfium/errors/#initialisationerror) — If WASM loading or library initialisation fails.
-
-#### Example
+## Example
 
 ```typescript
-// Node.js — automatic WASM loading
 using pdfium = await PDFium.init();
-
-// Browser — provide WASM binary
-const response = await fetch('/pdfium.wasm');
-const wasmBinary = await response.arrayBuffer();
-using pdfium = await PDFium.init({ wasmBinary });
-
-// With custom limits
-using pdfium = await PDFium.init({
-  limits: {
-    maxDocumentSize: 50 * 1024 * 1024, // 50 MB
-    maxRenderDimension: 8192,
-  },
-});
+using document = await pdfium.openDocument(pdfBytes);
+console.log(`Document has ${document.pageCount} pages`);
 ```
 
-## Instance Methods
+## Extends
 
-### openDocument()
+- [`Disposable`](Disposable.md)
 
-Opens a PDF document from binary data.
+## Accessors
 
-```typescript
-async openDocument(
-  data: Uint8Array | ArrayBuffer,
-  options?: OpenDocumentOptions
-): Promise<PDFiumDocument>
-```
+### disposed
 
-#### Parameters
+#### Get Signature
 
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `data` | `Uint8Array \| ArrayBuffer` | PDF file contents |
-| `options` | `OpenDocumentOptions` | Optional settings |
+> **get** **disposed**(): `boolean`
 
-#### OpenDocumentOptions
+Defined in: [src/core/disposable.ts:73](https://github.com/jacquesg/pdfium/blob/aed06a44016ab347fbf6eacb7b40f47962218b9f/src/core/disposable.ts#L73)
 
-| Property | Type | Description |
-|----------|------|-------------|
-| `password` | `string` | Password for encrypted PDFs |
+Whether this resource has been disposed.
 
-#### Returns
+##### Returns
 
-`Promise<PDFiumDocument>` — The opened document.
+`boolean`
 
-#### Throws
+#### Inherited from
 
-- [`DocumentError`](/pdfium/errors/#documenterror) with code:
-  - `DOC_FORMAT_INVALID` (201) — Invalid PDF format
-  - `DOC_PASSWORD_REQUIRED` (202) — Password required but not provided
-  - `DOC_PASSWORD_INCORRECT` (203) — Incorrect password
-  - `DOC_SECURITY_UNSUPPORTED` (204) — Unsupported security handler
+[`Disposable`](Disposable.md).[`disposed`](Disposable.md#disposed)
 
-#### Example
-
-```typescript
-import { promises as fs } from 'fs';
-
-const data = await fs.readFile('document.pdf');
-
-// Open unprotected document
-using document = await pdfium.openDocument(data);
-
-// Open password-protected document
-using document = await pdfium.openDocument(data, { password: 'secret' });
-```
-
----
-
-### createDocument()
-
-Creates a new empty PDF document for building from scratch.
-
-```typescript
-createDocument(): PDFiumDocumentBuilder
-```
-
-#### Returns
-
-[`PDFiumDocumentBuilder`](/pdfium/api/classes/pdfium-document-builder/) — A builder for creating PDF content.
-
-#### Example
-
-```typescript
-using builder = pdfium.createDocument();
-
-// Add a page
-using page = builder.addPage({ width: 612, height: 792 }); // US Letter
-
-// Add content to the page
-const font = builder.loadStandardFont('Helvetica');
-page.addText('Hello, World!', 72, 720, font, 24);
-page.finalize();
-
-// Save the document
-const pdfBytes = builder.save();
-await fs.writeFile('output.pdf', pdfBytes);
-```
-
----
-
-### createProgressiveLoader()
-
-Creates a progressive loader for linearised (web-optimised) PDFs.
-
-```typescript
-createProgressiveLoader(data: Uint8Array | ArrayBuffer): ProgressivePDFLoader
-```
-
-#### Parameters
-
-| Parameter | Type | Description |
-|-----------|------|-------------|
-| `data` | `Uint8Array \| ArrayBuffer` | Initial PDF data chunk |
-
-#### Returns
-
-[`ProgressivePDFLoader`](/pdfium/api/classes/progressive-pdf-loader/) — A loader for streaming PDF data.
-
-#### Example
-
-```typescript
-// Start with initial chunk
-using loader = pdfium.createProgressiveLoader(initialChunk);
-
-// Feed more data as it arrives
-loader.feedData(chunk2);
-loader.feedData(chunk3);
-
-// Check if document is ready
-if (loader.isComplete) {
-  using document = loader.getDocument();
-  // Use document...
-}
-```
-
-## Properties
-
-### module
-
-The underlying WASM module instance.
-
-```typescript
-get module(): PDFiumWASM
-```
-
-:::caution
-This is an advanced property for direct WASM access. Most users should use the high-level API methods instead.
-:::
-
----
+***
 
 ### limits
 
-The configured resource limits.
+#### Get Signature
 
-```typescript
-get limits(): Readonly<Required<PDFiumLimits>>
-```
+> **get** **limits**(): `Readonly`\<`Required`\<[`PDFiumLimits`](../interfaces/PDFiumLimits.md)\>\>
+
+Defined in: [src/pdfium.ts:461](https://github.com/jacquesg/pdfium/blob/aed06a44016ab347fbf6eacb7b40f47962218b9f/src/pdfium.ts#L461)
+
+Get the configured resource limits.
+
+##### Returns
+
+`Readonly`\<`Required`\<[`PDFiumLimits`](../interfaces/PDFiumLimits.md)\>\>
+
+## Methods
+
+### \[dispose\]()
+
+> **\[dispose\]**(): `void`
+
+Defined in: [src/core/disposable.ts:148](https://github.com/jacquesg/pdfium/blob/aed06a44016ab347fbf6eacb7b40f47962218b9f/src/core/disposable.ts#L148)
+
+Dispose of this resource, freeing WASM memory.
+
+This method is idempotent - calling it multiple times has no effect
+after the first call.
+
+#### Returns
+
+`void`
+
+#### Inherited from
+
+[`Disposable`](Disposable.md).[`[dispose]`](Disposable.md#dispose)
+
+***
+
+### createDocument()
+
+> **createDocument**(): [`PDFiumDocumentBuilder`](PDFiumDocumentBuilder.md)
+
+Defined in: [src/pdfium.ts:441](https://github.com/jacquesg/pdfium/blob/aed06a44016ab347fbf6eacb7b40f47962218b9f/src/pdfium.ts#L441)
+
+Create a new empty PDF document.
+
+#### Returns
+
+[`PDFiumDocumentBuilder`](PDFiumDocumentBuilder.md)
+
+A document builder for adding pages and content
+
+***
+
+### createProgressiveLoader()
+
+> **createProgressiveLoader**(`data`): [`ProgressivePDFLoader`](ProgressivePDFLoader.md)
+
+Defined in: [src/pdfium.ts:452](https://github.com/jacquesg/pdfium/blob/aed06a44016ab347fbf6eacb7b40f47962218b9f/src/pdfium.ts#L452)
+
+Create a progressive loader for linearisation detection and incremental loading.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `data` | `ArrayBuffer` \| `Uint8Array`\<`ArrayBufferLike`\> | PDF file data |
+
+#### Returns
+
+[`ProgressivePDFLoader`](ProgressivePDFLoader.md)
+
+A progressive loader instance
+
+***
+
+### dispose()
+
+> **dispose**(): `void`
+
+Defined in: [src/core/disposable.ts:164](https://github.com/jacquesg/pdfium/blob/aed06a44016ab347fbf6eacb7b40f47962218b9f/src/core/disposable.ts#L164)
+
+Alias for Symbol.dispose for explicit calls.
+
+#### Returns
+
+`void`
 
 #### Example
 
 ```typescript
-const limits = pdfium.limits;
-console.log(`Max document size: ${limits.maxDocumentSize} bytes`);
-console.log(`Max render dimension: ${limits.maxRenderDimension}px`);
-console.log(`Max text chars: ${limits.maxTextCharCount}`);
+document.dispose();
 ```
 
----
+#### Inherited from
 
-### memory
+[`Disposable`](Disposable.md).[`dispose`](Disposable.md#dispose-2)
 
-The WASM memory manager for advanced memory operations.
+***
 
-```typescript
-get memory(): WASMMemoryManager
-```
+### openDocument()
 
-:::caution
-This is an advanced property. Most users should not need to access the memory manager directly.
-:::
+> **openDocument**(`data`, `options`): `Promise`\<[`PDFiumDocument`](PDFiumDocument.md)\>
 
-## Resource Management
+Defined in: [src/pdfium.ts:343](https://github.com/jacquesg/pdfium/blob/aed06a44016ab347fbf6eacb7b40f47962218b9f/src/pdfium.ts#L343)
 
-`PDFium` implements the `Disposable` interface. Always use the `using` keyword or call `dispose()` to release resources:
+Open a PDF document from binary data.
 
-```typescript
-// Recommended: using keyword (automatic cleanup)
-using pdfium = await PDFium.init();
-// Resources freed when scope exits
+Note: The `password` option accepts a JavaScript string. JS strings cannot
+be securely zeroed after use — they are immutable and garbage collected at
+an unpredictable time. For highly sensitive passwords, consider the trade-offs.
 
-// Alternative: manual disposal
-const pdfium = await PDFium.init();
-try {
-  // Use pdfium...
-} finally {
-  pdfium.dispose();
-}
-```
+#### Parameters
 
-### dispose()
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `data` | `ArrayBuffer` \| `Uint8Array`\<`ArrayBufferLike`\> | PDF file data |
+| `options` | [`OpenDocumentOptions`](../interfaces/OpenDocumentOptions.md) | Document options (e.g., password, onProgress) |
 
-Releases all resources held by the PDFium instance.
+#### Returns
 
-```typescript
-dispose(): void
-```
+`Promise`\<[`PDFiumDocument`](PDFiumDocument.md)\>
 
-:::caution
-After calling `dispose()`, the instance cannot be used. Any attempt to use a disposed instance will throw a `PDFiumError` with code `RESOURCE_DISPOSED` (900).
-:::
+The loaded document
 
-## See Also
+#### Throws
 
-- [Installation Guide](/pdfium/installation/)
-- [PDFiumDocument](/pdfium/api/classes/pdfium-document/) — Working with loaded documents
-- [PDFiumDocumentBuilder](/pdfium/api/classes/pdfium-document-builder/) — Creating new documents
-- [Resource Management](/pdfium/concepts/resource-management/) — Understanding disposal patterns
+If the document cannot be opened
+
+***
+
+### init()
+
+#### Call Signature
+
+> `static` **init**(`options`): `Promise`\<[`WorkerPDFium`](WorkerPDFium.md)\>
+
+Defined in: [src/pdfium.ts:176](https://github.com/jacquesg/pdfium/blob/aed06a44016ab347fbf6eacb7b40f47962218b9f/src/pdfium.ts#L176)
+
+Initialise the PDFium library.
+
+When `useNative` is true, attempts to load the native addon first.
+Falls back to WASM if native is unavailable.
+
+When `forceWasm` is true, always uses WASM backend regardless of native availability.
+
+##### Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `options` | [`PDFiumInitOptions`](../interfaces/PDFiumInitOptions.md) & `object` | Initialisation options |
+
+##### Returns
+
+`Promise`\<[`WorkerPDFium`](WorkerPDFium.md)\>
+
+The PDFium or NativePDFiumInstance
+
+##### Throws
+
+If initialisation fails or options conflict
+
+#### Call Signature
+
+> `static` **init**(`options`): `Promise`\<`PDFium`\>
+
+Defined in: [src/pdfium.ts:177](https://github.com/jacquesg/pdfium/blob/aed06a44016ab347fbf6eacb7b40f47962218b9f/src/pdfium.ts#L177)
+
+Initialise the PDFium library.
+
+When `useNative` is true, attempts to load the native addon first.
+Falls back to WASM if native is unavailable.
+
+When `forceWasm` is true, always uses WASM backend regardless of native availability.
+
+##### Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `options` | [`PDFiumInitOptions`](../interfaces/PDFiumInitOptions.md) & `object` | Initialisation options |
+
+##### Returns
+
+`Promise`\<`PDFium`\>
+
+The PDFium or NativePDFiumInstance
+
+##### Throws
+
+If initialisation fails or options conflict
+
+#### Call Signature
+
+> `static` **init**(`options`): `Promise`\<[`NativePDFiumInstance`](NativePDFiumInstance.md) \| `PDFium`\>
+
+Defined in: [src/pdfium.ts:178](https://github.com/jacquesg/pdfium/blob/aed06a44016ab347fbf6eacb7b40f47962218b9f/src/pdfium.ts#L178)
+
+Initialise the PDFium library.
+
+When `useNative` is true, attempts to load the native addon first.
+Falls back to WASM if native is unavailable.
+
+When `forceWasm` is true, always uses WASM backend regardless of native availability.
+
+##### Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `options` | [`PDFiumInitOptions`](../interfaces/PDFiumInitOptions.md) & `object` | Initialisation options |
+
+##### Returns
+
+`Promise`\<[`NativePDFiumInstance`](NativePDFiumInstance.md) \| `PDFium`\>
+
+The PDFium or NativePDFiumInstance
+
+##### Throws
+
+If initialisation fails or options conflict
+
+#### Call Signature
+
+> `static` **init**(`options?`): `Promise`\<`PDFium`\>
+
+Defined in: [src/pdfium.ts:179](https://github.com/jacquesg/pdfium/blob/aed06a44016ab347fbf6eacb7b40f47962218b9f/src/pdfium.ts#L179)
+
+Initialise the PDFium library.
+
+When `useNative` is true, attempts to load the native addon first.
+Falls back to WASM if native is unavailable.
+
+When `forceWasm` is true, always uses WASM backend regardless of native availability.
+
+##### Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `options?` | [`PDFiumInitOptions`](../interfaces/PDFiumInitOptions.md) | Initialisation options |
+
+##### Returns
+
+`Promise`\<`PDFium`\>
+
+The PDFium or NativePDFiumInstance
+
+##### Throws
+
+If initialisation fails or options conflict
+
+***
+
+### initNative()
+
+> `static` **initNative**(`options`): `Promise`\<[`NativePDFiumInstance`](NativePDFiumInstance.md) \| `null`\>
+
+Defined in: [src/pdfium.ts:302](https://github.com/jacquesg/pdfium/blob/aed06a44016ab347fbf6eacb7b40f47962218b9f/src/pdfium.ts#L302)
+
+Initialise a native PDFium instance (Node.js only).
+
+Returns a `NativePDFiumInstance` backed by the platform-specific native addon.
+The instance provides core document operations (page count, text extraction,
+rendering) without WASM.
+
+Returns `null` if the native addon is not available for the current platform.
+
+#### Parameters
+
+| Parameter | Type | Description |
+| ------ | ------ | ------ |
+| `options` | \{ `limits?`: [`PDFiumLimits`](../interfaces/PDFiumLimits.md); \} | Optional resource limits |
+| `options.limits?` | [`PDFiumLimits`](../interfaces/PDFiumLimits.md) | - |
+
+#### Returns
+
+`Promise`\<[`NativePDFiumInstance`](NativePDFiumInstance.md) \| `null`\>
+
+The native instance, or null if unavailable

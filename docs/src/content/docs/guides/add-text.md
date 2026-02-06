@@ -252,5 +252,5 @@ createTextDocument();
 
 - [Create Document Guide](/pdfium/guides/create-document/) — Full document creation workflow
 - [Add Shapes Guide](/pdfium/guides/add-shapes/) — Drawing rectangles
-- [PDFiumPageBuilder](/pdfium/api/classes/pdfium-page-builder/) — Page builder API
+- [PDFiumPageBuilder](/pdfium/api/classes/pdfiumpagebuilder/) — Page builder API
 - [Coordinate Systems](/pdfium/concepts/coordinates/) — Understanding PDF coordinates

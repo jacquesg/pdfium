@@ -5,6 +5,7 @@ on:
     branches: [main]
     paths:
       - 'docs/**'
+      - 'src/**'
   workflow_dispatch:
 
 concurrency:
@@ -30,15 +31,19 @@ jobs:
         with:
           node-version: '24'
           cache: 'pnpm'
-          cache-dependency-path: docs/pnpm-lock.yaml
 
-      - name: Install dependencies
+      - name: Install Root Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate API Docs
+        run: pnpm docs:gen
+
+      - name: Install Docs Dependencies
         working-directory: docs
         run: pnpm install --frozen-lockfile
 
-      - name: Build documentation
-        working-directory: docs
-        run: pnpm build
+      - name: Build documentation (warnings are errors)
+        run: pnpm docs:build:strict
 
       - name: Upload build artifact
         uses: actions/upload-pages-artifact@v4

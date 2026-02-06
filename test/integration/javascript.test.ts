@@ -4,27 +4,14 @@
  * Tests the FPDFDoc_GetJavaScript* and FPDFJavaScriptAction_* functions.
  */
 
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
-import type { PDFiumDocument } from '../../src/document/document.js';
-import type { PDFium } from '../../src/pdfium.js';
+import { describe, expect, test } from 'vitest';
 import { initPdfium, loadTestDocument } from '../utils/helpers.js';
 
 describe('JavaScript Inspection API', () => {
-  let pdfium: PDFium;
-  let document: PDFiumDocument;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-    document = await loadTestDocument(pdfium, 'test_1.pdf');
-  });
-
-  afterAll(() => {
-    document?.dispose();
-    pdfium?.dispose();
-  });
-
   describe('javaScriptActionCount', () => {
-    test('should return non-negative number', () => {
+    test('should return non-negative number', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       const count = document.javaScriptActionCount;
       expect(typeof count).toBe('number');
       expect(count).toBeGreaterThanOrEqual(0);
@@ -32,12 +19,16 @@ describe('JavaScript Inspection API', () => {
   });
 
   describe('hasJavaScript', () => {
-    test('should return boolean', () => {
+    test('should return boolean', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       const hasJs = document.hasJavaScript();
       expect(typeof hasJs).toBe('boolean');
     });
 
-    test('should be consistent with javaScriptActionCount', () => {
+    test('should be consistent with javaScriptActionCount', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       const count = document.javaScriptActionCount;
       const hasJs = document.hasJavaScript();
       expect(hasJs).toBe(count > 0);
@@ -45,25 +36,33 @@ describe('JavaScript Inspection API', () => {
   });
 
   describe('getJavaScriptAction', () => {
-    test('should return undefined for negative index', () => {
+    test('should return undefined for negative index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       const action = document.getJavaScriptAction(-1);
       expect(action).toBeUndefined();
     });
 
-    test('should return undefined for out of bounds index', () => {
+    test('should return undefined for out of bounds index', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       const count = document.javaScriptActionCount;
       const action = document.getJavaScriptAction(count + 10);
       expect(action).toBeUndefined();
     });
 
-    test('should not throw for any valid index range', () => {
+    test('should not throw for any valid index range', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       const count = document.javaScriptActionCount;
       for (let i = 0; i < Math.min(count, 10); i++) {
         expect(() => document.getJavaScriptAction(i)).not.toThrow();
       }
     });
 
-    test('should return action with name and script if present', () => {
+    test('should return action with name and script if present', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       const count = document.javaScriptActionCount;
       if (count > 0) {
         const action = document.getJavaScriptAction(0);
@@ -76,19 +75,25 @@ describe('JavaScript Inspection API', () => {
   });
 
   describe('getJavaScriptActions', () => {
-    test('should return array', () => {
+    test('should return array', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       const actions = document.getJavaScriptActions();
       expect(Array.isArray(actions)).toBe(true);
     });
 
-    test('should return array with length matching count', () => {
+    test('should return array with length matching count', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       const count = document.javaScriptActionCount;
       const actions = document.getJavaScriptActions();
       // May be less if some actions fail to load
       expect(actions.length).toBeLessThanOrEqual(count);
     });
 
-    test('should return actions with valid structure', () => {
+    test('should return actions with valid structure', async () => {
+      using pdfium = await initPdfium();
+      using document = await loadTestDocument(pdfium, 'test_1.pdf');
       const actions = document.getJavaScriptActions();
       for (const action of actions) {
         expect(typeof action.name).toBe('string');
@@ -99,6 +104,7 @@ describe('JavaScript Inspection API', () => {
 
   describe('with different PDF files', () => {
     test('should handle test_3_with_images.pdf', async () => {
+      using pdfium = await initPdfium();
       using doc = await loadTestDocument(pdfium, 'test_3_with_images.pdf');
 
       expect(() => doc.javaScriptActionCount).not.toThrow();
@@ -109,36 +115,30 @@ describe('JavaScript Inspection API', () => {
 });
 
 describe('JavaScript Inspection post-dispose guards', () => {
-  let pdfium: PDFium;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-  });
-
-  afterAll(() => {
-    pdfium?.dispose();
-  });
-
   test('should throw on javaScriptActionCount after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+    using pdfium = await initPdfium();
+    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     doc.dispose();
     expect(() => doc.javaScriptActionCount).toThrow();
   });
 
   test('should throw on hasJavaScript after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+    using pdfium = await initPdfium();
+    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     doc.dispose();
     expect(() => doc.hasJavaScript()).toThrow();
   });
 
   test('should throw on getJavaScriptAction after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+    using pdfium = await initPdfium();
+    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     doc.dispose();
     expect(() => doc.getJavaScriptAction(0)).toThrow();
   });
 
   test('should throw on getJavaScriptActions after dispose', async () => {
-    const doc = await loadTestDocument(pdfium, 'test_1.pdf');
+    using pdfium = await initPdfium();
+    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
     doc.dispose();
     expect(() => doc.getJavaScriptActions()).toThrow();
   });

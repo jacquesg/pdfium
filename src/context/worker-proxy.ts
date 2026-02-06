@@ -7,7 +7,9 @@
  */
 
 import { AsyncDisposable } from '../core/disposable.js';
+import { isNodeEnvironment } from '../core/env.js';
 import { InitialisationError, PDFiumError, PDFiumErrorCode, WorkerError } from '../core/errors.js';
+import { getLogger } from '../core/logger.js';
 import type { ProgressCallback, RenderOptions, RenderResult, SerialisedError } from '../core/types.js';
 import type {
   LoadPageResponse,
@@ -42,6 +44,73 @@ export interface WorkerProxyOptions {
   renderTimeout?: number;
   /** Timeout for graceful DESTROY before forced termination in milliseconds (default: 5000) */
   destroyTimeout?: number;
+  /** Custom factory to create the worker transport (useful for testing or Node.js) */
+  workerFactory?: (url: string | URL) => WorkerTransport;
+}
+
+/**
+ * Minimal message event used by WorkerTransport.
+ */
+export interface WorkerMessageEvent<T> {
+  data: T;
+}
+
+/**
+ * Minimal error event used by WorkerTransport.
+ */
+export interface WorkerErrorEvent {
+  message?: string;
+}
+
+/**
+ * Minimal worker transport abstraction shared by browser Worker and Node worker_threads.
+ */
+export interface WorkerTransport {
+  onmessage: ((event: WorkerMessageEvent<WorkerResponse>) => void) | null;
+  onerror: ((event: WorkerErrorEvent) => void) | null;
+  postMessage(data: WorkerRequest, transfer?: readonly unknown[]): void;
+  terminate(): void;
+}
+
+async function createNodeWorkerTransport(workerUrl: string | URL): Promise<WorkerTransport> {
+  const workerThreads = await import('node:worker_threads');
+  // Do not inherit parent CLI flags (e.g. --input-type) that can break worker startup.
+  const nodeWorker = new workerThreads.Worker(workerUrl, { execArgv: [] });
+  let terminated = false;
+
+  const transport: WorkerTransport = {
+    onmessage: null,
+    onerror: null,
+    postMessage: (data, transfer = []) => {
+      nodeWorker.postMessage(data, transfer as []);
+    },
+    terminate: () => {
+      terminated = true;
+      void nodeWorker.terminate();
+    },
+  };
+
+  nodeWorker.on('message', (data: unknown) => {
+    transport.onmessage?.({ data: data as WorkerResponse });
+  });
+
+  nodeWorker.on('error', (error: Error) => {
+    transport.onerror?.({ message: error.message });
+  });
+
+  nodeWorker.on('messageerror', () => {
+    transport.onerror?.({ message: 'Worker message deserialisation failed' });
+  });
+
+  nodeWorker.on('exit', (code: number) => {
+    if (terminated) {
+      return;
+    }
+    const message = code === 0 ? 'Worker exited unexpectedly' : `Worker exited with code ${String(code)}`;
+    transport.onerror?.({ message });
+  });
+
+  return transport;
 }
 
 /**
@@ -67,7 +136,7 @@ interface PendingRequest<T> {
  * ```
  */
 export class WorkerProxy extends AsyncDisposable {
-  readonly #worker: Worker;
+  readonly #worker: WorkerTransport;
   /**
    * Map of pending requests keyed by request ID.
    *
@@ -80,7 +149,7 @@ export class WorkerProxy extends AsyncDisposable {
   readonly #renderTimeout: number;
   readonly #destroyTimeout: number;
 
-  private constructor(worker: Worker, timeout: number, renderTimeout: number, destroyTimeout: number) {
+  private constructor(worker: WorkerTransport, timeout: number, renderTimeout: number, destroyTimeout: number) {
     super('WorkerProxy');
     this.#worker = worker;
     this.#timeout = timeout;
@@ -112,9 +181,23 @@ export class WorkerProxy extends AsyncDisposable {
     const renderTimeout = options?.renderTimeout ?? RENDER_TIMEOUT;
     const destroyTimeout = options?.destroyTimeout ?? DESTROY_TIMEOUT;
 
-    let worker: Worker;
+    let worker: WorkerTransport;
     try {
-      worker = new Worker(workerUrl, { type: 'module' });
+      if (options?.workerFactory) {
+        worker = options.workerFactory(workerUrl);
+      } else if (typeof globalThis.Worker === 'function') {
+        // Browser / Web Worker compatible runtime
+        const BrowserWorker = globalThis.Worker as unknown as new (
+          url: string | URL,
+          options?: { type?: string },
+        ) => WorkerTransport;
+        worker = new BrowserWorker(workerUrl, { type: 'module' });
+      } else if (isNodeEnvironment()) {
+        // Node.js main thread fallback using worker_threads
+        worker = await createNodeWorkerTransport(workerUrl);
+      } else {
+        throw new Error('No global Worker constructor available and not running in Node.js');
+      }
     } catch (error) {
       throw new InitialisationError(
         PDFiumErrorCode.INIT_INVALID_OPTIONS,
@@ -252,6 +335,16 @@ export class WorkerProxy extends AsyncDisposable {
   }
 
   /**
+   * Get text rects from a page.
+   *
+   * @param pageId - Page ID
+   * @returns Object with text and flat array of coordinates [left, right, bottom, top]
+   */
+  async getTextLayout(pageId: string): Promise<{ text: string; rects: Float32Array }> {
+    return this.#sendRequest('GET_TEXT_LAYOUT', { pageId });
+  }
+
+  /**
    * Check if the worker is alive and responsive.
    *
    * Sends a lightweight PING message and waits for a response.
@@ -315,7 +408,7 @@ export class WorkerProxy extends AsyncDisposable {
   /**
    * Handle messages from the worker.
    */
-  #handleMessage(event: MessageEvent<WorkerResponse>): void {
+  #handleMessage(event: WorkerMessageEvent<WorkerResponse>): void {
     const response = event.data;
     const { type, id } = response;
 
@@ -346,8 +439,11 @@ export class WorkerProxy extends AsyncDisposable {
   /**
    * Handle worker errors.
    */
-  #handleError(error: ErrorEvent): void {
-    const workerError = new WorkerError(PDFiumErrorCode.WORKER_COMMUNICATION_FAILED, `Worker error: ${error.message}`);
+  #handleError(error: WorkerErrorEvent): void {
+    const workerError = new WorkerError(
+      PDFiumErrorCode.WORKER_COMMUNICATION_FAILED,
+      `Worker error: ${error.message ?? 'Unknown worker error'}`,
+    );
 
     for (const [id, pending] of this.#pending) {
       clearTimeout(pending.timer);
@@ -404,7 +500,7 @@ export class WorkerProxy extends AsyncDisposable {
       });
     } catch (error) {
       if (__DEV__) {
-        console.warn('[PDFium] Worker DESTROY error:', error);
+        getLogger().warn('Worker DESTROY error:', error);
       }
     }
 

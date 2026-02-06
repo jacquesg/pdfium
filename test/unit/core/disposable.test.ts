@@ -48,6 +48,7 @@ describe('Disposable', () => {
     test('creates undisposed resource', () => {
       const resource = new TestDisposable();
       expect(resource.disposed).toBe(false);
+      resource.dispose();
     });
   });
 
@@ -97,6 +98,7 @@ describe('Disposable', () => {
     test('allows operations on active resource', () => {
       const resource = new TestDisposable();
       expect(resource.doSomething()).toBe('done');
+      resource.dispose();
     });
 
     test('throws PDFiumError on disposed resource', () => {
@@ -182,6 +184,7 @@ describe('AsyncDisposable', () => {
     test('creates undisposed resource', () => {
       const resource = new TestAsyncDisposable();
       expect(resource.disposed).toBe(false);
+      resource.dispose();
     });
   });
 
@@ -237,6 +240,7 @@ describe('AsyncDisposable', () => {
     test('allows operations on active resource', () => {
       const resource = new TestAsyncDisposable();
       expect(resource.doSomething()).toBe('done');
+      resource.dispose();
     });
 
     test('throws PDFiumError on disposed resource', async () => {
