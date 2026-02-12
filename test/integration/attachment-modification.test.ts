@@ -4,14 +4,12 @@
  * Tests the FPDFDoc_*Attachment and FPDFAttachment_* functions.
  */
 
-import { describe, expect, test } from 'vitest';
-import { initPdfium, loadTestDocument } from '../utils/helpers.js';
+import { describe, expect, test } from '../utils/fixtures.js';
 
 describe('Attachment Modification API - Add/Delete', () => {
   describe('addAttachment', () => {
-    test('should return writer or null', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+    test('should return writer or null', async ({ openDocument }) => {
+      const document = await openDocument('test_1.pdf');
       const writer = document.addAttachment('test.txt');
       // May or may not succeed depending on document state
       if (writer !== null) {
@@ -19,30 +17,26 @@ describe('Attachment Modification API - Add/Delete', () => {
       }
     });
 
-    test('should handle empty name', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+    test('should handle empty name', async ({ openDocument }) => {
+      const document = await openDocument('test_1.pdf');
       expect(() => document.addAttachment('')).not.toThrow();
     });
 
-    test('should handle unicode name', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      expect(() => document.addAttachment('文件.txt')).not.toThrow();
+    test('should handle unicode name', async ({ openDocument }) => {
+      const document = await openDocument('test_1.pdf');
+      expect(() => document.addAttachment('\u6587\u4EF6.txt')).not.toThrow();
     });
   });
 
   describe('deleteAttachment', () => {
-    test('should return false when no attachments exist', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+    test('should return false when no attachments exist', async ({ openDocument }) => {
+      const document = await openDocument('test_1.pdf');
       const result = document.deleteAttachment(0);
       expect(result).toBe(false);
     });
 
-    test('should handle invalid index', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
+    test('should handle invalid index', async ({ openDocument }) => {
+      const document = await openDocument('test_1.pdf');
       expect(() => document.deleteAttachment(-1)).not.toThrow();
       expect(() => document.deleteAttachment(9999)).not.toThrow();
     });
@@ -50,16 +44,14 @@ describe('Attachment Modification API - Add/Delete', () => {
 });
 
 describe('PDFiumAttachmentWriter API', () => {
-  test('addAttachment should return a writer', async () => {
-    using pdfium = await initPdfium();
-    using document = await loadTestDocument(pdfium, 'test_1.pdf');
+  test('addAttachment should return a writer', async ({ openDocument }) => {
+    const document = await openDocument('test_1.pdf');
     const writer = document.addAttachment('report.txt');
     expect(writer).not.toBeNull();
   });
 
-  test('writer.setFile should accept a Uint8Array', async () => {
-    using pdfium = await initPdfium();
-    using document = await loadTestDocument(pdfium, 'test_1.pdf');
+  test('writer.setFile should accept a Uint8Array', async ({ openDocument }) => {
+    const document = await openDocument('test_1.pdf');
     const writer = document.addAttachment('data.bin');
     expect(writer).not.toBeNull();
 
@@ -68,9 +60,8 @@ describe('PDFiumAttachmentWriter API', () => {
     expect(result).toBe(true);
   });
 
-  test('writer.hasKey should return a boolean', async () => {
-    using pdfium = await initPdfium();
-    using document = await loadTestDocument(pdfium, 'test_1.pdf');
+  test('writer.hasKey should return a boolean', async ({ openDocument }) => {
+    const document = await openDocument('test_1.pdf');
     const writer = document.addAttachment('meta.txt');
     expect(writer).not.toBeNull();
 
@@ -79,9 +70,8 @@ describe('PDFiumAttachmentWriter API', () => {
     expect(has).toBe(false);
   });
 
-  test('writer.setStringValue / getStringValue should round-trip after setFile', async () => {
-    using pdfium = await initPdfium();
-    using document = await loadTestDocument(pdfium, 'test_1.pdf');
+  test('writer.setStringValue / getStringValue should round-trip after setFile', async ({ openDocument }) => {
+    const document = await openDocument('test_1.pdf');
     const writer = document.addAttachment('kv.txt');
     expect(writer).not.toBeNull();
 
@@ -99,9 +89,8 @@ describe('PDFiumAttachmentWriter API', () => {
     }
   });
 
-  test('writer.getValueType should return a known type', async () => {
-    using pdfium = await initPdfium();
-    using document = await loadTestDocument(pdfium, 'test_1.pdf');
+  test('writer.getValueType should return a known type', async ({ openDocument }) => {
+    const document = await openDocument('test_1.pdf');
     const writer = document.addAttachment('typed.txt');
     expect(writer).not.toBeNull();
 
@@ -112,9 +101,8 @@ describe('PDFiumAttachmentWriter API', () => {
 });
 
 describe('Attachment Modification with different PDFs', () => {
-  test('should handle test_3_with_images.pdf', async () => {
-    using pdfium = await initPdfium();
-    using doc = await loadTestDocument(pdfium, 'test_3_with_images.pdf');
+  test('should handle test_3_with_images.pdf', async ({ openDocument }) => {
+    const doc = await openDocument('test_3_with_images.pdf');
 
     expect(() => doc.addAttachment('test.txt')).not.toThrow();
     expect(() => doc.deleteAttachment(0)).not.toThrow();
@@ -122,16 +110,14 @@ describe('Attachment Modification with different PDFs', () => {
 });
 
 describe('Attachment Modification post-dispose guards', () => {
-  test('should throw on addAttachment after dispose', async () => {
-    using pdfium = await initPdfium();
-    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
+  test('should throw on addAttachment after dispose', async ({ openDocument }) => {
+    const doc = await openDocument('test_1.pdf');
     doc.dispose();
     expect(() => doc.addAttachment('test.txt')).toThrow();
   });
 
-  test('should throw on deleteAttachment after dispose', async () => {
-    using pdfium = await initPdfium();
-    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
+  test('should throw on deleteAttachment after dispose', async ({ openDocument }) => {
+    const doc = await openDocument('test_1.pdf');
     doc.dispose();
     expect(() => doc.deleteAttachment(0)).toThrow();
   });

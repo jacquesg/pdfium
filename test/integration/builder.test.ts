@@ -4,34 +4,28 @@
  * These tests verify PDF creation from scratch.
  */
 
-import { describe, expect, test } from 'vitest';
-
 import { INTERNAL } from '../../src/internal/symbols.js';
-import { initPdfium } from '../utils/helpers.js';
+import { describe, expect, test } from '../utils/fixtures.js';
 
 describe('PDFiumDocumentBuilder', () => {
-  test('should create an empty document', async () => {
-    using pdfium = await initPdfium();
+  test('should create an empty document', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     expect(builder.pageCount).toBe(0);
   });
 
-  test('should add a page with default dimensions', async () => {
-    using pdfium = await initPdfium();
+  test('should add a page with default dimensions', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     builder.addPage();
     expect(builder.pageCount).toBe(1);
   });
 
-  test('should add a page with custom dimensions', async () => {
-    using pdfium = await initPdfium();
+  test('should add a page with custom dimensions', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     builder.addPage({ width: 595, height: 842 }); // A4
     expect(builder.pageCount).toBe(1);
   });
 
-  test('should add multiple pages', async () => {
-    using pdfium = await initPdfium();
+  test('should add multiple pages', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     builder.addPage();
     builder.addPage();
@@ -39,8 +33,7 @@ describe('PDFiumDocumentBuilder', () => {
     expect(builder.pageCount).toBe(3);
   });
 
-  test('should delete a page', async () => {
-    using pdfium = await initPdfium();
+  test('should delete a page', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     builder.addPage();
     builder.addPage();
@@ -49,16 +42,14 @@ describe('PDFiumDocumentBuilder', () => {
     expect(builder.pageCount).toBe(1);
   });
 
-  test('should throw for out-of-range delete', async () => {
-    using pdfium = await initPdfium();
+  test('should throw for out-of-range delete', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     builder.addPage();
     expect(() => builder.deletePage(5)).toThrow();
     expect(() => builder.deletePage(-1)).toThrow();
   });
 
-  test('should save empty document to valid PDF bytes', async () => {
-    using pdfium = await initPdfium();
+  test('should save empty document to valid PDF bytes', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     builder.addPage();
     const bytes = builder.save();
@@ -68,8 +59,7 @@ describe('PDFiumDocumentBuilder', () => {
     expect(header).toBe('%PDF-');
   });
 
-  test('should save and re-open document', async () => {
-    using pdfium = await initPdfium();
+  test('should save and re-open document', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     builder.addPage();
     builder.addPage({ width: 595, height: 842 });
@@ -79,8 +69,7 @@ describe('PDFiumDocumentBuilder', () => {
     expect(reopened.pageCount).toBe(2);
   });
 
-  test('should add rectangle to page', async () => {
-    using pdfium = await initPdfium();
+  test('should add rectangle to page', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     const page = builder.addPage();
     page.addRectangle(100, 100, 200, 50, {
@@ -90,8 +79,7 @@ describe('PDFiumDocumentBuilder', () => {
     expect(bytes.length).toBeGreaterThan(0);
   });
 
-  test('should add rectangle with stroke', async () => {
-    using pdfium = await initPdfium();
+  test('should add rectangle with stroke', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     const page = builder.addPage();
     page.addRectangle(50, 50, 100, 100, {
@@ -102,16 +90,14 @@ describe('PDFiumDocumentBuilder', () => {
     expect(bytes.length).toBeGreaterThan(0);
   });
 
-  test('addRectangle returns this for chaining', async () => {
-    using pdfium = await initPdfium();
+  test('addRectangle returns this for chaining', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     const page = builder.addPage();
     const result = page.addRectangle(10, 10, 50, 50);
     expect(result).toBe(page);
   });
 
-  test('addText returns this for chaining', async () => {
-    using pdfium = await initPdfium();
+  test('addText returns this for chaining', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     const font = builder.loadStandardFont('Helvetica');
     const page = builder.addPage();
@@ -119,8 +105,7 @@ describe('PDFiumDocumentBuilder', () => {
     expect(result).toBe(page);
   });
 
-  test('methods can be chained together', async () => {
-    using pdfium = await initPdfium();
+  test('methods can be chained together', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     const font = builder.loadStandardFont('Helvetica');
     const page = builder.addPage();
@@ -133,8 +118,7 @@ describe('PDFiumDocumentBuilder', () => {
     expect(reopened.pageCount).toBe(1);
   });
 
-  test('should add text with standard font', async () => {
-    using pdfium = await initPdfium();
+  test('should add text with standard font', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     const font = builder.loadStandardFont('Helvetica');
     expect(font).toBeDefined();
@@ -150,8 +134,7 @@ describe('PDFiumDocumentBuilder', () => {
     expect(text).toContain('Hello, World!');
   });
 
-  test('should save with version option', async () => {
-    using pdfium = await initPdfium();
+  test('should save with version option', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     builder.addPage();
     const bytes = builder.save({ version: 17 });
@@ -159,14 +142,12 @@ describe('PDFiumDocumentBuilder', () => {
     expect(reopened.pageCount).toBe(1);
   });
 
-  test('should throw for invalid standard font', async () => {
-    using pdfium = await initPdfium();
+  test('should throw for invalid standard font', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     expect(() => builder.loadStandardFont('NonExistentFont')).toThrow();
   });
 
-  test('should clean up on dispose', async () => {
-    using pdfium = await initPdfium();
+  test('should clean up on dispose', async ({ pdfium }) => {
     const builder = pdfium.createDocument();
     builder.addPage();
     expect(builder.disposed).toBe(false);
@@ -174,37 +155,32 @@ describe('PDFiumDocumentBuilder', () => {
     expect(builder.disposed).toBe(true);
   });
 
-  test('should throw on save after dispose', async () => {
-    using pdfium = await initPdfium();
+  test('should throw on save after dispose', async ({ pdfium }) => {
     const builder = pdfium.createDocument();
     builder.addPage();
     builder.dispose();
     expect(() => builder.save()).toThrow();
   });
 
-  test('should throw on addPage after dispose', async () => {
-    using pdfium = await initPdfium();
+  test('should throw on addPage after dispose', async ({ pdfium }) => {
     const builder = pdfium.createDocument();
     builder.dispose();
     expect(() => builder.addPage()).toThrow();
   });
 
-  test('should throw on loadStandardFont after dispose', async () => {
-    using pdfium = await initPdfium();
+  test('should throw on loadStandardFont after dispose', async ({ pdfium }) => {
     const builder = pdfium.createDocument();
     builder.dispose();
     expect(() => builder.loadStandardFont('Helvetica')).toThrow();
   });
 
-  test('should throw on pageCount after dispose', async () => {
-    using pdfium = await initPdfium();
+  test('should throw on pageCount after dispose', async ({ pdfium }) => {
     const builder = pdfium.createDocument();
     builder.dispose();
     expect(() => builder.pageCount).toThrow();
   });
 
-  test('page builder should throw on addRectangle after dispose', async () => {
-    using pdfium = await initPdfium();
+  test('page builder should throw on addRectangle after dispose', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     const page = builder.addPage({ width: 100, height: 100 });
     page.dispose();
@@ -212,8 +188,7 @@ describe('PDFiumDocumentBuilder', () => {
     expect(() => page.addRectangle(10, 10, 50, 50)).toThrow();
   });
 
-  test('page builder should throw on addText after dispose', async () => {
-    using pdfium = await initPdfium();
+  test('page builder should throw on addText after dispose', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     const font = builder.loadStandardFont('Helvetica');
     const page = builder.addPage({ width: 100, height: 100 });
@@ -221,8 +196,7 @@ describe('PDFiumDocumentBuilder', () => {
     expect(() => page.addText('test', 10, 10, font, 12)).toThrow();
   });
 
-  test('disposing document builder should dispose its page builders', async () => {
-    using pdfium = await initPdfium();
+  test('disposing document builder should dispose its page builders', async ({ pdfium }) => {
     const builder = pdfium.createDocument();
     const page = builder.addPage({ width: 100, height: 100 });
     expect(page.disposed).toBe(false);
@@ -230,8 +204,7 @@ describe('PDFiumDocumentBuilder', () => {
     expect(page.disposed).toBe(true);
   });
 
-  test('rectangle should produce a valid PDF that can be rendered', async () => {
-    using pdfium = await initPdfium();
+  test('rectangle should produce a valid PDF that can be rendered', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     const page = builder.addPage({ width: 100, height: 100 });
     page.addRectangle(10, 10, 80, 80, {
@@ -248,24 +221,21 @@ describe('PDFiumDocumentBuilder', () => {
     expect(rendered.data.length).toBe(10 * 10 * 4);
   });
 
-  test('INTERNAL access on builder provides handle', async () => {
-    using pdfium = await initPdfium();
+  test('INTERNAL access on builder provides handle', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     const internal = builder[INTERNAL];
     expect(internal.handle).toBeDefined();
-    expect(typeof internal.handle).toBe('number');
+    expect(internal.handle).toBeTypeOf('number');
     expect(internal.handle).toBeGreaterThan(0);
   });
 
-  test('INTERNAL access throws on disposed builder', async () => {
-    using pdfium = await initPdfium();
+  test('INTERNAL access throws on disposed builder', async ({ pdfium }) => {
     const builder = pdfium.createDocument();
     builder.dispose();
     expect(() => builder[INTERNAL]).toThrow();
   });
 
-  test('addRectangle throws for invalid dimensions', async () => {
-    using pdfium = await initPdfium();
+  test('addRectangle throws for invalid dimensions', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     const page = builder.addPage();
     expect(() => page.addRectangle(0, 0, 0, 10)).toThrow();
@@ -276,8 +246,7 @@ describe('PDFiumDocumentBuilder', () => {
     expect(() => page.addRectangle(0, 0, 10, Infinity)).toThrow();
   });
 
-  test('addText throws for invalid font size', async () => {
-    using pdfium = await initPdfium();
+  test('addText throws for invalid font size', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     const font = builder.loadStandardFont('Helvetica');
     const page = builder.addPage();
@@ -287,8 +256,7 @@ describe('PDFiumDocumentBuilder', () => {
     expect(() => page.addText('test', 0, 0, font, Infinity)).toThrow();
   });
 
-  test('complex chaining preserves page reference', async () => {
-    using pdfium = await initPdfium();
+  test('complex chaining preserves page reference', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     const font = builder.loadStandardFont('Helvetica');
     const page = builder.addPage();
@@ -303,8 +271,7 @@ describe('PDFiumDocumentBuilder', () => {
     expect(result).toBe(page);
   });
 
-  test('multiple pages can be built independently', async () => {
-    using pdfium = await initPdfium();
+  test('multiple pages can be built independently', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     const font = builder.loadStandardFont('Helvetica');
 
@@ -328,8 +295,7 @@ describe('PDFiumDocumentBuilder', () => {
     expect(p2.getText()).toContain('Page 2');
   });
 
-  test('deletePage throws for non-integer index', async () => {
-    using pdfium = await initPdfium();
+  test('deletePage throws for non-integer index', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     builder.addPage();
 
@@ -339,8 +305,7 @@ describe('PDFiumDocumentBuilder', () => {
     expect(() => builder.deletePage(1.5)).toThrow();
   });
 
-  test('deletePage works correctly', async () => {
-    using pdfium = await initPdfium();
+  test('deletePage works correctly', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     builder.addPage();
     builder.addPage();
@@ -354,8 +319,7 @@ describe('PDFiumDocumentBuilder', () => {
     expect(builder.pageCount).toBe(1);
   });
 
-  test('addPage with all standard fonts', async () => {
-    using pdfium = await initPdfium();
+  test('addPage with all standard fonts', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     const page = builder.addPage();
 
@@ -390,8 +354,7 @@ describe('PDFiumDocumentBuilder', () => {
     expect(bytes.length).toBeGreaterThan(0);
   });
 
-  test('addRectangle with both fill and stroke', async () => {
-    using pdfium = await initPdfium();
+  test('addRectangle with both fill and stroke', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     const page = builder.addPage();
 
@@ -405,8 +368,7 @@ describe('PDFiumDocumentBuilder', () => {
     expect(bytes.length).toBeGreaterThan(0);
   });
 
-  test('addRectangle with only stroke (no fill)', async () => {
-    using pdfium = await initPdfium();
+  test('addRectangle with only stroke (no fill)', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     const page = builder.addPage();
 
@@ -419,8 +381,7 @@ describe('PDFiumDocumentBuilder', () => {
     expect(bytes.length).toBeGreaterThan(0);
   });
 
-  test('addText with single character', async () => {
-    using pdfium = await initPdfium();
+  test('addText with single character', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     const font = builder.loadStandardFont('Helvetica');
     const page = builder.addPage();
@@ -430,8 +391,7 @@ describe('PDFiumDocumentBuilder', () => {
     expect(bytes.length).toBeGreaterThan(0);
   });
 
-  test('addText with unicode characters', async () => {
-    using pdfium = await initPdfium();
+  test('addText with unicode characters', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     const font = builder.loadStandardFont('Helvetica');
     const page = builder.addPage();
@@ -445,8 +405,7 @@ describe('PDFiumDocumentBuilder', () => {
     expect(text).toContain('Hello');
   });
 
-  test('save with different PDF versions', async () => {
-    using pdfium = await initPdfium();
+  test('save with different PDF versions', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     builder.addPage();
 

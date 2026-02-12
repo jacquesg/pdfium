@@ -4,17 +4,15 @@
  * These tests verify importing pages from one document to another.
  */
 
-import { describe, expect, test } from 'vitest';
 import type { ImportPagesOptions, NUpLayoutOptions } from '../../src/core/types.js';
-import { initPdfium, loadTestDocument } from '../utils/helpers.js';
+import { describe, expect, test } from '../utils/fixtures.js';
 
 describe('Page Import/Merge', () => {
   describe('importPages', () => {
-    test('should import all pages from source document', async () => {
-      using pdfium = await initPdfium();
-      using sourceDoc = await loadTestDocument(pdfium, 'test_1.pdf');
+    test('should import all pages from source document', async ({ openDocument }) => {
+      const sourceDoc = await openDocument('test_1.pdf');
       // Load another copy of test_1.pdf as the destination
-      using dest = await loadTestDocument(pdfium, 'test_1.pdf');
+      const dest = await openDocument('test_1.pdf');
       const sourcePageCount = sourceDoc.pageCount;
       const initialDestCount = dest.pageCount;
 
@@ -23,10 +21,9 @@ describe('Page Import/Merge', () => {
       expect(dest.pageCount).toBe(initialDestCount + sourcePageCount);
     });
 
-    test('should import specific page range', async () => {
-      using pdfium = await initPdfium();
-      using sourceDoc = await loadTestDocument(pdfium, 'test_1.pdf');
-      using dest = await loadTestDocument(pdfium, 'test_1.pdf');
+    test('should import specific page range', async ({ openDocument }) => {
+      const sourceDoc = await openDocument('test_1.pdf');
+      const dest = await openDocument('test_1.pdf');
       const initialDestCount = dest.pageCount;
 
       const options: ImportPagesOptions = {
@@ -38,10 +35,9 @@ describe('Page Import/Merge', () => {
       expect(dest.pageCount).toBe(initialDestCount + 1);
     });
 
-    test('should import pages at specific position', async () => {
-      using pdfium = await initPdfium();
-      using sourceDoc = await loadTestDocument(pdfium, 'test_1.pdf');
-      using dest = await loadTestDocument(pdfium, 'test_1.pdf');
+    test('should import pages at specific position', async ({ openDocument }) => {
+      const sourceDoc = await openDocument('test_1.pdf');
+      const dest = await openDocument('test_1.pdf');
       const initialDestCount = dest.pageCount;
 
       // Import at beginning (index 0)
@@ -50,10 +46,9 @@ describe('Page Import/Merge', () => {
       expect(dest.pageCount).toBe(initialDestCount + sourceDoc.pageCount);
     });
 
-    test('should handle empty page range gracefully', async () => {
-      using pdfium = await initPdfium();
-      using sourceDoc = await loadTestDocument(pdfium, 'test_1.pdf');
-      using dest = await loadTestDocument(pdfium, 'test_1.pdf');
+    test('should handle empty page range gracefully', async ({ openDocument }) => {
+      const sourceDoc = await openDocument('test_1.pdf');
+      const dest = await openDocument('test_1.pdf');
       const initialDestCount = dest.pageCount;
 
       // Empty string means all pages
@@ -64,10 +59,9 @@ describe('Page Import/Merge', () => {
   });
 
   describe('importPagesByIndex', () => {
-    test('should import pages by zero-based indices', async () => {
-      using pdfium = await initPdfium();
-      using sourceDoc = await loadTestDocument(pdfium, 'test_1.pdf');
-      using dest = await loadTestDocument(pdfium, 'test_1.pdf');
+    test('should import pages by zero-based indices', async ({ openDocument }) => {
+      const sourceDoc = await openDocument('test_1.pdf');
+      const dest = await openDocument('test_1.pdf');
       const initialDestCount = dest.pageCount;
 
       // Import page 0 from source
@@ -76,10 +70,9 @@ describe('Page Import/Merge', () => {
       expect(dest.pageCount).toBe(initialDestCount + 1);
     });
 
-    test('should import single page', async () => {
-      using pdfium = await initPdfium();
-      using sourceDoc = await loadTestDocument(pdfium, 'test_1.pdf');
-      using dest = await loadTestDocument(pdfium, 'test_1.pdf');
+    test('should import single page', async ({ openDocument }) => {
+      const sourceDoc = await openDocument('test_1.pdf');
+      const dest = await openDocument('test_1.pdf');
       const initialDestCount = dest.pageCount;
 
       dest.importPagesByIndex(sourceDoc, [0]);
@@ -87,10 +80,9 @@ describe('Page Import/Merge', () => {
       expect(dest.pageCount).toBe(initialDestCount + 1);
     });
 
-    test('should handle empty indices array', async () => {
-      using pdfium = await initPdfium();
-      using sourceDoc = await loadTestDocument(pdfium, 'test_1.pdf');
-      using dest = await loadTestDocument(pdfium, 'test_1.pdf');
+    test('should handle empty indices array', async ({ openDocument }) => {
+      const sourceDoc = await openDocument('test_1.pdf');
+      const dest = await openDocument('test_1.pdf');
       const initialDestCount = dest.pageCount;
 
       dest.importPagesByIndex(sourceDoc, []);
@@ -98,10 +90,9 @@ describe('Page Import/Merge', () => {
       expect(dest.pageCount).toBe(initialDestCount); // No change
     });
 
-    test('should import at specific position', async () => {
-      using pdfium = await initPdfium();
-      using sourceDoc = await loadTestDocument(pdfium, 'test_1.pdf');
-      using dest = await loadTestDocument(pdfium, 'test_1.pdf');
+    test('should import at specific position', async ({ openDocument }) => {
+      const sourceDoc = await openDocument('test_1.pdf');
+      const dest = await openDocument('test_1.pdf');
       const initialDestCount = dest.pageCount;
 
       // Import at position 0
@@ -112,58 +103,52 @@ describe('Page Import/Merge', () => {
   });
 
   describe('importPages error cases', () => {
-    test('should throw when called on disposed document', async () => {
-      using pdfium = await initPdfium();
-      using sourceDoc = await loadTestDocument(pdfium, 'test_1.pdf');
-      using dest = await loadTestDocument(pdfium, 'test_1.pdf');
+    test('should throw when called on disposed document', async ({ openDocument }) => {
+      const sourceDoc = await openDocument('test_1.pdf');
+      const dest = await openDocument('test_1.pdf');
       dest.dispose();
       expect(() => dest.importPages(sourceDoc)).toThrow();
     });
 
-    test('should throw when source document is disposed', async () => {
-      using pdfium = await initPdfium();
-      using dest = await loadTestDocument(pdfium, 'test_1.pdf');
-      using source = await loadTestDocument(pdfium, 'test_1.pdf');
+    test('should throw when source document is disposed', async ({ openDocument }) => {
+      const dest = await openDocument('test_1.pdf');
+      const source = await openDocument('test_1.pdf');
       source.dispose();
       expect(() => dest.importPages(source)).toThrow();
     });
   });
 
   describe('importPagesByIndex error cases', () => {
-    test('should throw when called on disposed document', async () => {
-      using pdfium = await initPdfium();
-      using sourceDoc = await loadTestDocument(pdfium, 'test_1.pdf');
-      using dest = await loadTestDocument(pdfium, 'test_1.pdf');
+    test('should throw when called on disposed document', async ({ openDocument }) => {
+      const sourceDoc = await openDocument('test_1.pdf');
+      const dest = await openDocument('test_1.pdf');
       dest.dispose();
       expect(() => dest.importPagesByIndex(sourceDoc, [0])).toThrow();
     });
 
-    test('should throw when source document is disposed', async () => {
-      using pdfium = await initPdfium();
-      using dest = await loadTestDocument(pdfium, 'test_1.pdf');
-      using source = await loadTestDocument(pdfium, 'test_1.pdf');
+    test('should throw when source document is disposed', async ({ openDocument }) => {
+      const dest = await openDocument('test_1.pdf');
+      const source = await openDocument('test_1.pdf');
       source.dispose();
       expect(() => dest.importPagesByIndex(source, [0])).toThrow();
     });
   });
 
   describe('copyViewerPreferences', () => {
-    test('should copy viewer preferences from source', async () => {
-      using pdfium = await initPdfium();
-      using sourceDoc = await loadTestDocument(pdfium, 'test_1.pdf');
-      using dest = await loadTestDocument(pdfium, 'test_1.pdf');
+    test('should copy viewer preferences from source', async ({ openDocument }) => {
+      const sourceDoc = await openDocument('test_1.pdf');
+      const dest = await openDocument('test_1.pdf');
 
       const success = dest.copyViewerPreferences(sourceDoc);
 
       // May or may not succeed depending on WASM build having the function
-      expect(typeof success).toBe('boolean');
+      expect(success).toBeTypeOf('boolean');
     });
   });
 
   describe('createNUpDocument', () => {
-    test('should create 2-up layout', async () => {
-      using pdfium = await initPdfium();
-      using sourceDoc = await loadTestDocument(pdfium, 'test_1.pdf');
+    test('should create 2-up layout', async ({ openDocument }) => {
+      const sourceDoc = await openDocument('test_1.pdf');
       const sourcePageCount = sourceDoc.pageCount;
 
       const options: NUpLayoutOptions = {
@@ -185,9 +170,8 @@ describe('Page Import/Merge', () => {
       }
     });
 
-    test('should create 4-up layout', async () => {
-      using pdfium = await initPdfium();
-      using sourceDoc = await loadTestDocument(pdfium, 'test_1.pdf');
+    test('should create 4-up layout', async ({ openDocument }) => {
+      const sourceDoc = await openDocument('test_1.pdf');
       const sourcePageCount = sourceDoc.pageCount;
 
       const options: NUpLayoutOptions = {
@@ -209,9 +193,8 @@ describe('Page Import/Merge', () => {
       }
     });
 
-    test('should handle single page document', async () => {
-      using pdfium = await initPdfium();
-      using sourceDoc = await loadTestDocument(pdfium, 'test_1.pdf');
+    test('should handle single page document', async ({ openDocument }) => {
+      const sourceDoc = await openDocument('test_1.pdf');
       const options: NUpLayoutOptions = {
         outputWidth: 842,
         outputHeight: 595,

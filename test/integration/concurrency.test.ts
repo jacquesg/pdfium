@@ -5,16 +5,11 @@
  * the underlying WASM is single-threaded.
  */
 
-import { readFile } from 'node:fs/promises';
-import { describe, expect, test } from 'vitest';
-import { initPdfium } from '../utils/helpers.js';
+import { describe, expect, test } from '../utils/fixtures.js';
 
 describe('Concurrency', () => {
-  test('should handle concurrent page rendering from same document', async () => {
-    using pdfium = await initPdfium();
-    const pdfData = await readFile('test/fixtures/test_1.pdf');
-    using doc = await pdfium.openDocument(pdfData);
-
+  test('should handle concurrent page rendering from same document', async ({ openDocument }) => {
+    const doc = await openDocument('test_1.pdf');
     const pages = [0, 1, 2].map((i) => doc.getPage(i));
 
     // Render all pages concurrently
@@ -40,11 +35,8 @@ describe('Concurrency', () => {
     }
   });
 
-  test('should handle concurrent text extraction', async () => {
-    using pdfium = await initPdfium();
-    const pdfData = await readFile('test/fixtures/test_1.pdf');
-    using doc = await pdfium.openDocument(pdfData);
-
+  test('should handle concurrent text extraction', async ({ openDocument }) => {
+    const doc = await openDocument('test_1.pdf');
     const pages = [0, 1, 2].map((i) => doc.getPage(i));
 
     const promises = pages.map((page) => {
@@ -59,7 +51,7 @@ describe('Concurrency', () => {
 
     expect(results.length).toBe(3);
     for (const text of results) {
-      expect(typeof text).toBe('string');
+      expect(text).toBeTypeOf('string');
     }
 
     for (const page of pages) {

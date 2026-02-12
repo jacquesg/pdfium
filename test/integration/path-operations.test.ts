@@ -4,13 +4,10 @@
  * Tests the FPDFPath_* and FPDFPathSegment_* functions via the PDFiumPathObject wrapper.
  */
 
-import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import { PathFillMode, PathSegmentType } from '../../src/core/types.js';
-import type { PDFiumDocument } from '../../src/document/document.js';
-import type { PDFiumPage } from '../../src/document/page.js';
 import { PDFiumPathObject } from '../../src/document/page-object.js';
 import type { PDFium } from '../../src/pdfium.js';
-import { initPdfium, loadTestDocument } from '../utils/helpers.js';
+import { describe, expect, test } from '../utils/fixtures.js';
 
 /**
  * Helper: create a document with a rectangle path, reopen it, and return
@@ -34,149 +31,123 @@ async function createDocWithPath(pdfium: PDFium) {
 }
 
 describe('Path Operations API - Basic Operations', () => {
-  let pdfium: PDFium;
-  let document: PDFiumDocument;
-  let page: PDFiumPage;
-  let pathObj: PDFiumPathObject | undefined;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-    const result = await createDocWithPath(pdfium);
-    document = result.doc;
-    page = result.page;
-    pathObj = result.pathObj;
-  });
-
-  afterAll(() => {
-    page?.dispose();
-    document?.dispose();
-    pdfium?.dispose();
-  });
-
   describe('moveTo', () => {
-    test('should return boolean', () => {
+    test('should return boolean', async ({ pdfium }) => {
+      const { doc, page, pathObj } = await createDocWithPath(pdfium);
       expect(pathObj).toBeDefined();
       const result = pathObj!.moveTo(100, 100);
-      expect(typeof result).toBe('boolean');
+      expect(result).toBeTypeOf('boolean');
+      page.dispose();
+      doc.dispose();
     });
   });
 
   describe('lineTo', () => {
-    test('should return boolean', () => {
+    test('should return boolean', async ({ pdfium }) => {
+      const { doc, page, pathObj } = await createDocWithPath(pdfium);
       expect(pathObj).toBeDefined();
       const result = pathObj!.lineTo(200, 200);
-      expect(typeof result).toBe('boolean');
+      expect(result).toBeTypeOf('boolean');
+      page.dispose();
+      doc.dispose();
     });
   });
 
   describe('bezierTo', () => {
-    test('should return boolean', () => {
+    test('should return boolean', async ({ pdfium }) => {
+      const { doc, page, pathObj } = await createDocWithPath(pdfium);
       expect(pathObj).toBeDefined();
       const result = pathObj!.bezierTo(100, 100, 150, 150, 200, 200);
-      expect(typeof result).toBe('boolean');
+      expect(result).toBeTypeOf('boolean');
+      page.dispose();
+      doc.dispose();
     });
   });
 
   describe('closePath', () => {
-    test('should return boolean', () => {
+    test('should return boolean', async ({ pdfium }) => {
+      const { doc, page, pathObj } = await createDocWithPath(pdfium);
       expect(pathObj).toBeDefined();
       const result = pathObj!.closePath();
-      expect(typeof result).toBe('boolean');
+      expect(result).toBeTypeOf('boolean');
+      page.dispose();
+      doc.dispose();
     });
   });
 });
 
 describe('Path Operations API - Draw Mode', () => {
-  let pdfium: PDFium;
-  let document: PDFiumDocument;
-  let page: PDFiumPage;
-  let pathObj: PDFiumPathObject | undefined;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-    const result = await createDocWithPath(pdfium);
-    document = result.doc;
-    page = result.page;
-    pathObj = result.pathObj;
-  });
-
-  afterAll(() => {
-    page?.dispose();
-    document?.dispose();
-    pdfium?.dispose();
-  });
-
   describe('setDrawMode', () => {
-    test('should return boolean', () => {
+    test('should return boolean', async ({ pdfium }) => {
+      const { doc, page, pathObj } = await createDocWithPath(pdfium);
       expect(pathObj).toBeDefined();
       const result = pathObj!.setDrawMode(PathFillMode.None, false);
-      expect(typeof result).toBe('boolean');
+      expect(result).toBeTypeOf('boolean');
+      page.dispose();
+      doc.dispose();
     });
 
-    test('should handle different fill modes', () => {
+    test('should handle different fill modes', async ({ pdfium }) => {
+      const { doc, page, pathObj } = await createDocWithPath(pdfium);
       expect(pathObj).toBeDefined();
       expect(() => pathObj!.setDrawMode(PathFillMode.None, false)).not.toThrow();
       expect(() => pathObj!.setDrawMode(PathFillMode.Alternate, false)).not.toThrow();
       expect(() => pathObj!.setDrawMode(PathFillMode.Winding, true)).not.toThrow();
+      page.dispose();
+      doc.dispose();
     });
   });
 
   describe('getDrawMode', () => {
-    test('should return draw mode object', () => {
+    test('should return draw mode object', async ({ pdfium }) => {
+      const { doc, page, pathObj } = await createDocWithPath(pdfium);
       expect(pathObj).toBeDefined();
       const result = pathObj!.getDrawMode();
       expect(result).not.toBeNull();
+      page.dispose();
+      doc.dispose();
     });
   });
 });
 
 describe('Path Operations API - Segments', () => {
-  let pdfium: PDFium;
-  let document: PDFiumDocument;
-  let page: PDFiumPage;
-  let pathObj: PDFiumPathObject | undefined;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-    const result = await createDocWithPath(pdfium);
-    document = result.doc;
-    page = result.page;
-    pathObj = result.pathObj;
-  });
-
-  afterAll(() => {
-    page?.dispose();
-    document?.dispose();
-    pdfium?.dispose();
-  });
-
   describe('segmentCount', () => {
-    test('should return a number', () => {
+    test('should return a number', async ({ pdfium }) => {
+      const { doc, page, pathObj } = await createDocWithPath(pdfium);
       expect(pathObj).toBeDefined();
       const result = pathObj!.segmentCount;
-      expect(typeof result).toBe('number');
+      expect(result).toBeTypeOf('number');
+      page.dispose();
+      doc.dispose();
     });
   });
 
   describe('getSegment', () => {
-    test('should return a segment for valid index', () => {
+    test('should return a segment for valid index', async ({ pdfium }) => {
+      const { doc, page, pathObj } = await createDocWithPath(pdfium);
       expect(pathObj).toBeDefined();
       const count = pathObj!.segmentCount;
       if (count > 0) {
         const segment = pathObj!.getSegment(0);
         expect(segment).not.toBeNull();
       }
+      page.dispose();
+      doc.dispose();
     });
 
-    test('should return null for out-of-bounds index', () => {
+    test('should return null for out-of-bounds index', async ({ pdfium }) => {
+      const { doc, page, pathObj } = await createDocWithPath(pdfium);
       expect(pathObj).toBeDefined();
       const result = pathObj!.getSegment(999);
       expect(result).toBeNull();
+      page.dispose();
+      doc.dispose();
     });
   });
 
   describe('segment properties', () => {
-    test('segment.point should return a point', () => {
+    test('segment.point should return a point', async ({ pdfium }) => {
+      const { doc, page, pathObj } = await createDocWithPath(pdfium);
       expect(pathObj).toBeDefined();
       const count = pathObj!.segmentCount;
       if (count > 0) {
@@ -186,14 +157,17 @@ describe('Path Operations API - Segments', () => {
           const point = segment.point;
           expect(point).not.toBeNull();
           if (point) {
-            expect(typeof point.x).toBe('number');
-            expect(typeof point.y).toBe('number');
+            expect(point.x).toBeTypeOf('number');
+            expect(point.y).toBeTypeOf('number');
           }
         }
       }
+      page.dispose();
+      doc.dispose();
     });
 
-    test('segment.type should return a PathSegmentType', () => {
+    test('segment.type should return a PathSegmentType', async ({ pdfium }) => {
+      const { doc, page, pathObj } = await createDocWithPath(pdfium);
       expect(pathObj).toBeDefined();
       const count = pathObj!.segmentCount;
       if (count > 0) {
@@ -208,58 +182,47 @@ describe('Path Operations API - Segments', () => {
           ]).toContain(segment.type);
         }
       }
+      page.dispose();
+      doc.dispose();
     });
 
-    test('segment.isClosing should return a boolean', () => {
+    test('segment.isClosing should return a boolean', async ({ pdfium }) => {
+      const { doc, page, pathObj } = await createDocWithPath(pdfium);
       expect(pathObj).toBeDefined();
       const count = pathObj!.segmentCount;
       if (count > 0) {
         const segment = pathObj!.getSegment(0);
         expect(segment).not.toBeNull();
         if (segment) {
-          expect(typeof segment.isClosing).toBe('boolean');
+          expect(segment.isClosing).toBeTypeOf('boolean');
         }
       }
+      page.dispose();
+      doc.dispose();
     });
   });
 });
 
 describe('Path Operations with page objects', () => {
-  let pdfium: PDFium;
-  let document: PDFiumDocument;
-  let page: PDFiumPage;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-    document = await loadTestDocument(pdfium, 'test_1.pdf');
-    page = document.getPage(0);
+  test('should count page objects', async ({ testPage }) => {
+    const objects = testPage.getObjects();
+    expect(objects).toBeInstanceOf(Array);
   });
 
-  afterAll(() => {
-    page?.dispose();
-    document?.dispose();
-    pdfium?.dispose();
-  });
-
-  test('should count page objects', () => {
-    const objects = page.getObjects();
-    expect(Array.isArray(objects)).toBe(true);
-  });
-
-  test('objects() returns a generator', () => {
-    const gen = page.objects();
+  test('objects() returns a generator', async ({ testPage }) => {
+    const gen = testPage.objects();
     expect(gen[Symbol.iterator]).toBeDefined();
-    expect(typeof gen.next).toBe('function');
+    expect(gen.next).toBeTypeOf('function');
   });
 
-  test('objects() yields same objects as getObjects()', () => {
-    const fromGenerator = [...page.objects()];
-    const fromArray = page.getObjects();
+  test('objects() yields same objects as getObjects()', async ({ testPage }) => {
+    const fromGenerator = [...testPage.objects()];
+    const fromArray = testPage.getObjects();
     expect(fromGenerator).toEqual(fromArray);
   });
 
-  test('objects() is lazy - can break early', () => {
-    const gen = page.objects();
+  test('objects() is lazy - can break early', async ({ testPage }) => {
+    const gen = testPage.objects();
     const first = gen.next();
     // Test that we can iterate without exhausting
     if (!first.done) {
@@ -269,34 +232,23 @@ describe('Path Operations with page objects', () => {
 });
 
 describe('Path Operations with different PDFs', () => {
-  let pdfium: PDFium;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-  });
-
-  afterAll(() => {
-    pdfium?.dispose();
-  });
-
-  test('should handle test_3_with_images.pdf', async () => {
-    using doc = await loadTestDocument(pdfium, 'test_3_with_images.pdf');
+  test('should handle test_3_with_images.pdf', async ({ openDocument }) => {
+    const doc = await openDocument('test_3_with_images.pdf');
     using page = doc.getPage(0);
 
     const objects = page.getObjects();
-    expect(Array.isArray(objects)).toBe(true);
+    expect(objects).toBeInstanceOf(Array);
 
     const pathObj = objects.find((o): o is PDFiumPathObject => o instanceof PDFiumPathObject);
     if (pathObj) {
-      expect(typeof pathObj.segmentCount).toBe('number');
+      expect(pathObj.segmentCount).toBeTypeOf('number');
       expect(pathObj.moveTo(100, 100)).toBe(true);
     }
   });
 });
 
 describe('Path Operations with Created Document', () => {
-  test('should handle path operations on created rectangle', async () => {
-    using pdfium = await initPdfium();
+  test('should handle path operations on created rectangle', async ({ pdfium }) => {
     using builder = pdfium.createDocument();
     const builderPage = builder.addPage();
     builderPage.addRectangle(10, 10, 100, 100, {
@@ -323,15 +275,15 @@ describe('Path Operations with Created Document', () => {
         const point = segment.point;
         expect(point).not.toBeNull();
         if (point) {
-          expect(typeof point.x).toBe('number');
-          expect(typeof point.y).toBe('number');
+          expect(point.x).toBeTypeOf('number');
+          expect(point.y).toBeTypeOf('number');
         }
 
         const type = segment.type;
-        expect(typeof type).toBe('string');
+        expect(type).toBeTypeOf('string');
 
         const close = segment.isClosing;
-        expect(typeof close).toBe('boolean');
+        expect(close).toBeTypeOf('boolean');
       }
 
       // Modify existing path
@@ -348,17 +300,7 @@ describe('Path Operations with Created Document', () => {
 });
 
 describe('Path Operations post-dispose guards', () => {
-  let pdfium: PDFium;
-
-  beforeAll(async () => {
-    pdfium = await initPdfium();
-  });
-
-  afterAll(() => {
-    pdfium?.dispose();
-  });
-
-  test('should throw on moveTo after page dispose', async () => {
+  test('should throw on moveTo after page dispose', async ({ pdfium }) => {
     const { doc, page, pathObj } = await createDocWithPath(pdfium);
     expect(pathObj).toBeDefined();
     page.dispose();
@@ -366,7 +308,7 @@ describe('Path Operations post-dispose guards', () => {
     doc.dispose();
   });
 
-  test('should throw on lineTo after page dispose', async () => {
+  test('should throw on lineTo after page dispose', async ({ pdfium }) => {
     const { doc, page, pathObj } = await createDocWithPath(pdfium);
     expect(pathObj).toBeDefined();
     page.dispose();
@@ -374,7 +316,7 @@ describe('Path Operations post-dispose guards', () => {
     doc.dispose();
   });
 
-  test('should throw on bezierTo after page dispose', async () => {
+  test('should throw on bezierTo after page dispose', async ({ pdfium }) => {
     const { doc, page, pathObj } = await createDocWithPath(pdfium);
     expect(pathObj).toBeDefined();
     page.dispose();
@@ -382,7 +324,7 @@ describe('Path Operations post-dispose guards', () => {
     doc.dispose();
   });
 
-  test('should throw on closePath after page dispose', async () => {
+  test('should throw on closePath after page dispose', async ({ pdfium }) => {
     const { doc, page, pathObj } = await createDocWithPath(pdfium);
     expect(pathObj).toBeDefined();
     page.dispose();
@@ -390,7 +332,7 @@ describe('Path Operations post-dispose guards', () => {
     doc.dispose();
   });
 
-  test('should throw on setDrawMode after page dispose', async () => {
+  test('should throw on setDrawMode after page dispose', async ({ pdfium }) => {
     const { doc, page, pathObj } = await createDocWithPath(pdfium);
     expect(pathObj).toBeDefined();
     page.dispose();
@@ -398,7 +340,7 @@ describe('Path Operations post-dispose guards', () => {
     doc.dispose();
   });
 
-  test('should throw on getDrawMode after page dispose', async () => {
+  test('should throw on getDrawMode after page dispose', async ({ pdfium }) => {
     const { doc, page, pathObj } = await createDocWithPath(pdfium);
     expect(pathObj).toBeDefined();
     page.dispose();
@@ -406,7 +348,7 @@ describe('Path Operations post-dispose guards', () => {
     doc.dispose();
   });
 
-  test('should throw on segmentCount after page dispose', async () => {
+  test('should throw on segmentCount after page dispose', async ({ pdfium }) => {
     const { doc, page, pathObj } = await createDocWithPath(pdfium);
     expect(pathObj).toBeDefined();
     page.dispose();
@@ -414,7 +356,7 @@ describe('Path Operations post-dispose guards', () => {
     doc.dispose();
   });
 
-  test('should throw on getSegment after page dispose', async () => {
+  test('should throw on getSegment after page dispose', async ({ pdfium }) => {
     const { doc, page, pathObj } = await createDocWithPath(pdfium);
     expect(pathObj).toBeDefined();
     page.dispose();

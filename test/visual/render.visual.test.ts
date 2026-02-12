@@ -9,9 +9,8 @@
 import { existsSync } from 'node:fs';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { describe, expect, test } from 'vitest';
 import { PageRotation } from '../../src/core/types.js';
-import { initPdfium, loadTestDocument } from '../utils/helpers.js';
+import { describe, expect, test } from '../utils/fixtures.js';
 import { type ComparisonResult, calculateSSIM, compareImages } from '../utils/visual-comparator.js';
 
 /** Directory for snapshot files. */
@@ -84,16 +83,12 @@ async function saveDiffImage(name: string, result: ComparisonResult, width: numb
 
 describe('Visual Regression', () => {
   describe('test_1.pdf', () => {
-    test('page 0 renders correctly at 1x scale', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      const result = page.render({ scale: 1 });
+    test('page 0 renders correctly at 1x scale', async ({ testPage }) => {
+      const result = testPage.render({ scale: 1 });
 
       const { expected, isNew } = await getSnapshot('test_1_page0_1x', result.width, result.height, result.data);
 
       if (isNew) {
-        // New snapshot created, test passes
         return;
       }
 
@@ -109,11 +104,8 @@ describe('Visual Regression', () => {
       expect(comparison.diffPercentage).toBeLessThan(MAX_DIFF_PERCENTAGE);
     });
 
-    test('page 0 renders correctly at 0.5x scale', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      const result = page.render({ scale: 0.5 });
+    test('page 0 renders correctly at 0.5x scale', async ({ testPage }) => {
+      const result = testPage.render({ scale: 0.5 });
 
       const { expected, isNew } = await getSnapshot('test_1_page0_0.5x', result.width, result.height, result.data);
 
@@ -133,11 +125,8 @@ describe('Visual Regression', () => {
       expect(comparison.diffPercentage).toBeLessThan(MAX_DIFF_PERCENTAGE);
     });
 
-    test('page 0 has high SSIM score', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      const result = page.render({ scale: 1 });
+    test('page 0 has high SSIM score', async ({ testPage }) => {
+      const result = testPage.render({ scale: 1 });
 
       const { expected, isNew } = await getSnapshot('test_1_page0_1x', result.width, result.height, result.data);
 
@@ -151,9 +140,8 @@ describe('Visual Regression', () => {
   });
 
   describe('test_3_with_images.pdf', () => {
-    test('page 0 renders images correctly', async () => {
-      using pdfium = await initPdfium();
-      using imageDocument = await loadTestDocument(pdfium, 'test_3_with_images.pdf');
+    test('page 0 renders images correctly', async ({ openDocument }) => {
+      const imageDocument = await openDocument('test_3_with_images.pdf');
       using page = imageDocument.getPage(0);
       const result = page.render({ scale: 1 });
 
@@ -177,9 +165,8 @@ describe('Visual Regression', () => {
   });
 
   describe('test_6_with_form.pdf', () => {
-    test('page 0 renders form fields correctly', async () => {
-      using pdfium = await initPdfium();
-      using formDocument = await loadTestDocument(pdfium, 'test_6_with_form.pdf');
+    test('page 0 renders form fields correctly', async ({ openDocument }) => {
+      const formDocument = await openDocument('test_6_with_form.pdf');
       using page = formDocument.getPage(0);
       const result = page.render({ scale: 1, renderFormFields: true });
 
@@ -203,11 +190,8 @@ describe('Visual Regression', () => {
   });
 
   describe('Rotation rendering', () => {
-    test('page rotated 90 degrees renders correctly', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      const result = page.render({ scale: 0.5, rotation: PageRotation.Clockwise90 }); // 90 degrees clockwise
+    test('page rotated 90 degrees renders correctly', async ({ testPage }) => {
+      const result = testPage.render({ scale: 0.5, rotation: PageRotation.Clockwise90 });
 
       const { expected, isNew } = await getSnapshot('test_1_page0_rot90', result.width, result.height, result.data);
 

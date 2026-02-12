@@ -6,11 +6,10 @@
  * or various clipping combinations.
  */
 
-import { describe, expect, test } from 'vitest';
 import { TextRenderMode } from '../../src/core/types.js';
 import type { PDFiumPage } from '../../src/document/page.js';
 import { PDFiumTextObject } from '../../src/document/page-object.js';
-import { initPdfium, loadTestDocument } from '../utils/helpers.js';
+import { describe, expect, test } from '../utils/fixtures.js';
 
 function getFirstTextObj(page: PDFiumPage): PDFiumTextObject | undefined {
   const objects = page.getObjects();
@@ -32,11 +31,8 @@ describe('Text Render Mode', () => {
   });
 
   describe('textObjGetRenderMode', () => {
-    test('should return render mode for text objects', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      const textObj = getFirstTextObj(page);
+    test('should return render mode for text objects', async ({ testPage }) => {
+      const textObj = getFirstTextObj(testPage);
       if (textObj === undefined) return;
 
       const mode = textObj.renderMode;
@@ -47,11 +43,8 @@ describe('Text Render Mode', () => {
       }
     });
 
-    test('should return Fill mode (0) for most standard text', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      const textObj = getFirstTextObj(page);
+    test('should return Fill mode (0) for most standard text', async ({ testPage }) => {
+      const textObj = getFirstTextObj(testPage);
       if (textObj === undefined) return;
 
       const mode = textObj.renderMode;
@@ -62,11 +55,8 @@ describe('Text Render Mode', () => {
       }
     });
 
-    test('should work with all text objects on page', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      const objects = page.getObjects();
+    test('should work with all text objects on page', async ({ testPage }) => {
+      const objects = testPage.getObjects();
       const textObjects = objects.filter((o): o is PDFiumTextObject => o instanceof PDFiumTextObject);
 
       expect(textObjects.length).toBeGreaterThan(0);
@@ -82,11 +72,8 @@ describe('Text Render Mode', () => {
   });
 
   describe('textObjSetRenderMode', () => {
-    test('should set render mode on text objects', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      const textObj = getFirstTextObj(page);
+    test('should set render mode on text objects', async ({ testPage }) => {
+      const textObj = getFirstTextObj(testPage);
       if (textObj === undefined) return;
 
       // Get original mode
@@ -106,11 +93,8 @@ describe('Text Render Mode', () => {
       }
     });
 
-    test('should accept all valid render mode values', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      const textObj = getFirstTextObj(page);
+    test('should accept all valid render mode values', async ({ testPage }) => {
+      const textObj = getFirstTextObj(testPage);
       if (textObj === undefined) return;
 
       const originalMode = textObj.renderMode;
@@ -128,7 +112,7 @@ describe('Text Render Mode', () => {
       for (const mode of modes) {
         const success = textObj.setRenderMode(mode);
         // Method should not throw, regardless of success
-        expect(typeof success).toBe('boolean');
+        expect(success).toBeTypeOf('boolean');
       }
 
       // Restore original mode
@@ -137,23 +121,19 @@ describe('Text Render Mode', () => {
       }
     });
 
-    test('should return boolean indicating success', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      const textObj = getFirstTextObj(page);
+    test('should return boolean indicating success', async ({ testPage }) => {
+      const textObj = getFirstTextObj(testPage);
       if (textObj === undefined) return;
 
       const result = textObj.setRenderMode(TextRenderMode.Fill);
-      expect(typeof result).toBe('boolean');
+      expect(result).toBeTypeOf('boolean');
     });
   });
 });
 
 describe('Text Render Mode with different documents', () => {
-  test('should work with form document', async () => {
-    using pdfium = await initPdfium();
-    using doc = await loadTestDocument(pdfium, 'test_6_with_form.pdf');
+  test('should work with form document', async ({ openDocument }) => {
+    const doc = await openDocument('test_6_with_form.pdf');
     using page = doc.getPage(0);
 
     const objects = page.getObjects();
@@ -167,9 +147,8 @@ describe('Text Render Mode with different documents', () => {
     }
   });
 
-  test('should work with images document', async () => {
-    using pdfium = await initPdfium();
-    using doc = await loadTestDocument(pdfium, 'test_3_with_images.pdf');
+  test('should work with images document', async ({ openDocument }) => {
+    const doc = await openDocument('test_3_with_images.pdf');
     using page = doc.getPage(0);
 
     const objects = page.getObjects();
@@ -185,9 +164,8 @@ describe('Text Render Mode with different documents', () => {
 });
 
 describe('Text Render Mode post-dispose guards', () => {
-  test('should throw on renderMode after dispose', async () => {
-    using pdfium = await initPdfium();
-    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
+  test('should throw on renderMode after dispose', async ({ openDocument }) => {
+    const doc = await openDocument('test_1.pdf');
     using page = doc.getPage(0);
     const objects = page.getObjects();
     const textObj = objects.find((o): o is PDFiumTextObject => o instanceof PDFiumTextObject);
@@ -199,9 +177,8 @@ describe('Text Render Mode post-dispose guards', () => {
     }
   });
 
-  test('should throw on setRenderMode after dispose', async () => {
-    using pdfium = await initPdfium();
-    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
+  test('should throw on setRenderMode after dispose', async ({ openDocument }) => {
+    const doc = await openDocument('test_1.pdf');
     using page = doc.getPage(0);
     const objects = page.getObjects();
     const textObj = objects.find((o): o is PDFiumTextObject => o instanceof PDFiumTextObject);

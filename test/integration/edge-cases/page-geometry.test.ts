@@ -1,25 +1,10 @@
-import { readFile } from 'node:fs/promises';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { PageError } from '../../../src/core/errors.js';
 import { PageRotation } from '../../../src/core/types.js';
-import { PDFium } from '../../../src/pdfium.js';
+import { describe, expect, test } from '../../utils/fixtures.js';
 
 describe('Page Geometry Edge Cases', () => {
-  let pdfium: PDFium;
-  let pdfBytes: Uint8Array;
-
-  beforeAll(async () => {
-    pdfium = await PDFium.init();
-    const buffer = await readFile('test/fixtures/test_1.pdf');
-    pdfBytes = new Uint8Array(buffer);
-  });
-
-  afterAll(() => {
-    pdfium.dispose();
-  });
-
-  it('should throw for non-finite coordinates in deviceToPage', async () => {
-    using doc = await pdfium.openDocument(pdfBytes);
+  test('should throw for non-finite coordinates in deviceToPage', async ({ openDocument }) => {
+    const doc = await openDocument('test_1.pdf');
     using page = doc.getPage(0);
 
     const context = {
@@ -40,8 +25,8 @@ describe('Page Geometry Edge Cases', () => {
     }
   });
 
-  it('should throw for non-finite coordinates in pageToDevice', async () => {
-    using doc = await pdfium.openDocument(pdfBytes);
+  test('should throw for non-finite coordinates in pageToDevice', async ({ openDocument }) => {
+    const doc = await openDocument('test_1.pdf');
     using page = doc.getPage(0);
 
     const context = {

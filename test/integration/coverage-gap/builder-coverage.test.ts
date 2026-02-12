@@ -1,18 +1,7 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { PDFium } from '../../../src/pdfium.js';
+import { describe, expect, test } from '../../utils/fixtures.js';
 
 describe('Builder Coverage Gap', () => {
-  let pdfium: PDFium;
-
-  beforeAll(async () => {
-    pdfium = await PDFium.init();
-  });
-
-  afterAll(() => {
-    pdfium.dispose();
-  });
-
-  it('should delete page by index', () => {
+  test('should delete page by index', async ({ pdfium }) => {
     using doc = pdfium.createDocument();
     doc.addPage();
     doc.addPage();
@@ -22,7 +11,7 @@ describe('Builder Coverage Gap', () => {
     expect(doc.pageCount).toBe(1);
   });
 
-  it('should throw when deleting invalid page index', () => {
+  test('should throw when deleting invalid page index', async ({ pdfium }) => {
     using doc = pdfium.createDocument();
     expect(() => doc.deletePage(0)).toThrow(); // Empty doc
 

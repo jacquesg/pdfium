@@ -5,20 +5,16 @@
  * recursion depth limits.
  */
 
-import { describe, expect, test } from 'vitest';
-
 import { PDFiumErrorCode, RenderError } from '../../src/core/errors.js';
 import { PDFium } from '../../src/pdfium.js';
-import { initPdfium, loadTestDocument, loadWasmBinary } from '../utils/helpers.js';
+import { describe, expect, test } from '../utils/fixtures.js';
+import { loadTestDocument, loadWasmBinary } from '../utils/helpers.js';
 
 describe('Security: render dimension validation', () => {
-  test('NaN width should throw RenderError with RENDER_INVALID_DIMENSIONS', async () => {
-    using pdfium = await initPdfium();
-    using document = await loadTestDocument(pdfium, 'test_1.pdf');
-    using page = document.getPage(0);
+  test('NaN width should throw RenderError with RENDER_INVALID_DIMENSIONS', async ({ testPage }) => {
+    expect(() => testPage.render({ width: NaN, height: 100 })).toThrow(RenderError);
     try {
-      page.render({ width: NaN, height: 100 });
-      expect.fail('Expected RenderError');
+      testPage.render({ width: NaN, height: 100 });
     } catch (error) {
       expect(error).toBeInstanceOf(RenderError);
       if (error instanceof RenderError) {
@@ -27,13 +23,10 @@ describe('Security: render dimension validation', () => {
     }
   });
 
-  test('Infinity height should throw RenderError with RENDER_INVALID_DIMENSIONS', async () => {
-    using pdfium = await initPdfium();
-    using document = await loadTestDocument(pdfium, 'test_1.pdf');
-    using page = document.getPage(0);
+  test('Infinity height should throw RenderError with RENDER_INVALID_DIMENSIONS', async ({ testPage }) => {
+    expect(() => testPage.render({ width: 100, height: Infinity })).toThrow(RenderError);
     try {
-      page.render({ width: 100, height: Infinity });
-      expect.fail('Expected RenderError');
+      testPage.render({ width: 100, height: Infinity });
     } catch (error) {
       expect(error).toBeInstanceOf(RenderError);
       if (error instanceof RenderError) {
@@ -42,13 +35,10 @@ describe('Security: render dimension validation', () => {
     }
   });
 
-  test('NaN scale should throw RenderError with RENDER_INVALID_DIMENSIONS', async () => {
-    using pdfium = await initPdfium();
-    using document = await loadTestDocument(pdfium, 'test_1.pdf');
-    using page = document.getPage(0);
+  test('NaN scale should throw RenderError with RENDER_INVALID_DIMENSIONS', async ({ testPage }) => {
+    expect(() => testPage.render({ scale: NaN })).toThrow(RenderError);
     try {
-      page.render({ scale: NaN });
-      expect.fail('Expected RenderError');
+      testPage.render({ scale: NaN });
     } catch (error) {
       expect(error).toBeInstanceOf(RenderError);
       if (error instanceof RenderError) {
@@ -57,12 +47,9 @@ describe('Security: render dimension validation', () => {
     }
   });
 
-  test('-Infinity dimensions should throw RenderError', async () => {
-    using pdfium = await initPdfium();
-    using document = await loadTestDocument(pdfium, 'test_1.pdf');
-    using page = document.getPage(0);
-    expect(() => page.render({ width: -Infinity })).toThrow(RenderError);
-    expect(() => page.render({ height: -Infinity })).toThrow(RenderError);
+  test('-Infinity dimensions should throw RenderError', async ({ testPage }) => {
+    expect(() => testPage.render({ width: -Infinity })).toThrow(RenderError);
+    expect(() => testPage.render({ height: -Infinity })).toThrow(RenderError);
   });
 });
 
@@ -83,45 +70,31 @@ describe('Security: integer overflow protection', () => {
 });
 
 describe('Security: page index validation', () => {
-  test('NaN page index should throw', async () => {
-    using pdfium = await initPdfium();
-    using document = await loadTestDocument(pdfium, 'test_1.pdf');
-    expect(() => document.getPage(NaN)).toThrow();
+  test('NaN page index should throw', async ({ testDocument }) => {
+    expect(() => testDocument.getPage(NaN)).toThrow();
   });
 
-  test('Infinity page index should throw', async () => {
-    using pdfium = await initPdfium();
-    using document = await loadTestDocument(pdfium, 'test_1.pdf');
-    expect(() => document.getPage(Infinity)).toThrow();
+  test('Infinity page index should throw', async ({ testDocument }) => {
+    expect(() => testDocument.getPage(Infinity)).toThrow();
   });
 
-  test('floating point page index should throw', async () => {
-    using pdfium = await initPdfium();
-    using document = await loadTestDocument(pdfium, 'test_1.pdf');
-    expect(() => document.getPage(1.5)).toThrow();
+  test('floating point page index should throw', async ({ testDocument }) => {
+    expect(() => testDocument.getPage(1.5)).toThrow();
   });
 });
 
 describe('Security: encryption support', () => {
-  // We only have one encrypted fixture (likely RC4 or AES-128), but we can verify
-  // that the security handler revision is exposed correctly.
-  test('should identify encrypted document security handler revision', async () => {
-    using pdfium = await initPdfium();
-    const pdfData = await loadWasmBinary().then(() =>
-      import('node:fs/promises').then((fs) => fs.readFile('test/fixtures/test_1_pass_12345678.pdf')),
-    );
-    using document = await pdfium.openDocument(pdfData, { password: '12345678' });
+  test('should identify encrypted document security handler revision', async ({ openDocument }) => {
+    const document = await openDocument('test_1_pass_12345678.pdf', '12345678');
 
     // Security handler revision should be > 0 for encrypted files
     expect(document.securityHandlerRevision).toBeGreaterThan(0);
 
     // Permissions should be restricted (or at least valid number)
-    expect(typeof document.rawPermissions).toBe('number');
+    expect(document.rawPermissions).toBeTypeOf('number');
   });
 
-  test('unencrypted document should have -1 revision', async () => {
-    using pdfium = await initPdfium();
-    using document = await loadTestDocument(pdfium, 'test_1.pdf');
-    expect(document.securityHandlerRevision).toBe(-1);
+  test('unencrypted document should have -1 revision', async ({ testDocument }) => {
+    expect(testDocument.securityHandlerRevision).toBe(-1);
   });
 });

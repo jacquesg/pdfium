@@ -14,11 +14,10 @@
  * @see ProgressiveRenderStatus
  */
 
-import { describe, expect, test } from 'vitest';
 import { RenderError } from '../../src/core/errors.js';
 import { ProgressiveRenderStatus } from '../../src/core/types.js';
 import type { ProgressiveRenderContext } from '../../src/document/progressive-render.js';
-import { initPdfium, loadTestDocument } from '../utils/helpers.js';
+import { describe, expect, test } from '../utils/fixtures.js';
 
 describe('Progressive Rendering', () => {
   describe('ProgressiveRenderStatus enum values', () => {
@@ -46,40 +45,28 @@ describe('Progressive Rendering', () => {
   });
 
   describe('startProgressiveRender', () => {
-    test('should return a ProgressiveRenderContext', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      using render = page.startProgressiveRender({ scale: 1 });
+    test('should return a ProgressiveRenderContext', async ({ testPage }) => {
+      using render = testPage.startProgressiveRender({ scale: 1 });
       expect(render).toBeDefined();
       expect(render.width).toBeGreaterThan(0);
       expect(render.height).toBeGreaterThan(0);
     });
 
-    test('should work with default options', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      using render = page.startProgressiveRender();
+    test('should work with default options', async ({ testPage }) => {
+      using render = testPage.startProgressiveRender();
       expect(render).toBeDefined();
     });
 
-    test('should work with scale option', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
+    test('should work with scale option', async ({ testPage }) => {
       const scales = [0.25, 0.5, 1, 1.5, 2, 4];
 
       for (const scale of scales) {
-        using render = page.startProgressiveRender({ scale });
+        using render = testPage.startProgressiveRender({ scale });
         expect(render).toBeDefined();
       }
     });
 
-    test('should work with width/height options', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
+    test('should work with width/height options', async ({ testPage }) => {
       const dimensions = [
         { width: 100, height: 150 },
         { width: 200, height: 300 },
@@ -88,37 +75,28 @@ describe('Progressive Rendering', () => {
       ];
 
       for (const { width, height } of dimensions) {
-        using render = page.startProgressiveRender({ width, height });
+        using render = testPage.startProgressiveRender({ width, height });
         expect(render.width).toBe(width);
         expect(render.height).toBe(height);
       }
     });
 
-    test('should work with only width specified (auto height)', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      using render = page.startProgressiveRender({ width: 300 });
+    test('should work with only width specified (auto height)', async ({ testPage }) => {
+      using render = testPage.startProgressiveRender({ width: 300 });
       expect(render.width).toBe(300);
       expect(render.height).toBeGreaterThan(0);
     });
 
-    test('should work with only height specified (auto width)', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      using render = page.startProgressiveRender({ height: 400 });
+    test('should work with only height specified (auto width)', async ({ testPage }) => {
+      using render = testPage.startProgressiveRender({ height: 400 });
       expect(render.height).toBe(400);
       expect(render.width).toBeGreaterThan(0);
     });
   });
 
   describe('ProgressiveRenderContext.continue', () => {
-    test('should return a valid status', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      using render = page.startProgressiveRender();
+    test('should return a valid status', async ({ testPage }) => {
+      using render = testPage.startProgressiveRender();
       const status = render.continue();
 
       expect([
@@ -129,11 +107,8 @@ describe('Progressive Rendering', () => {
       ]).toContain(status);
     });
 
-    test('should be callable multiple times', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      using render = page.startProgressiveRender();
+    test('should be callable multiple times', async ({ testPage }) => {
+      using render = testPage.startProgressiveRender();
 
       for (let i = 0; i < 5; i++) {
         const status = render.continue();
@@ -148,19 +123,13 @@ describe('Progressive Rendering', () => {
   });
 
   describe('ProgressiveRenderContext disposal', () => {
-    test('should not throw when disposed after start', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      const render = page.startProgressiveRender();
+    test('should not throw when disposed after start', async ({ testPage }) => {
+      const render = testPage.startProgressiveRender();
       expect(() => render.dispose()).not.toThrow();
     });
 
-    test('should be safe to dispose multiple times', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      const render = page.startProgressiveRender();
+    test('should be safe to dispose multiple times', async ({ testPage }) => {
+      const render = testPage.startProgressiveRender();
       render.dispose();
 
       // Subsequent calls should be safe (idempotent)
@@ -184,21 +153,15 @@ describe('Progressive Rendering', () => {
       }
     }
 
-    test('should complete render loop for simple page', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      using render = page.startProgressiveRender({ scale: 1 });
+    test('should complete render loop for simple page', async ({ testPage }) => {
+      using render = testPage.startProgressiveRender({ scale: 1 });
       runToCompletion(render);
 
       expect([ProgressiveRenderStatus.Done, ProgressiveRenderStatus.Failed]).toContain(render.status);
     });
 
-    test('should produce result when done', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      using render = page.startProgressiveRender({ scale: 1 });
+    test('should produce result when done', async ({ testPage }) => {
+      using render = testPage.startProgressiveRender({ scale: 1 });
       runToCompletion(render);
 
       if (render.status === ProgressiveRenderStatus.Done) {
@@ -212,10 +175,9 @@ describe('Progressive Rendering', () => {
       }
     });
 
-    test('should throw when getting result before done', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_3_with_images.pdf');
-      using page = document.getPage(0);
+    test('should throw when getting result before done', async ({ openDocument }) => {
+      const doc = await openDocument('test_3_with_images.pdf');
+      using page = doc.getPage(0);
       // Use a very large scale to force progressive rendering to pause
       using render = page.startProgressiveRender({ scale: 20 });
 
@@ -226,11 +188,8 @@ describe('Progressive Rendering', () => {
       }
     });
 
-    test('should be idempotent for terminal states', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      using render = page.startProgressiveRender({ scale: 1 });
+    test('should be idempotent for terminal states', async ({ testPage }) => {
+      using render = testPage.startProgressiveRender({ scale: 1 });
       runToCompletion(render);
 
       const terminalStatus = render.status;
@@ -241,20 +200,14 @@ describe('Progressive Rendering', () => {
       expect(status).toBe(terminalStatus);
     });
 
-    test('should clean up on early disposal', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      using render = page.startProgressiveRender({ scale: 2 });
+    test('should clean up on early disposal', async ({ testPage }) => {
+      using render = testPage.startProgressiveRender({ scale: 2 });
       render.continue();
       // dispose called automatically via using, no leak
     });
 
-    test('should work with high DPI rendering', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      using render = page.startProgressiveRender({ scale: 4 });
+    test('should work with high DPI rendering', async ({ testPage }) => {
+      using render = testPage.startProgressiveRender({ scale: 4 });
       runToCompletion(render, 5000);
 
       expect([ProgressiveRenderStatus.Done, ProgressiveRenderStatus.Failed]).toContain(render.status);
@@ -274,9 +227,8 @@ describe('Progressive Rendering with different documents', () => {
     }
   }
 
-  test('should work with images PDF', async () => {
-    using pdfium = await initPdfium();
-    using doc = await loadTestDocument(pdfium, 'test_3_with_images.pdf');
+  test('should work with images PDF', async ({ openDocument }) => {
+    const doc = await openDocument('test_3_with_images.pdf');
     using page = doc.getPage(0);
     using render = page.startProgressiveRender({ scale: 1 });
 
@@ -285,9 +237,8 @@ describe('Progressive Rendering with different documents', () => {
     expect([ProgressiveRenderStatus.Done, ProgressiveRenderStatus.Failed]).toContain(render.status);
   });
 
-  test('should work with form document', async () => {
-    using pdfium = await initPdfium();
-    using doc = await loadTestDocument(pdfium, 'test_6_with_form.pdf');
+  test('should work with form document', async ({ openDocument }) => {
+    const doc = await openDocument('test_6_with_form.pdf');
     using page = doc.getPage(0);
     using render = page.startProgressiveRender({ scale: 1 });
 
@@ -296,15 +247,13 @@ describe('Progressive Rendering with different documents', () => {
     expect([ProgressiveRenderStatus.Done, ProgressiveRenderStatus.Failed]).toContain(render.status);
   });
 
-  test('should work across multiple pages', async () => {
-    using pdfium = await initPdfium();
-    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
-    const pageCount = doc.pageCount;
+  test('should work across multiple pages', async ({ testDocument }) => {
+    const pageCount = testDocument.pageCount;
 
     expect(pageCount).toBeGreaterThan(1);
 
     for (let i = 0; i < Math.min(pageCount, 3); i++) {
-      using page = doc.getPage(i);
+      using page = testDocument.getPage(i);
       using render = page.startProgressiveRender({ scale: 0.5 });
 
       runToCompletion(render, 500);
@@ -315,32 +264,22 @@ describe('Progressive Rendering with different documents', () => {
 });
 
 describe('Progressive Rendering edge cases', () => {
-  test('should handle very small scale', async () => {
-    using pdfium = await initPdfium();
-    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
-    using page = doc.getPage(0);
-    using render = page.startProgressiveRender({ scale: 0.01 });
+  test('should handle very small scale', async ({ testPage }) => {
+    using render = testPage.startProgressiveRender({ scale: 0.01 });
 
     expect(render).toBeDefined();
   });
 
-  test('should handle very small dimensions', async () => {
-    using pdfium = await initPdfium();
-    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
-    using page = doc.getPage(0);
-    using render = page.startProgressiveRender({ width: 10, height: 10 });
+  test('should handle very small dimensions', async ({ testPage }) => {
+    using render = testPage.startProgressiveRender({ width: 10, height: 10 });
 
     expect(render).toBeDefined();
   });
 
-  test('should handle sequential render operations', async () => {
-    using pdfium = await initPdfium();
-    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
-    using page = doc.getPage(0);
-
+  test('should handle sequential render operations', async ({ testPage }) => {
     // First render
     {
-      using render = page.startProgressiveRender({ scale: 1 });
+      using render = testPage.startProgressiveRender({ scale: 1 });
       while (
         render.status === ProgressiveRenderStatus.ToBeContinued ||
         render.status === ProgressiveRenderStatus.Ready
@@ -351,7 +290,7 @@ describe('Progressive Rendering edge cases', () => {
 
     // Second render immediately after
     {
-      using render = page.startProgressiveRender({ scale: 2 });
+      using render = testPage.startProgressiveRender({ scale: 2 });
       while (
         render.status === ProgressiveRenderStatus.ToBeContinued ||
         render.status === ProgressiveRenderStatus.Ready
@@ -364,33 +303,24 @@ describe('Progressive Rendering edge cases', () => {
 });
 
 describe('Progressive Rendering post-dispose guards', () => {
-  test('should throw on startProgressiveRender after page dispose', async () => {
-    using pdfium = await initPdfium();
-    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
+  test('should throw on startProgressiveRender after page dispose', async ({ openDocument }) => {
+    const doc = await openDocument('test_1.pdf');
     const page = doc.getPage(0);
     page.dispose();
 
     expect(() => page.startProgressiveRender()).toThrow();
-
-    doc.dispose();
   });
 
-  test('should throw on context.continue after context dispose', async () => {
-    using pdfium = await initPdfium();
-    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
-    using page = doc.getPage(0);
-    const render = page.startProgressiveRender({ scale: 1 });
+  test('should throw on context.continue after context dispose', async ({ testPage }) => {
+    const render = testPage.startProgressiveRender({ scale: 1 });
 
     render.dispose();
 
     expect(() => render.continue()).toThrow();
   });
 
-  test('should throw on context.getResult after context dispose', async () => {
-    using pdfium = await initPdfium();
-    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
-    using page = doc.getPage(0);
-    const render = page.startProgressiveRender({ scale: 1 });
+  test('should throw on context.getResult after context dispose', async ({ testPage }) => {
+    const render = testPage.startProgressiveRender({ scale: 1 });
 
     render.dispose();
 

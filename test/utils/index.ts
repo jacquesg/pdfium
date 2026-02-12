@@ -4,6 +4,7 @@
  * @module test/utils
  */
 
+export { test } from './fixtures.js';
 export { initPdfium, loadTestDocument, loadWasmBinary } from './helpers.js';
 export {
   assertNoLeaks,

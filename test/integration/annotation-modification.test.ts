@@ -4,13 +4,11 @@
  * Tests annotation modification via the PDFiumAnnotation wrapper.
  */
 
-import { describe, expect, test } from 'vitest';
 import { AnnotationFlags, AnnotationType, type QuadPoints } from '../../src/core/types.js';
-import { initPdfium, loadTestDocument } from '../utils/helpers.js';
+import { describe, expect, test } from '../utils/fixtures.js';
 
 describe('Annotation Modification on Created Annotation', () => {
-  test('should create, modify and remove annotation', async () => {
-    using pdfium = await initPdfium();
+  test('should create, modify and remove annotation', async ({ pdfium }) => {
     // Create a new document to ensure we can create annotations freely
     using builder = pdfium.createDocument();
     builder.addPage();
@@ -76,13 +74,10 @@ describe('Annotation Modification on Created Annotation', () => {
 
 describe('Annotation Modification API', () => {
   describe('setColour via PDFiumAnnotation', () => {
-    test('should succeed on existing annotation', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      const count = page.annotationCount;
+    test('should succeed on existing annotation', async ({ testPage }) => {
+      const count = testPage.annotationCount;
       if (count > 0) {
-        using annot = page.getAnnotation(0);
+        using annot = testPage.getAnnotation(0);
         const result = annot.setColour({ r: 255, g: 0, b: 0, a: 255 });
         expect(result).toBe(true);
       }
@@ -90,13 +85,10 @@ describe('Annotation Modification API', () => {
   });
 
   describe('setFlags via PDFiumAnnotation', () => {
-    test('should succeed on existing annotation', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      const count = page.annotationCount;
+    test('should succeed on existing annotation', async ({ testPage }) => {
+      const count = testPage.annotationCount;
       if (count > 0) {
-        using annot = page.getAnnotation(0);
+        using annot = testPage.getAnnotation(0);
         const result = annot.setFlags(AnnotationFlags.Print);
         expect(result).toBe(true);
       }
@@ -104,13 +96,10 @@ describe('Annotation Modification API', () => {
   });
 
   describe('setStringValue via PDFiumAnnotation', () => {
-    test('should succeed on existing annotation', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      const count = page.annotationCount;
+    test('should succeed on existing annotation', async ({ testPage }) => {
+      const count = testPage.annotationCount;
       if (count > 0) {
-        using annot = page.getAnnotation(0);
+        using annot = testPage.getAnnotation(0);
         const result = annot.setStringValue('Contents', 'Test content');
         expect(result).toBe(true);
       }
@@ -118,13 +107,10 @@ describe('Annotation Modification API', () => {
   });
 
   describe('setBorder via PDFiumAnnotation', () => {
-    test('should succeed on existing annotation', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      const count = page.annotationCount;
+    test('should succeed on existing annotation', async ({ testPage }) => {
+      const count = testPage.annotationCount;
       if (count > 0) {
-        using annot = page.getAnnotation(0);
+        using annot = testPage.getAnnotation(0);
         const result = annot.setBorder({
           horizontalRadius: 0,
           verticalRadius: 0,
@@ -136,13 +122,10 @@ describe('Annotation Modification API', () => {
   });
 
   describe('setRect via PDFiumAnnotation', () => {
-    test('should succeed on existing annotation', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      const count = page.annotationCount;
+    test('should succeed on existing annotation', async ({ testPage }) => {
+      const count = testPage.annotationCount;
       if (count > 0) {
-        using annot = page.getAnnotation(0);
+        using annot = testPage.getAnnotation(0);
         const result = annot.setRect({
           left: 100,
           bottom: 100,
@@ -155,32 +138,23 @@ describe('Annotation Modification API', () => {
   });
 
   describe('removeAnnotation', () => {
-    test('should return false for invalid index', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      const result = page.removeAnnotation(-1);
+    test('should return false for invalid index', async ({ testPage }) => {
+      const result = testPage.removeAnnotation(-1);
       expect(result).toBe(false);
     });
   });
 
   describe('createAnnotation', () => {
-    test('should return PDFiumAnnotation or undefined', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      using annot = page.createAnnotation(AnnotationType.Text);
+    test('should return PDFiumAnnotation or undefined', async ({ testPage }) => {
+      using annot = testPage.createAnnotation(AnnotationType.Text);
       expect(annot).not.toBeNull();
       expect(annot!.type).toBe(AnnotationType.Text);
     });
   });
 
   describe('setAttachmentPoints via PDFiumAnnotation', () => {
-    test('should return false for Text annotations (unsupported)', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      using annot = page.createAnnotation(AnnotationType.Text);
+    test('should return false for Text annotations (unsupported)', async ({ testPage }) => {
+      using annot = testPage.createAnnotation(AnnotationType.Text);
       expect(annot).not.toBeNull();
       const quadPoints: QuadPoints = {
         x1: 100,
@@ -198,11 +172,8 @@ describe('Annotation Modification API', () => {
   });
 
   describe('appendAttachmentPoints via PDFiumAnnotation', () => {
-    test('should return false for Text annotations (unsupported)', async () => {
-      using pdfium = await initPdfium();
-      using document = await loadTestDocument(pdfium, 'test_1.pdf');
-      using page = document.getPage(0);
-      using annot = page.createAnnotation(AnnotationType.Text);
+    test('should return false for Text annotations (unsupported)', async ({ testPage }) => {
+      using annot = testPage.createAnnotation(AnnotationType.Text);
       expect(annot).not.toBeNull();
       const quadPoints: QuadPoints = {
         x1: 100,
@@ -221,9 +192,8 @@ describe('Annotation Modification API', () => {
 });
 
 describe('Annotation Modification with different PDFs', () => {
-  test('should handle test_3_with_images.pdf', async () => {
-    using pdfium = await initPdfium();
-    using doc = await loadTestDocument(pdfium, 'test_3_with_images.pdf');
+  test('should handle test_3_with_images.pdf', async ({ openDocument }) => {
+    const doc = await openDocument('test_3_with_images.pdf');
     using page = doc.getPage(0);
 
     expect(() => page.removeAnnotation(-1)).not.toThrow();
@@ -231,25 +201,22 @@ describe('Annotation Modification with different PDFs', () => {
 });
 
 describe('Annotation Modification post-dispose guards', () => {
-  test('should throw on getAnnotation after dispose', async () => {
-    using pdfium = await initPdfium();
-    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
+  test('should throw on getAnnotation after dispose', async ({ openDocument }) => {
+    const doc = await openDocument('test_1.pdf');
     using page = doc.getPage(0);
     page.dispose();
     expect(() => page.getAnnotation(0)).toThrow();
   });
 
-  test('should throw on removeAnnotation after dispose', async () => {
-    using pdfium = await initPdfium();
-    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
+  test('should throw on removeAnnotation after dispose', async ({ openDocument }) => {
+    const doc = await openDocument('test_1.pdf');
     using page = doc.getPage(0);
     page.dispose();
     expect(() => page.removeAnnotation(0)).toThrow();
   });
 
-  test('should throw on createAnnotation after dispose', async () => {
-    using pdfium = await initPdfium();
-    using doc = await loadTestDocument(pdfium, 'test_1.pdf');
+  test('should throw on createAnnotation after dispose', async ({ openDocument }) => {
+    const doc = await openDocument('test_1.pdf');
     using page = doc.getPage(0);
     page.dispose();
     expect(() => page.createAnnotation(AnnotationType.Text)).toThrow();
