@@ -212,6 +212,56 @@ describe('Digital Signatures with signed PDF', () => {
   });
 });
 
+describe('Digital Signatures with reason (signature_reason.pdf)', () => {
+  test('should detect signatures in signature_reason.pdf', async ({ openDocument }) => {
+    using doc = await openDocument('pdfium/signature_reason.pdf');
+    expect(doc.hasSignatures()).toBe(true);
+    expect(doc.signatureCount).toBeGreaterThan(0);
+  });
+
+  test('should read signature with reason field', async ({ openDocument }) => {
+    using doc = await openDocument('pdfium/signature_reason.pdf');
+    const sigs = doc.getSignatures();
+    expect(sigs.length).toBeGreaterThan(0);
+
+    // At least one signature should have a reason field
+    const sigWithReason = sigs.find((s) => s.reason !== undefined);
+    expect(sigWithReason).toBeDefined();
+    if (sigWithReason) {
+      expect(sigWithReason.reason).toBeTypeOf('string');
+      expect(sigWithReason.reason!.length).toBeGreaterThan(0);
+    }
+  });
+
+  test('should read all signature fields', async ({ openDocument }) => {
+    using doc = await openDocument('pdfium/signature_reason.pdf');
+    const sigs = doc.getSignatures();
+
+    for (const sig of sigs) {
+      expect(sig.index).toBeTypeOf('number');
+      expect(sig.docMDPPermission).toBeTypeOf('string');
+
+      if (sig.contents !== undefined) {
+        expect(sig.contents).toBeInstanceOf(Uint8Array);
+        expect(sig.contents.length).toBeGreaterThan(0);
+      }
+      if (sig.subFilter !== undefined) {
+        expect(sig.subFilter).toBeTypeOf('string');
+      }
+      if (sig.time !== undefined) {
+        expect(sig.time).toBeTypeOf('string');
+      }
+    }
+  });
+
+  test('signatures generator should yield same results', async ({ openDocument }) => {
+    using doc = await openDocument('pdfium/signature_reason.pdf');
+    const fromGenerator = [...doc.signatures()];
+    const fromArray = doc.getSignatures();
+    expect(fromGenerator.length).toBe(fromArray.length);
+  });
+});
+
 describe('Digital Signatures post-dispose guards', () => {
   test('should throw on signatureCount after dispose', async ({ openDocument }) => {
     const doc = await openDocument('test_1.pdf');

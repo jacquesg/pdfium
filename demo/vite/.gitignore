@@ -26,4 +26,4 @@ dist-ssr
 # Generated/Copied assets in public
 public/*.js
 public/*.js.map
-!public/reference.pdf
+public/samples/

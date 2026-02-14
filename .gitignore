@@ -163,3 +163,6 @@ npm/*/libpdfium.*
 npm/*/pdfium.dll
 npm/*/*.node
 docs/src/content/docs/api/
+
+# Coverage temp directory
+coverage-temp/

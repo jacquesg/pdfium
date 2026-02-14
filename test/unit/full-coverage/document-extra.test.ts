@@ -55,14 +55,14 @@ describe('PDFium Document Extra Coverage', () => {
 
   describe('Form (Extra)', () => {
     it('killFormFocus should return false if no form', async () => {
+      mockModule._FPDFDOC_InitFormFillEnvironment.mockReturnValue(0); // Must be set BEFORE openDocument
       using doc = await pdfium.openDocument(new Uint8Array(10));
-      mockModule._FPDFDOC_InitFormFillEnvironment.mockReturnValue(0); // Fail init
       expect(doc.killFormFocus()).toBe(false);
     });
 
     it('setFormFieldHighlightColour/Alpha should do nothing if no form', async () => {
+      mockModule._FPDFDOC_InitFormFillEnvironment.mockReturnValue(0); // Must be set BEFORE openDocument
       using doc = await pdfium.openDocument(new Uint8Array(10));
-      mockModule._FPDFDOC_InitFormFillEnvironment.mockReturnValue(0);
       doc.setFormFieldHighlightColour(FormFieldType.Unknown, { r: 0, g: 0, b: 0, a: 0 }); // Should not crash
       doc.setFormFieldHighlightAlpha(0); // Should not crash
     });
@@ -115,23 +115,102 @@ describe('PDFium Document Extra Coverage', () => {
     });
   });
 
+  describe('Trailer Ends + Print Page Ranges', () => {
+    it('getTrailerEnds returns empty array when count <= 0', async () => {
+      mockModule._FPDF_GetTrailerEnds.mockReturnValue(0);
+      using doc = await pdfium.openDocument(new Uint8Array(10));
+      expect(doc.getTrailerEnds()).toEqual([]);
+    });
+
+    it('getTrailerEnds returns array of ends when count > 0', async () => {
+      mockModule._FPDF_GetTrailerEnds
+        .mockReturnValueOnce(2) // first call: count
+        .mockReturnValueOnce(2); // second call: actual count
+      using doc = await pdfium.openDocument(new Uint8Array(10));
+      const ends = doc.getTrailerEnds();
+      expect(ends).toHaveLength(2);
+    });
+
+    it('getPrintPageRanges returns undefined when pageRange handle is 0', async () => {
+      mockModule._FPDF_VIEWERREF_GetPrintPageRange.mockReturnValue(0);
+      using doc = await pdfium.openDocument(new Uint8Array(10));
+      expect(doc.getPrintPageRanges()).toBeUndefined();
+    });
+
+    it('getPrintPageRanges returns undefined when count <= 0', async () => {
+      mockModule._FPDF_VIEWERREF_GetPrintPageRange.mockReturnValue(100);
+      mockModule._FPDF_VIEWERREF_GetPrintPageRangeCount.mockReturnValue(0);
+      using doc = await pdfium.openDocument(new Uint8Array(10));
+      expect(doc.getPrintPageRanges()).toBeUndefined();
+    });
+
+    it('getPrintPageRanges returns array of page numbers', async () => {
+      mockModule._FPDF_VIEWERREF_GetPrintPageRange.mockReturnValue(100);
+      mockModule._FPDF_VIEWERREF_GetPrintPageRangeCount.mockReturnValue(2);
+      mockModule._FPDF_VIEWERREF_GetPrintPageRangeElement.mockReturnValueOnce(0).mockReturnValueOnce(3);
+      using doc = await pdfium.openDocument(new Uint8Array(10));
+      expect(doc.getPrintPageRanges()).toEqual([0, 3]);
+    });
+
+    it('getPrintPageRanges skips negative elements', async () => {
+      mockModule._FPDF_VIEWERREF_GetPrintPageRange.mockReturnValue(100);
+      mockModule._FPDF_VIEWERREF_GetPrintPageRangeCount.mockReturnValue(2);
+      mockModule._FPDF_VIEWERREF_GetPrintPageRangeElement.mockReturnValueOnce(-1).mockReturnValueOnce(-1);
+      using doc = await pdfium.openDocument(new Uint8Array(10));
+      expect(doc.getPrintPageRanges()).toBeUndefined(); // Empty after filtering
+    });
+  });
+
+  describe('Viewer Preferences + Document Metadata', () => {
+    it('hasValidCrossReferenceTable returns boolean', async () => {
+      mockModule._FPDF_DocumentHasValidCrossReferenceTable.mockReturnValue(1);
+      using doc = await pdfium.openDocument(new Uint8Array(10));
+      expect(doc.hasValidCrossReferenceTable()).toBe(true);
+    });
+
+    it('getPageLabel returns undefined for invalid page', async () => {
+      mockModule._FPDF_GetPageLabel.mockReturnValue(0);
+      using doc = await pdfium.openDocument(new Uint8Array(10));
+      expect(doc.getPageLabel(0)).toBeUndefined();
+    });
+
+    it('copyViewerPreferences returns boolean', async () => {
+      mockModule._FPDF_CopyViewerPreferences.mockReturnValue(1);
+      using doc = await pdfium.openDocument(new Uint8Array(10));
+      using src = await pdfium.openDocument(new Uint8Array(10));
+      expect(doc.copyViewerPreferences(src)).toBe(true);
+    });
+
+    it('getNumCopies returns number', async () => {
+      mockModule._FPDF_VIEWERREF_GetNumCopies.mockReturnValue(3);
+      using doc = await pdfium.openDocument(new Uint8Array(10));
+      expect(doc.numCopies).toBe(3);
+    });
+
+    it('printScaling returns boolean', async () => {
+      mockModule._FPDF_VIEWERREF_GetPrintScaling.mockReturnValue(1);
+      using doc = await pdfium.openDocument(new Uint8Array(10));
+      expect(doc.printScaling).toBe(true);
+    });
+  });
+
   describe('Form Actions (Extra)', () => {
     it('executeDocumentAction should do nothing if no form', async () => {
-      mockModule._FPDFDOC_InitFormFillEnvironment.mockReturnValue(0);
+      mockModule._FPDFDOC_InitFormFillEnvironment.mockReturnValue(0); // Before openDocument
       using doc = await pdfium.openDocument(new Uint8Array(10));
       doc.executeDocumentAction(DocumentActionType.WillSave);
       expect(mockModule._FORM_DoDocumentAAction).not.toHaveBeenCalled();
     });
 
     it('executeDocumentJSAction should do nothing if no form', async () => {
-      mockModule._FPDFDOC_InitFormFillEnvironment.mockReturnValue(0);
+      mockModule._FPDFDOC_InitFormFillEnvironment.mockReturnValue(0); // Before openDocument
       using doc = await pdfium.openDocument(new Uint8Array(10));
       doc.executeDocumentJSAction();
       expect(mockModule._FORM_DoDocumentJSAction).not.toHaveBeenCalled();
     });
 
     it('executeDocumentOpenAction should do nothing if no form', async () => {
-      mockModule._FPDFDOC_InitFormFillEnvironment.mockReturnValue(0);
+      mockModule._FPDFDOC_InitFormFillEnvironment.mockReturnValue(0); // Before openDocument
       using doc = await pdfium.openDocument(new Uint8Array(10));
       doc.executeDocumentOpenAction();
       expect(mockModule._FORM_DoDocumentOpenAction).not.toHaveBeenCalled();

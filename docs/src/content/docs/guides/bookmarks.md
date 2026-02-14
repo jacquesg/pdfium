@@ -35,13 +35,13 @@ Each bookmark has:
 |----------|------|-------------|
 | `title` | `string` | Display text |
 | `pageIndex` | `number \| undefined` | Target page (if any) |
-| `children` | `Bookmark[]` | Nested bookmarks |
+| `children` | `readonly Bookmark[]` | Nested bookmarks |
 
 ```typescript
 interface Bookmark {
-  title: string;
-  pageIndex?: number;
-  children: Bookmark[];
+  readonly title: string;
+  readonly pageIndex: number | undefined;
+  readonly children: readonly Bookmark[];
 }
 ```
 

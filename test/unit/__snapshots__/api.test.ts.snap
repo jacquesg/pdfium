@@ -23,6 +23,7 @@ exports[`Public API > should export expected symbols 1`] = `
   "FlattenResult",
   "FontFlags",
   "FontType",
+  "FormFieldActionEvent",
   "FormFieldFlags",
   "FormFieldType",
   "FormModifierFlags",

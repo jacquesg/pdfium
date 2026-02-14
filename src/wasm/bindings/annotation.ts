@@ -137,6 +137,13 @@ export interface AnnotationBindings {
   _FPDFAnnot_AddInkStroke: (annotation: AnnotationHandle, points: WASMPointer, pointCount: number) => number;
   _FPDFAnnot_GetLink: (annotation: AnnotationHandle) => LinkHandle;
   _FPDFAnnot_SetURI: (annotation: AnnotationHandle, uri: WASMPointer) => number;
+  _FPDFAnnot_GetFormAdditionalActionJavaScript: (
+    form: FormHandle,
+    annotation: AnnotationHandle,
+    event: number,
+    buffer: WASMPointer,
+    buflen: number,
+  ) => number;
   _FPDFAnnot_GetFontSize: (form: FormHandle, annotation: AnnotationHandle, value: WASMPointer) => number;
   _FPDFAnnot_GetFocusableSubtypesCount: (form: FormHandle) => number;
   _FPDFAnnot_GetFocusableSubtypes: (form: FormHandle, subtypes: WASMPointer, count: number) => number;

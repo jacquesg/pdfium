@@ -34,6 +34,10 @@
     "./pdfium.wasm": {
       "default": "./dist/vendor/pdfium.wasm"
     },
+    "./react": {
+      "types": "./dist/react.d.ts",
+      "import": "./dist/react.js"
+    },
     "./package.json": "./package.json"
   },
   "typesVersions": {
@@ -49,7 +53,26 @@
       ],
       "internal": [
         "./dist/internal/index.d.ts"
+      ],
+      "react": [
+        "./dist/react.d.ts"
       ]
+    }
+  },
+  "peerDependencies": {
+    "lucide-react": ">=0.400.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "peerDependenciesMeta": {
+    "lucide-react": {
+      "optional": true
+    },
+    "react": {
+      "optional": false
+    },
+    "react-dom": {
+      "optional": false
     }
   },
   "sideEffects": false,
@@ -83,6 +106,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
+    "test:react:stable": "vitest run test/unit/react/components && vitest run test/unit/react/hooks && vitest run test/unit/react/internal && vitest run test/unit/react/*.test.ts test/unit/react/*.test.tsx",
+    "test:react:memory-regression": "vitest run test/unit/react --maxWorkers=1 --no-file-parallelism --no-isolate --logHeapUsage --reporter=dot",
     "test:mutation": "stryker run",
     "test:bench": "vitest bench --config vitest.bench.config.ts",
     "test:visual": "vitest run test/visual",
@@ -127,11 +152,18 @@
     "@semantic-release/git": "^10.0.1",
     "@stryker-mutator/core": "^8.7.1",
     "@stryker-mutator/vitest-runner": "^8.7.1",
+    "@testing-library/react": "^16.3.2",
     "@types/node": "^25.2.0",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
     "@types/tar": "^6.1.13",
     "@vitest/coverage-v8": "^4.0.18",
     "conventional-changelog-conventionalcommits": "^9.0.0",
+    "happy-dom": "^20.6.1",
     "husky": "^9.1.7",
+    "lucide-react": "^0.575.0",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
     "semantic-release": "^25.0.0",
     "tar": "^7.4.3",
     "tsup": "^8.5.0",

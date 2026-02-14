@@ -20,6 +20,7 @@ import {
   AnnotationType,
   type Colour,
   type DictionaryKey,
+  type FormFieldActionEvent,
   FormFieldFlags,
   FormFieldType,
   type LinePoints,
@@ -897,6 +898,30 @@ export class PDFiumAnnotation extends Disposable implements Annotation {
     if (this.#ctx.formHandle === NULL_FORM) return undefined;
     return getWasmStringUTF16LE(this.#ctx.memory, (buf, len) =>
       this.#ctx.module._FPDFAnnot_GetFormFieldAlternateName(this.#ctx.formHandle, this.#handle, buf, len),
+    );
+  }
+
+  /**
+   * Gets JavaScript associated with a form field additional action event.
+   *
+   * Form fields can have JavaScript actions triggered by events like keystroke,
+   * format, validate, or calculate. This method retrieves the JavaScript for
+   * a specific event type.
+   *
+   * @param event - The form field action event type
+   * @returns The JavaScript source string, or undefined if no JS for this event
+   */
+  getFormAdditionalActionJavaScript(event: FormFieldActionEvent): string | undefined {
+    this.ensureNotDisposed();
+    if (this.#ctx.formHandle === NULL_FORM) return undefined;
+    return getWasmStringUTF16LE(this.#ctx.memory, (buf, len) =>
+      this.#ctx.module._FPDFAnnot_GetFormAdditionalActionJavaScript(
+        this.#ctx.formHandle,
+        this.#handle,
+        event,
+        buf,
+        len,
+      ),
     );
   }
 

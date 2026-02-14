@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { Button } from './Button';
+import { Button } from './ui/button';
 
 interface FilePickerProps {
   onFileSelect: (data: Uint8Array, name: string) => void;
@@ -19,9 +19,8 @@ export function FilePicker({ onFileSelect, label = 'Open File', accept = '.pdf' 
       onFileSelect(new Uint8Array(buffer), file.name);
     } catch (err) {
       console.error('Error reading file:', err);
-      alert('Failed to read file');
     }
-    
+
     // Reset input so same file can be selected again
     if (inputRef.current) {
       inputRef.current.value = '';
@@ -30,13 +29,7 @@ export function FilePicker({ onFileSelect, label = 'Open File', accept = '.pdf' 
 
   return (
     <>
-      <input
-        type="file"
-        ref={inputRef}
-        onChange={handleChange}
-        accept={accept}
-        style={{ display: 'none' }}
-      />
+      <input type="file" ref={inputRef} onChange={handleChange} accept={accept} className="hidden" />
       <Button variant="secondary" onClick={() => inputRef.current?.click()}>
         {label}
       </Button>

@@ -1,14 +1,23 @@
-# PDFium Vite + React Demo
+# PDFium Workbench — Vite + React Demo
 
-A React application demonstrating how to use `@scaryterry/pdfium` with Vite and React Query. Shows best practices for integrating PDFium in a modern frontend build setup.
+A comprehensive React application demonstrating the full `@scaryterry/pdfium` API surface. 12 interactive labs cover rendering, text extraction, annotations, document creation, form handling, security, and more — all with proper resource management using `using` / `Symbol.dispose`.
 
-## What You'll Learn
+## Labs
 
-- Configuring Vite to work with PDFium WASM
-- Loading WASM binaries using Vite's `?url` import suffix
-- React Query integration for async document loading
-- Rendering PDF pages to a canvas in React
-- Proper resource management patterns
+| Tab | Lab | APIs Demonstrated |
+|-----|-----|-------------------|
+| Viewer | PDF rendering with page properties | `render()`, `getPageBox()`, `rotation`, `hasTransparency()`, `getPageLabel()`, `save()` |
+| Creator | Build PDFs from scratch | `createDocument()`, `addPage()`, `addText()`, `addRectangle()`, `loadStandardFont()`, `save()` |
+| Text | Text extraction, search, character inspection | `getText()`, `findText()`, `getCharacterInfo()`, `getCharBox()`, `getCharIndexAtPos()`, `getTextInRect()` |
+| Annots | Annotation browsing and creation | `getAnnotations()`, `createAnnotation()`, `removeAnnotation()`, full `PDFiumAnnotation` API |
+| Objects | Page object inspection (text, image, path) | `getObjects()`, `PDFiumFont.getMetrics()`, font flags, `PDFiumImageObject` metadata, `PDFiumPathObject` details |
+| Structure | Bookmarks, attachments, links, structure tree | `getBookmarks()`, `getAttachments()`, `getLinks()`, `getWebLinks()`, `getStructureTree()`, `getNamedDestinations()` |
+| Forms | Interactive form fields and flattening | `hasForm()`, `formType`, widget annotations, `flatten()`, `FlattenFlags`, highlight colours |
+| Mixer | Merge documents and N-up layouts | `importPages()`, `createNUpDocument()`, `copyViewerPreferences()`, `save()` |
+| Render | Progressive rendering, thumbnails, coordinates | `startProgressiveRender()`, `hasThumbnail()`, `getThumbnailAsBitmap()`, `pageToDevice()`, `deviceToPage()` |
+| Worker | Off-main-thread processing via Web Workers | `WorkerPDFium`, `WorkerPDFiumDocument`, `WorkerPDFiumPage`, `getTextLayout()` |
+| Inspector | Document metadata, permissions, viewer prefs | `getMetadata()`, `getPermissions()`, `getViewerPreferences()`, `getSignatures()`, `getJavaScriptActions()` |
+| Security | Password-protected PDFs and error handling | `openDocument({ password })`, `PDFiumError` hierarchy, error codes |
 
 ## Prerequisites
 
@@ -53,8 +62,6 @@ A React application demonstrating how to use `@scaryterry/pdfium` with Vite and 
    npm run dev
    ```
 
-The `postinstall` script automatically copies `pdfium.cjs` to the public directory.
-
 ## Code Walkthrough
 
 ### Vite Configuration
@@ -83,68 +90,115 @@ const pdfium = await PDFium.init({
 
 Vite's `?url` suffix gives you a resolved URL to the WASM binary that works in both development and production builds.
 
-### React Query Integration
+### Resource Management
+
+All PDFium resources use the `using` keyword for automatic cleanup:
 
 ```typescript
-const useDocument = () => {
-  return useQuery({
-    queryKey: ['document'],
-    queryFn: async () => {
-      const response = await fetch('/sample.pdf');
-      const arrayBuffer = await response.arrayBuffer();
-      const pdfium = await PDFium.init({
-        wasmBinary: await fetch(wasmUrl).then((r) => r.arrayBuffer()),
-      });
-      const document = await pdfium.openDocument(new Uint8Array(arrayBuffer));
-      return document;
-    },
-  });
-};
+// Synchronous resources (pages, fonts, builders)
+using page = document.getPage(0);
+const text = page.getText();
+// page is automatically disposed at end of scope
+
+// Async resources (worker proxies)
+await using page = await workerDoc.getPage(0);
+const result = await page.render({ scale: 2 });
 ```
 
-React Query handles loading states and caching. The document object is kept in the query cache.
+**Never** call `.dispose()` manually — always use `using` / `await using` or `[Symbol.dispose]()` / `[Symbol.asyncDispose]()`.
 
-### Rendering to Canvas
+### Store-Backed React Hooks
 
 ```typescript
-function PDFPageDemo({ document, pageNumber }) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const { data: result, status } = useRenderPage(document, {
-    pageNumber,
-    scale: 3,
-  });
-
-  useEffect(() => {
-    if (status === 'success' && canvasRef.current && result) {
-      const ctx = canvasRef.current.getContext('2d');
-      if (ctx) {
-        const imageData = new ImageData(
-          new Uint8ClampedArray(result.data),
-          result.width,
-          result.height,
-        );
-        ctx.putImageData(imageData, 0, 0);
-      }
-    }
-  }, [status, result]);
-
-  return <canvas ref={canvasRef} width={result?.width} height={result?.height} />;
-}
+const { renderKey, width, height, isLoading } = useRenderPage(document, 0, { scale: 2 });
 ```
 
-## Why is `pdfium.cjs` needed?
+The React package ships built-in async hooks with loading/error states and cache management. The hooks return plain serialisable data and dispose worker page handles internally.
 
-The PDFium WASM module requires JavaScript glue code (`pdfium.cjs`) to set up the WASM environment. In browsers, this file is fetched at runtime from `/pdfium.cjs`.
+## Project Structure
 
-For Vite projects, place this file in the `public/` directory so it's served at the root.
+```
+demo/vite/
+├── public/
+│   ├── pdfium.cjs           # WASM glue code (copied by setup)
+│   ├── sample.pdf            # Default document
+│   ├── reference.pdf         # Reference document (for Text lab)
+│   ├── annots.pdf            # Annotated document (for Annotations lab)
+│   ├── protected.pdf         # Password-protected document (for Security lab)
+│   └── worker.js             # Web Worker script
+├── src/
+│   ├── App.tsx               # Main app with 12-tab navigation, React.lazy code splitting
+│   ├── client.ts             # React Query client configuration
+│   ├── main.tsx              # Entry point with providers
+│   ├── index.css             # Utility CSS classes
+│   ├── components/
+│   │   ├── Button.tsx        # Shared button (primary/secondary/danger variants)
+│   │   ├── CodeSnippet.tsx   # Monospace code block with copy button
+│   │   ├── DocPanel.tsx      # Collapsible API documentation sidebar
+│   │   ├── DownloadButton.tsx # Save document as PDF download
+│   │   ├── DragDropZone.tsx  # Full-screen drag-and-drop PDF loading
+│   │   ├── ErrorBoundary.tsx # React error boundary for each lab
+│   │   ├── FilePicker.tsx    # File input for loading custom PDFs
+│   │   ├── PasswordDialog.tsx # Modal for password-protected PDFs
+│   │   ├── PDFCanvas.tsx     # Canvas renderer for PDF pixel data
+│   │   ├── PropertyTable.tsx # Key-value property display table
+│   │   ├── SubTabNav.tsx     # Horizontal sub-tab navigation (ARIA tablist)
+│   │   ├── TextLayer.tsx     # Selectable text overlay on rendered pages
+│   │   ├── TextOverlay.tsx   # Text position overlay (Worker lab)
+│   │   ├── TreeView.tsx      # Recursive collapsible tree (ARIA tree)
+│   │   └── __tests__/        # Component unit tests
+│   ├── hooks/
+│   │   ├── usePDFium.tsx     # PDFium context provider (init, document management, passwords)
+│   │   ├── useRender.ts      # React Query hook for page rendering
+│   │   ├── useDownload.ts    # Document save + download hook
+│   │   └── useOnScreen.ts    # IntersectionObserver visibility hook
+│   └── features/
+│       ├── Viewer/           # PDF rendering + page properties
+│       ├── Creation/         # Document builder
+│       ├── Text/             # Text extraction with 4 sub-tabs (Selection, Search, Characters, Extraction)
+│       ├── Annotations/      # Annotation browsing + creation + detail view
+│       ├── Objects/          # Page object inspection (text, image, path)
+│       ├── Structure/        # Bookmarks, attachments, links, web links, structure tree, named dests
+│       ├── Forms/            # Form fields, highlighting, flattening
+│       ├── Layouts/          # Document merger + N-up layouts
+│       ├── Rendering/        # Progressive render, thumbnails, coordinate transforms
+│       ├── Worker/           # Web Worker off-main-thread processing
+│       ├── Inspector/        # Metadata, permissions, signatures, JavaScript, viewer prefs
+│       └── Security/         # Password handling + error catalogue
+├── index.html
+├── package.json
+├── tsconfig.json
+└── vite.config.ts
+```
 
-## Expected Output
+## Key Patterns
 
-When you run the demo, you should see:
+### Hash-Based Deep Linking
 
-- A heading "PDF viewer"
-- A rendered PDF page at 3x scale
-- The page is bordered and responsive (max-width: 100%)
+Each lab is accessible via URL hash (e.g. `#viewer`, `#security`). The active tab syncs with `window.location.hash`.
+
+### Code Splitting
+
+All 12 labs are loaded via `React.lazy()` + `Suspense`, so only the active lab's code is downloaded.
+
+### Error Handling
+
+- `ErrorBoundary` wraps each lab to catch render-phase errors
+- `PasswordDialog` handles password-protected PDFs (error code 202)
+- `DragDropZone` wraps the main content area for drag-and-drop PDF loading
+- All event handler errors use try/catch with local error state (not `alert()`)
+
+### Cache Invalidation
+
+After mutating operations (flatten, create/remove annotation, highlight colour change), labs call `bumpDocumentRevision()` from the `usePDFium` context. This increments a counter used in React Query cache keys, forcing re-renders.
+
+## Testing
+
+```bash
+pnpm --dir demo/vite test
+```
+
+Tests use Vitest with `@testing-library/react` in browser mode (Playwright). Each lab has a test file with smoke tests verifying key UI elements render correctly.
 
 ## Troubleshooting
 
@@ -185,32 +239,9 @@ optimizeDeps: {
 }
 ```
 
-### Page renders but shows nothing
-
-**Cause**: Page number might be out of range (1-indexed in the demo).
-
-**Solution**: Check that the PDF has the requested page. Page numbers start at 0 in the API but the demo uses 1.
-
-## Project Structure
-
-```
-demo/vite/
-├── public/
-│   ├── pdfium.cjs       # WASM glue code (copied by setup)
-│   ├── sample.pdf       # Sample PDF (copied by setup)
-│   └── vite.svg         # Vite logo
-├── src/
-│   ├── client.ts        # React Query client
-│   ├── demo.tsx         # PDF viewer component
-│   └── main.tsx         # App entry point
-├── index.html           # HTML template
-├── package.json         # Dependencies
-├── tsconfig.json        # TypeScript config
-└── vite.config.ts       # Vite config
-```
-
 ## Related Resources
 
-- [Main README](../../README.md) - Full API documentation
-- [Node Demo](../node/) - Node.js server-side example
-- [Plain Demo](../plain/) - Browser example without build tools
+- [Main README](../../README.md) — Full API documentation
+- [Documentation Site](https://pdfium.scaryterry.dev) — Guides and API reference
+- [Node Demo](../node/) — Node.js server-side example
+- [Plain Demo](../plain/) — Browser example without build tools

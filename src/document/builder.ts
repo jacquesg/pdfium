@@ -6,7 +6,7 @@
 
 import { Disposable } from '../core/disposable.js';
 import { DocumentError, PDFiumErrorCode } from '../core/errors.js';
-import type { SaveOptions, ShapeStyle } from '../core/types.js';
+import type { Colour, SaveOptions, ShapeStyle } from '../core/types.js';
 import type { DocumentHandle, FontHandle, PageHandle, PageObjectHandle } from '../internal/handles.js';
 import { INTERNAL } from '../internal/symbols.js';
 import type { PDFiumWASM } from '../wasm/bindings/index.js';
@@ -276,9 +276,10 @@ export class PDFiumPageBuilder extends Disposable {
    * @param y - Y position in points
    * @param font - Font from builder.loadStandardFont()
    * @param fontSize - Font size in points
+   * @param colour - Optional text colour (defaults to black)
    * @returns this for method chaining
    */
-  addText(text: string, x: number, y: number, font: PDFiumBuilderFont, fontSize: number): this {
+  addText(text: string, x: number, y: number, font: PDFiumBuilderFont, fontSize: number, colour?: Colour): this {
     this.ensureNotDisposed();
     if (!Number.isFinite(fontSize) || fontSize <= 0) {
       throw new DocumentError(PDFiumErrorCode.DOC_CREATE_FAILED, 'Font size must be a positive finite number');
@@ -287,6 +288,13 @@ export class PDFiumPageBuilder extends Disposable {
     const textObj = this.#module._FPDFPageObj_CreateTextObj(this.#documentHandle, font[INTERNAL].handle, fontSize);
     if (textObj === asHandle<PageObjectHandle>(0)) {
       throw new DocumentError(PDFiumErrorCode.DOC_CREATE_FAILED, 'Failed to create text object');
+    }
+
+    // Set text colour (fill colour on the text object)
+    if (colour) {
+      if (!this.#module._FPDFPageObj_SetFillColor(textObj, colour.r, colour.g, colour.b, colour.a)) {
+        throw new DocumentError(PDFiumErrorCode.DOC_CREATE_FAILED, 'Failed to set text colour');
+      }
     }
 
     // Encode text as UTF-16LE for PDFium
@@ -298,6 +306,70 @@ export class PDFiumPageBuilder extends Disposable {
     this.#module._FPDFPageObj_Transform(textObj, 1, 0, 0, 1, x, y);
 
     this.#module._FPDFPage_InsertObject(this.#pageHandle, textObj);
+    return this;
+  }
+
+  /**
+   * Add a straight line to the page.
+   *
+   * @param x1 - Start X in points
+   * @param y1 - Start Y in points
+   * @param x2 - End X in points
+   * @param y2 - End Y in points
+   * @param style - Stroke style (fill is ignored for lines)
+   * @returns this for method chaining
+   */
+  addLine(x1: number, y1: number, x2: number, y2: number, style?: ShapeStyle): this {
+    this.ensureNotDisposed();
+
+    const path = this.#module._FPDFPageObj_CreateNewPath(x1, y1);
+    if (path === asHandle<PageObjectHandle>(0)) {
+      throw new DocumentError(PDFiumErrorCode.DOC_CREATE_FAILED, 'Failed to create path for line');
+    }
+
+    this.#module._FPDFPath_LineTo(path, x2, y2);
+    this.#applyShapeStyle(path, style);
+    this.#module._FPDFPage_InsertObject(this.#pageHandle, path);
+    return this;
+  }
+
+  /**
+   * Add an ellipse (or circle) to the page, inscribed in the given bounding box.
+   *
+   * Approximated with four cubic Bezier segments (standard technique).
+   *
+   * @param cx - Centre X in points
+   * @param cy - Centre Y in points
+   * @param rx - Horizontal radius in points
+   * @param ry - Vertical radius in points
+   * @param style - Fill and stroke style
+   * @returns this for method chaining
+   */
+  addEllipse(cx: number, cy: number, rx: number, ry: number, style?: ShapeStyle): this {
+    this.ensureNotDisposed();
+    if (!Number.isFinite(rx) || !Number.isFinite(ry) || rx <= 0 || ry <= 0) {
+      throw new DocumentError(PDFiumErrorCode.DOC_CREATE_FAILED, 'Ellipse radii must be positive finite numbers');
+    }
+
+    // Bezier approximation constant: (4/3)(sqrt(2)-1)
+    const k = 0.5522847498;
+    const kx = k * rx;
+    const ky = k * ry;
+
+    const path = this.#module._FPDFPageObj_CreateNewPath(cx + rx, cy);
+    if (path === asHandle<PageObjectHandle>(0)) {
+      throw new DocumentError(PDFiumErrorCode.DOC_CREATE_FAILED, 'Failed to create path for ellipse');
+    }
+
+    // Four quadrant arcs
+    this.#module._FPDFPath_BezierTo(path, cx + rx, cy + ky, cx + kx, cy + ry, cx, cy + ry);
+    this.#module._FPDFPath_BezierTo(path, cx - kx, cy + ry, cx - rx, cy + ky, cx - rx, cy);
+    this.#module._FPDFPath_BezierTo(path, cx - rx, cy - ky, cx - kx, cy - ry, cx, cy - ry);
+    this.#module._FPDFPath_BezierTo(path, cx + kx, cy - ry, cx + rx, cy - ky, cx + rx, cy);
+    this.#module._FPDFPath_Close(path);
+
+    this.#applyShapeStyle(path, style);
+    this.#module._FPDFPage_InsertObject(this.#pageHandle, path);
     return this;
   }
 

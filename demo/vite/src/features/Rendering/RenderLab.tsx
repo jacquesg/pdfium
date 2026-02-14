@@ -1,186 +1,218 @@
-import { ProgressiveRenderStatus } from '@scaryterry/pdfium/browser';
-import { useState } from 'react';
+import type { PageInfoResponse } from '@scaryterry/pdfium/browser';
+import { useCallback, useState } from 'react';
+import {
+  type Rect,
+  DefaultToolbar,
+  PDFDocumentView,
+  PageNavigatorMinimap,
+  useRenderPage,
+  useViewerSetup,
+} from '@scaryterry/pdfium/react';
 import { Button } from '../../components/Button';
+import { DocPanel } from '../../components/DocPanel';
+
 import { PDFCanvas } from '../../components/PDFCanvas';
-import { usePDFium } from '../../hooks/usePDFium';
-import { useRenderPage } from '../../hooks/useRender';
+import { ResponsiveSidebar } from '../../components/ResponsiveSidebar';
+import { Alert, AlertDescription } from '../../components/ui/alert';
+import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import { Skeleton } from '../../components/ui/skeleton';
+
+
+const DEFAULT_CLIP_SIZE = 300; // PDF points
 
 export function RenderLab() {
-  const { document } = usePDFium();
-  const [viewport, setViewport] = useState({ left: 0, top: 0, right: 300, bottom: 300 });
-  const [progress, setProgress] = useState(0);
-  const [renderMode, setRenderMode] = useState<'standard' | 'progressive'>('standard');
-  const [progressiveResult, setProgressiveResult] = useState<{ width: number, height: number, data: Uint8Array } | null>(null);
+  const viewer = useViewerSetup({ initialScale: 1.5 });
+  const { document } = viewer;
+  const { pageIndex, setPageIndex } = viewer.navigation;
+  const { scale } = viewer.zoom;
+  const { scrollMode } = viewer.scroll;
+  const { ref: containerRef } = viewer.container;
   const [renderError, setRenderError] = useState<string | null>(null);
-  const [scale, setScale] = useState(1);
+  const [renderScale, setRenderScale] = useState(2);
+  const [pageInfo, setPageInfo] = useState<PageInfoResponse | null>(null);
+  const [showSpecialRender, setShowSpecialRender] = useState(false);
 
-  // -- Standard Render with ClipRect --
-  const { data: clipResult } = useRenderPage(document, {
-    pageNumber: 0,
-    width: 600,
-    height: 600,
-    clipRect: renderMode === 'standard' ? viewport : undefined, // Only apply in standard mode for this demo
+  // Clip-rect viewport (in PDF page coordinates)
+  const [viewport, setViewport] = useState<Rect>({
+    left: 0,
+    bottom: 0,
+    right: DEFAULT_CLIP_SIZE,
+    top: DEFAULT_CLIP_SIZE,
   });
 
-  // -- Minimap Render (Full Page) --
-  const { data: minimap } = useRenderPage(document, {
-    pageNumber: 0,
-    width: 200, // Small thumbnail
+  // Clip-rect render
+  const {
+    renderKey: clipKey,
+    width: clipWidth,
+    height: clipHeight,
+  } = useRenderPage(showSpecialRender ? document : null, pageIndex, {
+    clipRect: viewport,
+    scale: 2, // Render clip at 2x for crisp display
   });
 
-  // -- Progressive Render Logic --
-  const startProgressive = async () => {
+  // Scaled render demo
+  const {
+    renderKey: scaledKey,
+    width: scaledWidth,
+    height: scaledHeight,
+  } = useRenderPage(showSpecialRender ? document : null, pageIndex, {
+    scale: renderScale,
+  });
+
+  const handleViewportChange = useCallback((newViewport: Rect) => {
+    setViewport(newViewport);
+  }, []);
+
+  const fetchPageInfo = async () => {
     if (!document) return;
-    setRenderMode('progressive');
-    setProgress(0);
-    setProgressiveResult(null);
     setRenderError(null);
-
-    const page = document.getPage(0);
-    
     try {
-      // NOTE: startProgressiveRender returns a CONTEXT, not a promise.
-      // It starts synchronously but returns a status.
-      // The context must be disposed!
-      using render = page.startProgressiveRender({ scale });
-
-      // If it fails immediately (e.g. OOM or invalid handle)
-      if (render.status === ProgressiveRenderStatus.Failed) {
-        setRenderError(`Render failed immediately (Status: ${render.status})`);
-        return;
-      }
-
-      while (render.status === ProgressiveRenderStatus.ToBeContinued) {
-        render.continue();
-        
-        // Update progress bar artificially (PDFium doesn't give % in this API)
-        setProgress(prev => Math.min(prev + 0.05, 0.95)); 
-        
-        // Yield to event loop to allow UI updates and prevent blocking
-        await new Promise(r => setTimeout(r, 50)); 
-      }
-
-      if (render.status === ProgressiveRenderStatus.Done) {
-        setProgress(1);
-        setProgressiveResult(render.getResult());
-      } else {
-        setRenderError(`Render failed during continue (Status: ${render.status})`);
-      }
-    } catch (e) {
-      console.error(e);
-      setRenderError(`Error: ${e instanceof Error ? e.message : String(e)}`);
+      await using page = await document.getPage(pageIndex);
+      const info = await page.getPageInfo();
+      setPageInfo(info);
+    } catch (err) {
+      setRenderError(`Error: ${err instanceof Error ? err.message : String(err)}`);
     }
   };
 
-  const handleMinimapClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!minimap) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    
-    if (!document) return;
-    const page = document.getPage(0);
-    const scaleX = page.width / minimap.width;
-    const scaleY = page.height / minimap.height;
-    
-    const pdfX = x * scaleX;
-    
-    const w = 300;
-    const h = 300;
-    
-    setViewport({
-      left: Math.max(0, pdfX - w/2),
-      top: Math.max(0, (y * scaleY) - h/2),
-      right: Math.max(0, pdfX - w/2) + w,
-      bottom: Math.max(0, (y * scaleY) - h/2) + h,
-    });
-    
-    setRenderMode('standard');
-  };
-
   return (
-    <div className="flex h-full gap-4 p-4">
-      {/* Left Column: Controls & Minimap */}
-      <div className="w-64 space-y-4">
-        <div className="border p-2 rounded shadow-sm bg-white">
-          <h3 className="font-bold mb-2">Navigator</h3>
-          <p className="text-xs text-gray-500 mb-2">Click to move view</p>
-          <div className="relative cursor-crosshair inline-block">
-             {minimap && (
-               <PDFCanvas 
-                 width={minimap.width} 
-                 height={minimap.height} 
-                 data={minimap.data}
-                 onMouseDown={handleMinimapClick}
-               />
-             )}
-          </div>
-          <div className="mt-2 text-xs font-mono">
-            x: {Math.round(viewport.left)}, y: {Math.round(viewport.top)}
-          </div>
-        </div>
+    <div className="flex h-full">
+      {/* Left Sidebar: Render Controls + Minimap */}
+      <ResponsiveSidebar side="left" breakpoint="md" label="Render Controls" className="w-64 bg-white p-3 border-r space-y-4 overflow-y-auto max-h-full">
+        {/* Minimap Navigator */}
+        {document && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle>Page Minimap</CardTitle>
+            </CardHeader>
+            <CardContent className="flex justify-center">
+              <PageNavigatorMinimap
+                document={document}
+                pageIndex={pageIndex}
+                thumbnailWidth={200}
+                viewport={viewport}
+                onViewportChange={handleViewportChange}
+                style={{ border: '1px solid #e5e7eb', borderRadius: 4 }}
+              />
+            </CardContent>
+          </Card>
+        )}
 
-        <div className="border p-2 rounded shadow-sm bg-white">
-          <h3 className="font-bold mb-2">Progressive Test</h3>
-          <div className="mb-2">
-            <label className="text-xs block">Scale: {scale}x</label>
-            <input 
-              type="range" min="1" max="5" step="1" 
-              value={scale} 
-              onChange={e => setScale(Number(e.target.value))} 
-              className="w-full"
-            />
-          </div>
-          <Button onClick={startProgressive} className="w-full text-sm">
-            Start Render
-          </Button>
-          <div className="mt-2 h-4 bg-gray-200 rounded overflow-hidden">
-            <div 
-              className="h-full bg-blue-500 transition-all duration-300" 
-              style={{ width: `${progress * 100}%` }}
-            />
-          </div>
-          <div className="text-right text-xs mt-1">{(progress * 100).toFixed(0)}%</div>
-          {renderError && (
-            <div className="mt-2 text-xs text-red-600 font-bold border p-1 bg-red-50 rounded">
-              {renderError}
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle>Render Demos</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="mb-2">
+              <label className="text-xs block">Render Scale: {renderScale}x</label>
+              <input
+                type="range" min="1" max="5" step="1"
+                value={renderScale}
+                onChange={(e) => setRenderScale(Number(e.target.value))}
+                className="w-full"
+              />
+            </div>
+            <Button
+              onClick={() => setShowSpecialRender((s) => !s)}
+              variant="secondary"
+              className="w-full text-xs"
+            >
+              {showSpecialRender ? 'Hide Demos' : 'Show Clip & Scale Demos'}
+            </Button>
+            <p className="text-xs text-gray-500 mt-2">
+              Toggle to see clip-rect viewport and scaled render of page {pageIndex + 1}.
+            </p>
+            {showSpecialRender && (
+              <div className="mt-2 text-xs text-gray-500 font-mono">
+                Viewport: [{viewport.left.toFixed(0)}, {viewport.bottom.toFixed(0)}, {viewport.right.toFixed(0)}, {viewport.top.toFixed(0)}]
+              </div>
+            )}
+            {renderError && (
+              <Alert variant="destructive" className="mt-2">
+                <AlertDescription className="text-xs font-bold">{renderError}</AlertDescription>
+              </Alert>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle>Page Boxes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-xs text-gray-500 mb-2">
+              Inspect the five standard PDF page boxes for page {pageIndex + 1}.
+            </p>
+            <Button onClick={fetchPageInfo} className="w-full text-sm">Fetch Page Info</Button>
+            {pageInfo && (
+              <div className="mt-2 space-y-1">
+                <div className="text-xs font-mono text-gray-600">
+                  Rotation: {pageInfo.rotation}, Chars: {pageInfo.charCount}
+                </div>
+                {(Object.entries(pageInfo.pageBoxes) as Array<[string, { left: number; top: number; right: number; bottom: number } | undefined]>).map(([name, box]) => (
+                  <div key={name} className={`text-xs font-mono px-1.5 py-0.5 rounded ${box ? 'bg-green-50 text-green-700' : 'bg-gray-100 text-gray-400'}`}>
+                    {name}: {box ? `[${box.left.toFixed(1)}, ${box.top.toFixed(1)}, ${box.right.toFixed(1)}, ${box.bottom.toFixed(1)}]` : 'not set'}
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </ResponsiveSidebar>
+
+      {/* Main Content */}
+      <div className="flex-1 flex flex-col min-w-0">
+        <DefaultToolbar viewer={viewer}>
+          <Button variant="secondary" onClick={viewer.zoom.reset} className="text-xs">Reset Zoom</Button>
+        </DefaultToolbar>
+
+        {/* Document View + optional clip/scale demos side-by-side */}
+        <div className="flex-1 flex overflow-hidden">
+          <PDFDocumentView
+            containerRef={containerRef}
+            scrollMode={scrollMode}
+            scale={scale}
+            currentPageIndex={pageIndex}
+            onCurrentPageChange={setPageIndex}
+            className="flex-1"
+            style={{ minHeight: 0 }}
+          />
+
+          {showSpecialRender && (
+            <div className="w-[40%] border-l bg-gray-900 overflow-auto flex flex-col items-center p-4 gap-6">
+              {/* Clip-rect viewport render */}
+              <div className="text-center">
+                <div className="text-xs text-gray-400 mb-2">Clip Viewport (2x)</div>
+                {clipKey ? (
+                  <PDFCanvas width={clipWidth ?? 0} height={clipHeight ?? 0} renderKey={clipKey} />
+                ) : (
+                  <Skeleton className="w-48 h-48 rounded bg-gray-700" />
+                )}
+              </div>
+
+              {/* Scaled render */}
+              <div className="text-center">
+                <div className="text-xs text-gray-400 mb-2">{renderScale}x Scale ({scaledWidth}x{scaledHeight})</div>
+                {scaledKey ? (
+                  <PDFCanvas width={scaledWidth ?? 0} height={scaledHeight ?? 0} renderKey={scaledKey} />
+                ) : (
+                  <Skeleton className="w-48 h-64 rounded bg-gray-700" />
+                )}
+              </div>
             </div>
           )}
         </div>
       </div>
 
-      {/* Main View */}
-      <div className="flex-1 bg-gray-900 flex items-center justify-center overflow-auto p-4 rounded">
-        {renderMode === 'standard' ? (
-          clipResult ? (
-            <div className="relative">
-              <PDFCanvas 
-                width={clipResult.width} 
-                height={clipResult.height} 
-                data={clipResult.data} 
-                className="shadow-2xl border-4 border-white"
-              />
-              <div className="absolute top-0 left-0 bg-black/50 text-white p-1 text-xs">
-                Clip View (600x600 px)
-              </div>
-            </div>
-          ) : <div className="text-white">Rendering Region...</div>
-        ) : (
-          progressiveResult ? (
-            <div className="overflow-auto max-w-full max-h-full">
-               <PDFCanvas 
-                  width={progressiveResult.width} 
-                  height={progressiveResult.height} 
-                  data={progressiveResult.data} 
-               />
-            </div>
-          ) : renderError ? (
-             <div className="text-red-400">Failed.</div>
-          ) : (
-             <div className="text-white animate-pulse">Processing...</div>
-          )
-        )}
-      </div>
+      {/* Right Sidebar: Documentation */}
+      <ResponsiveSidebar side="right" breakpoint="lg" label="Documentation" className="w-72 bg-white border-l overflow-y-auto p-3">
+        <DocPanel
+          title="Rendering Lab"
+          apis={['renderPage()', 'getPageInfo()', 'render()', 'clipRect']}
+          snippet={'// Render a page at 2x scale\nconst result = await document.renderPage(0, { scale: 2 });\n\n// Render a clip-rect sub-region\nconst clip = await document.renderPage(0, {\n  clipRect: { left: 0, bottom: 0, right: 300, top: 300 },\n  scale: 2,\n});\n\n// Get page info including page boxes\nawait using page = await document.getPage(0);\nconst info = await page.getPageInfo();'}
+          description="Async rendering via the worker thread, page box inspection, clip-rect viewport, and scale controls. Use the minimap to navigate, and toggle demos to see clip and scale renders."
+        />
+      </ResponsiveSidebar>
     </div>
   );
 }

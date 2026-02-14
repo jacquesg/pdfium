@@ -115,6 +115,57 @@ describe('ProgressivePDFLoader', () => {
   });
 });
 
+describe('ProgressivePDFLoader with linearised PDF', () => {
+  test('should detect linearised document', async ({ pdfium }) => {
+    const data = await loadTestPdfData('pdfium/linearized.pdf');
+    using loader = pdfium.createProgressiveLoader(data);
+    expect(loader.linearisationStatus).toBe(LinearisationStatus.Linearised);
+    expect(loader.isLinearised).toBe(true);
+  });
+
+  test('isDocumentAvailable returns true for complete linearised buffer', async ({ pdfium }) => {
+    const data = await loadTestPdfData('pdfium/linearized.pdf');
+    using loader = pdfium.createProgressiveLoader(data);
+    expect(loader.isDocumentAvailable).toBe(true);
+  });
+
+  test('isPageAvailable returns boolean for page 0 of linearised doc', async ({ pdfium }) => {
+    const data = await loadTestPdfData('pdfium/linearized.pdf');
+    using loader = pdfium.createProgressiveLoader(data);
+    const available = loader.isPageAvailable(0);
+    expect(available).toBeTypeOf('boolean');
+  });
+
+  test('firstPageNumber returns 0 for linearised document', async ({ pdfium }) => {
+    const data = await loadTestPdfData('pdfium/linearized.pdf');
+    using loader = pdfium.createProgressiveLoader(data);
+    expect(loader.firstPageNumber).toBe(0);
+  });
+
+  test('getDocument extracts working document from linearised PDF', async ({ pdfium }) => {
+    const data = await loadTestPdfData('pdfium/linearized.pdf');
+    using loader = pdfium.createProgressiveLoader(data);
+    using doc = loader.getDocument();
+    expect(doc.pageCount).toBeGreaterThan(0);
+    using page = doc.getPage(0);
+    expect(page.width).toBeGreaterThan(0);
+  });
+
+  test('post-dispose: isPageAvailable throws', async ({ pdfium }) => {
+    const data = await loadTestPdfData('pdfium/linearized.pdf');
+    const loader = pdfium.createProgressiveLoader(data);
+    loader.dispose();
+    expect(() => loader.isPageAvailable(0)).toThrow();
+  });
+
+  test('post-dispose: firstPageNumber throws', async ({ pdfium }) => {
+    const data = await loadTestPdfData('pdfium/linearized.pdf');
+    const loader = pdfium.createProgressiveLoader(data);
+    loader.dispose();
+    expect(() => loader.firstPageNumber).toThrow();
+  });
+});
+
 describe('ProgressivePDFLoader error paths', () => {
   test('should throw when given corrupt data (random bytes)', async ({ pdfium }) => {
     const garbage = new Uint8Array(256);

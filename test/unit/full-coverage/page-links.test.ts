@@ -122,6 +122,39 @@ describe('PDFium Page Links (Full Coverage)', () => {
       }
     });
 
+    it('getWebLinks should extract rects when getRect succeeds', async () => {
+      using doc = await pdfium.openDocument(new Uint8Array(10));
+      using page = doc.getPage(0);
+      mockModule._FPDFLink_LoadWebLinks.mockReturnValue(100);
+      mockModule._FPDFLink_CountWebLinks.mockReturnValue(1);
+      mockModule._FPDFLink_GetURL.mockReturnValue(10); // Success URL
+      mockModule._FPDFLink_CountRects.mockReturnValue(1);
+      mockModule._FPDFLink_GetRect.mockReturnValue(1); // Success
+
+      const links = page.getWebLinks();
+      expect(links).toHaveLength(1);
+      if (links[0]) {
+        expect(links[0].rects).toHaveLength(1);
+      }
+    });
+
+    it('getWebLinks should extract text range when GetTextRange succeeds', async () => {
+      using doc = await pdfium.openDocument(new Uint8Array(10));
+      using page = doc.getPage(0);
+      mockModule._FPDFLink_LoadWebLinks.mockReturnValue(100);
+      mockModule._FPDFLink_CountWebLinks.mockReturnValue(1);
+      mockModule._FPDFLink_GetURL.mockReturnValue(10);
+      mockModule._FPDFLink_GetTextRange.mockReturnValue(1); // Success
+
+      const links = page.getWebLinks();
+      expect(links).toHaveLength(1);
+      if (links[0]) {
+        expect(links[0].textRange).toBeDefined();
+        expect(links[0].textRange?.startCharIndex).toBeDefined();
+        expect(links[0].textRange?.charCount).toBeDefined();
+      }
+    });
+
     it('getWebLinks should handle text range failure', async () => {
       using doc = await pdfium.openDocument(new Uint8Array(10));
       using page = doc.getPage(0);
@@ -152,7 +185,7 @@ describe('PDFium Page Links (Full Coverage)', () => {
       expect(link?.action?.uri).toBeUndefined();
     });
 
-    it('getLinkAtPoint should extract Launch action', async () => {
+    it('getLinkAtPoint should extract Launch action without file path', async () => {
       using doc = await pdfium.openDocument(new Uint8Array(10));
       using page = doc.getPage(0);
       mockModule._FPDFLink_GetLinkAtPoint.mockReturnValue(100);
@@ -163,6 +196,30 @@ describe('PDFium Page Links (Full Coverage)', () => {
       const link = page.getLinkAtPoint(0, 0);
       expect(link?.action?.type).toBe(ActionType.Launch);
       expect(link?.action?.filePath).toBeUndefined();
+    });
+
+    it('getLinkAtPoint should extract Launch action with file path', async () => {
+      using doc = await pdfium.openDocument(new Uint8Array(10));
+      using page = doc.getPage(0);
+      mockModule._FPDFLink_GetLinkAtPoint.mockReturnValue(100);
+      mockModule._FPDFLink_GetAction.mockReturnValue(200);
+      mockModule._FPDFAction_GetType.mockReturnValue(4); // Native value for Launch
+
+      let getFilePathCallCount = 0;
+      mockModule._FPDFAction_GetFilePath.mockImplementation(() => {
+        getFilePathCallCount++;
+        if (getFilePathCallCount === 1) {
+          return 9; // Size: 8 chars + null = 9 bytes
+        }
+        // Second call: write "test.pdf\0" to the buffer
+        // The mock heap will have the data at the alloc'd ptr
+        return 9;
+      });
+
+      const link = page.getLinkAtPoint(0, 0);
+      expect(link?.action?.type).toBe(ActionType.Launch);
+      // filePath will be defined (though content depends on heap state)
+      expect(link?.action?.filePath).toBeDefined();
     });
 
     it('getLinkAtPoint should extract Destination', async () => {

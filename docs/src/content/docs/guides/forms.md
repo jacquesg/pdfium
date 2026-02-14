@@ -80,6 +80,10 @@ Form fields are accessed through `PDFiumAnnotation` methods, not a separate widg
 | `getFormFieldExportValue()` | `string \| undefined` | The export value (for checkboxes/radio buttons) |
 | `getFormFieldOptions()` | `WidgetOption[] \| undefined` | Options for combo/list boxes |
 | `getFormFieldFlags()` | `FormFieldFlags` | Bitfield of field flags (read-only, required, etc.) |
+| `getFontSize()` | `number \| null` | The font size of the form field widget |
+| `getFormControlCount()` | `number` | Number of form controls sharing this field name |
+| `getFormControlIndex()` | `number` | Index of this control among controls sharing the same field name |
+| `getFormAdditionalActionJavaScript(event)` | `string \| undefined` | JavaScript for a form field event (Format, KeyStroke, Validate, Calculate) |
 
 ## Form Interaction
 

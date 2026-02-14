@@ -14,6 +14,7 @@ export default defineConfig((options) => ({
     browser: 'src/browser.ts',
     node: 'src/node.ts',
     worker: 'src/worker.ts',
+    react: 'src/react.ts',
   },
   format: ['esm'],
   target: 'es2024',
@@ -38,6 +39,9 @@ export default defineConfig((options) => ({
     'path',
     'crypto',
     'worker_threads',
+    'react',
+    'react/jsx-runtime',
+    'react-dom',
   ],
   define: {
     __PACKAGE_VERSION__: JSON.stringify(process.env.npm_package_version ?? '0.0.0'),

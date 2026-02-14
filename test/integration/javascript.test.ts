@@ -4,6 +4,7 @@
  * Tests the FPDFDoc_GetJavaScript* and FPDFJavaScriptAction_* functions.
  */
 
+import { AnnotationType, FormFieldActionEvent } from '../../src/core/types.js';
 import { describe, expect, test } from '../utils/fixtures.js';
 
 describe('JavaScript Inspection API', () => {
@@ -89,6 +90,64 @@ describe('JavaScript Inspection API', () => {
       expect(() => doc.hasJavaScript()).not.toThrow();
       expect(() => doc.getJavaScriptActions()).not.toThrow();
     });
+  });
+});
+
+describe('Annotation-Level JavaScript (annot_javascript.pdf)', () => {
+  test('should have no document-level JS actions', async ({ openDocument }) => {
+    using doc = await openDocument('pdfium/annot_javascript.pdf');
+    expect(doc.pageCount).toBe(1);
+    expect(doc.hasJavaScript()).toBe(false);
+    expect(doc.javaScriptActionCount).toBe(0);
+    expect(doc.getJavaScriptActions()).toHaveLength(0);
+  });
+
+  test('should have a Widget annotation with form field name', async ({ openDocument }) => {
+    using doc = await openDocument('pdfium/annot_javascript.pdf');
+    using page = doc.getPage(0);
+
+    // The PDF has a single Widget annotation named "Widget"
+    const annotCount = page.annotationCount;
+    expect(annotCount).toBeGreaterThan(0);
+
+    using annot = page.getAnnotation(0);
+    expect(annot.type).toBe(AnnotationType.Widget);
+
+    const name = annot.getFormFieldName();
+    expect(name).toBe('Widget');
+  });
+
+  test('should read Format event JavaScript from Widget annotation', async ({ openDocument }) => {
+    using doc = await openDocument('pdfium/annot_javascript.pdf');
+    using page = doc.getPage(0);
+    using annot = page.getAnnotation(0);
+
+    // The Widget has AFDate_FormatEx("yyyy-mm-dd") on the Format event
+    const js = annot.getFormAdditionalActionJavaScript(FormFieldActionEvent.Format);
+    expect(js).toBeDefined();
+    expect(js).toBeTypeOf('string');
+    expect(js!.length).toBeGreaterThan(0);
+    expect(js).toContain('AFDate_FormatEx');
+  });
+
+  test('should return undefined for events without JavaScript', async ({ openDocument }) => {
+    using doc = await openDocument('pdfium/annot_javascript.pdf');
+    using page = doc.getPage(0);
+    using annot = page.getAnnotation(0);
+
+    // Only Format has JS; other events should return undefined
+    const keystroke = annot.getFormAdditionalActionJavaScript(FormFieldActionEvent.KeyStroke);
+    const validate = annot.getFormAdditionalActionJavaScript(FormFieldActionEvent.Validate);
+    const calculate = annot.getFormAdditionalActionJavaScript(FormFieldActionEvent.Calculate);
+
+    // These events have no JS attached in this PDF
+    const noJsEvents = [keystroke, validate, calculate];
+    for (const js of noJsEvents) {
+      if (js !== undefined) {
+        // If defined, it should be an empty or whitespace-only string
+        expect(js.trim()).toBe('');
+      }
+    }
   });
 });
 

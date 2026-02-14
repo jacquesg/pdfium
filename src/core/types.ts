@@ -1111,6 +1111,23 @@ export enum FormFieldType {
 }
 
 /**
+ * Form field additional action event types.
+ *
+ * Used with {@link PDFiumAnnotation.getFormAdditionalActionJavaScript} to
+ * retrieve JavaScript associated with specific form field events.
+ */
+export enum FormFieldActionEvent {
+  /** Triggered on keystroke in the form field. */
+  KeyStroke = 12,
+  /** Triggered when the field value is formatted for display. */
+  Format = 13,
+  /** Triggered when the field value is validated. */
+  Validate = 14,
+  /** Triggered when the field is used in a calculation. */
+  Calculate = 15,
+}
+
+/**
  * Annotation flags as bit flags.
  *
  * These flags control the behaviour and visibility of annotations.

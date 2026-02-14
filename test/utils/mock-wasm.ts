@@ -3,6 +3,7 @@ import { vi } from 'vitest';
 export function createMockWasmModule() {
   const heap = new Uint8Array(1024 * 1024); // 1MB mock heap
   let nextPtr = 8; // Local state per module instance
+  let nextFunctionPtr = 1000; // Unique function pointer IDs
 
   return {
     HEAPU8: heap,
@@ -25,6 +26,13 @@ export function createMockWasmModule() {
       return ptr;
     }),
     _free: vi.fn(),
+
+    // Emscripten function table support for callbacks
+    addFunction: vi.fn((_callback, _signature) => {
+      const ptr = nextFunctionPtr++;
+      return ptr;
+    }),
+    removeFunction: vi.fn(),
 
     // Core
     _FPDF_InitLibraryWithConfig: vi.fn(),
@@ -82,6 +90,9 @@ export function createMockWasmModule() {
     _FPDFText_CountRects: vi.fn(() => 0),
     _FPDFText_GetRect: vi.fn(() => 0),
     _FPDFText_GetBoundedText: vi.fn(() => 0),
+    _FPDFText_GetCharBox: vi.fn(() => 1),
+    _FPDFText_GetLooseCharBox: vi.fn(() => 1),
+    _FPDFText_GetCharIndexAtPos: vi.fn(() => 0),
     _FPDFText_LoadStandardFont: vi.fn(() => 50),
     _FPDFFont_Close: vi.fn(),
     _FPDFText_SetText: vi.fn(),
@@ -115,10 +126,33 @@ export function createMockWasmModule() {
     _FORM_DoPageAAction: vi.fn(),
     _FORM_OnBeforeClosePage: vi.fn(),
     _FORM_ReplaceAndKeepSelection: vi.fn(),
+    _FORM_ReplaceSelection: vi.fn(),
     _FORM_SelectAllText: vi.fn(() => 1),
     _FORM_SetFocusedAnnot: vi.fn(() => 1),
     _FORM_SetIndexSelected: vi.fn(() => 1),
     _FORM_IsIndexSelected: vi.fn(() => 1),
+    _FORM_GetSelectedText: vi.fn(() => 0),
+    _FORM_GetFocusedText: vi.fn(() => 0),
+    _FORM_CanUndo: vi.fn(() => 0),
+    _FORM_CanRedo: vi.fn(() => 0),
+    _FORM_Undo: vi.fn(() => 0),
+    _FORM_Redo: vi.fn(() => 0),
+    _FORM_OnMouseMove: vi.fn(() => 0),
+    _FORM_OnMouseWheel: vi.fn(() => 0),
+    _FORM_OnFocus: vi.fn(() => 0),
+    _FORM_OnLButtonDown: vi.fn(() => 0),
+    _FORM_OnLButtonUp: vi.fn(() => 0),
+    _FORM_OnRButtonDown: vi.fn(() => 0),
+    _FORM_OnRButtonUp: vi.fn(() => 0),
+    _FORM_OnMButtonDown: vi.fn(() => 0),
+    _FORM_OnMButtonUp: vi.fn(() => 0),
+    _FORM_OnLButtonDoubleClick: vi.fn(() => 0),
+    _FORM_OnKeyDown: vi.fn(() => 0),
+    _FORM_OnKeyUp: vi.fn(() => 0),
+    _FORM_OnChar: vi.fn(() => 0),
+    _FORM_GetFocusedAnnot: vi.fn(() => 0),
+    _FPDFPage_HasFormFieldAtPoint: vi.fn(() => -1),
+    _FPDFPage_FormFieldZOrderAtPoint: vi.fn(() => -1),
     _FPDFPage_SetRotation: vi.fn(),
     _FPDFPage_Flatten: vi.fn(() => 0), // Success
     _FPDFPage_SetMediaBox: vi.fn(),
@@ -126,17 +160,128 @@ export function createMockWasmModule() {
     _FPDFPage_SetBleedBox: vi.fn(),
     _FPDFPage_SetTrimBox: vi.fn(),
     _FPDFPage_SetArtBox: vi.fn(),
+    _FPDFPage_GetMediaBox: vi.fn(() => 1),
+    _FPDFPage_GetCropBox: vi.fn(() => 1),
+    _FPDFPage_GetBleedBox: vi.fn(() => 1),
+    _FPDFPage_GetTrimBox: vi.fn(() => 1),
+    _FPDFPage_GetArtBox: vi.fn(() => 1),
     _FPDF_GetPageBoundingBox: vi.fn(() => 1),
     _FPDFPage_TransFormWithClip: vi.fn(() => 1),
+    _FPDFPage_TransformAnnots: vi.fn(),
     _FPDF_CreateClipPath: vi.fn(() => 600),
     _FPDFPage_InsertClipPath: vi.fn(),
     _FPDF_DestroyClipPath: vi.fn(),
+    _FPDFPage_GetThumbnailAsBitmap: vi.fn(() => 0),
+    _FPDFPage_GetDecodedThumbnailData: vi.fn(() => 0),
+    _FPDFPage_GetRawThumbnailData: vi.fn(() => 0),
 
     // Objects
     _FPDFPage_CountObjects: vi.fn(() => 0),
     _FPDFPage_GetObject: vi.fn(() => 0),
     _FPDFPageObj_GetBounds: vi.fn(() => 0),
     _FPDFPageObj_GetType: vi.fn(() => 0),
+    _FPDFPageObj_GetFillColor: vi.fn(() => 0),
+    _FPDFPageObj_GetStrokeColor: vi.fn(() => 0),
+    _FPDFPageObj_GetStrokeWidth: vi.fn(() => 0),
+    _FPDFPageObj_GetMatrix: vi.fn(() => 0),
+    _FPDFPageObj_SetMatrix: vi.fn(() => 1),
+    _FPDFPageObj_GetRotatedBounds: vi.fn(() => 0),
+    _FPDFPageObj_GetDashCount: vi.fn(() => 0),
+    _FPDFPageObj_GetDashArray: vi.fn(() => 0),
+    _FPDFPageObj_GetDashPhase: vi.fn(() => 0),
+    _FPDFPageObj_SetDashArray: vi.fn(() => 1),
+    _FPDFPageObj_SetDashPhase: vi.fn(() => 1),
+    _FPDFPageObj_GetLineCap: vi.fn(() => 0),
+    _FPDFPageObj_SetLineCap: vi.fn(() => 1),
+    _FPDFPageObj_GetLineJoin: vi.fn(() => 0),
+    _FPDFPageObj_SetLineJoin: vi.fn(() => 1),
+    _FPDFPageObj_HasTransparency: vi.fn(() => 0),
+    _FPDFPageObj_SetBlendMode: vi.fn(),
+    _FPDFPageObj_GetClipPath: vi.fn(() => 0),
+    _FPDFPageObj_TransformClipPath: vi.fn(),
+    _FPDFPageObj_CountMarks: vi.fn(() => 0),
+    _FPDFPageObj_GetMark: vi.fn(() => 0),
+    _FPDFPageObj_AddMark: vi.fn(() => 0),
+    _FPDFPageObj_RemoveMark: vi.fn(() => 0),
+    _FPDFPageObjMark_GetName: vi.fn(() => 0),
+    _FPDFPageObjMark_CountParams: vi.fn(() => 0),
+    _FPDFPageObjMark_GetParamKey: vi.fn(() => 0),
+    _FPDFPageObjMark_GetParamValueType: vi.fn(() => 1),
+    _FPDFPageObjMark_GetParamIntValue: vi.fn(() => 0),
+    _FPDFPageObjMark_GetParamStringValue: vi.fn(() => 0),
+    _FPDFPageObjMark_GetParamBlobValue: vi.fn(() => 0),
+    _FPDFPageObjMark_SetIntParam: vi.fn(() => 0),
+    _FPDFPageObjMark_SetStringParam: vi.fn(() => 0),
+    _FPDFPageObjMark_SetBlobParam: vi.fn(() => 0),
+    _FPDFPageObjMark_RemoveParam: vi.fn(() => 0),
+
+    // Text Objects
+    _FPDFTextObj_SetTextRenderMode: vi.fn(() => 1),
+    _FPDFTextObj_GetFontSize: vi.fn(() => 1),
+    _FPDFTextObj_GetFont: vi.fn(() => 0),
+    _FPDFTextObj_GetText: vi.fn(() => 0),
+
+    // Path Objects
+    _FPDFPath_GetDrawMode: vi.fn(() => 0),
+    _FPDFPath_SetDrawMode: vi.fn(() => 1),
+    _FPDFPath_CountSegments: vi.fn(() => 0),
+    _FPDFPath_GetPathSegment: vi.fn(() => 0),
+    _FPDFPath_MoveTo: vi.fn(() => 1),
+    _FPDFPath_LineTo: vi.fn(() => 1),
+    _FPDFPath_BezierTo: vi.fn(() => 1),
+    _FPDFPath_Close: vi.fn(() => 1),
+    _FPDFPathSegment_GetPoint: vi.fn(() => 0),
+    _FPDFPathSegment_GetType: vi.fn(() => 0),
+    _FPDFPathSegment_GetClose: vi.fn(() => 0),
+
+    // Image Objects
+    _FPDFImageObj_LoadJpegFile: vi.fn(() => 1),
+    _FPDFImageObj_LoadJpegFileInline: vi.fn(() => 1),
+    _FPDFImageObj_SetBitmap: vi.fn(() => 1),
+    _FPDFImageObj_SetMatrix: vi.fn(() => 1),
+    _FPDFImageObj_GetBitmap: vi.fn(() => 0),
+    _FPDFImageObj_GetRenderedBitmap: vi.fn(() => 0),
+    _FPDFImageObj_GetImageMetadata: vi.fn(() => 0),
+    _FPDFImageObj_GetImageDataDecoded: vi.fn(() => 0),
+    _FPDFImageObj_GetImageDataRaw: vi.fn(() => 0),
+    _FPDFImageObj_GetImagePixelSize: vi.fn(() => 0),
+    _FPDFImageObj_GetImageFilterCount: vi.fn(() => 0),
+    _FPDFImageObj_GetImageFilter: vi.fn(() => 0),
+
+    // Font
+    _FPDFFont_GetFamilyName: vi.fn(() => 0),
+    _FPDFFont_GetBaseFontName: vi.fn(() => 0),
+    _FPDFFont_GetItalicAngle: vi.fn(() => 0),
+    _FPDFFont_GetFontName: vi.fn(() => 0),
+    _FPDFFont_GetFlags: vi.fn(() => 0),
+    _FPDFFont_GetWeight: vi.fn(() => 0),
+    _FPDFFont_GetFontData: vi.fn(() => 0),
+    _FPDFFont_GetIsEmbedded: vi.fn(() => 0),
+    _FPDFFont_GetAscent: vi.fn(() => 0),
+    _FPDFFont_GetDescent: vi.fn(() => 0),
+    _FPDFFont_GetGlyphWidth: vi.fn(() => 0),
+    _FPDFFont_GetGlyphPath: vi.fn(() => 0),
+    _FPDFGlyphPath_CountGlyphSegments: vi.fn(() => 0),
+    _FPDFGlyphPath_GetGlyphPathSegment: vi.fn(() => 0),
+
+    // Bitmap
+    _FPDFBitmap_GetBuffer: vi.fn(() => 0),
+    _FPDFBitmap_GetWidth: vi.fn(() => 0),
+    _FPDFBitmap_GetHeight: vi.fn(() => 0),
+    _FPDFBitmap_GetStride: vi.fn(() => 0),
+    _FPDFBitmap_GetFormat: vi.fn(() => 0),
+
+    // Page Object Creation
+    _FPDFPageObj_CreateNewPath: vi.fn(() => 0),
+    _FPDFPageObj_NewImageObj: vi.fn(() => 0),
+
+    // Progressive Rendering
+    _FPDF_RenderPageBitmap_Start: vi.fn(() => 0),
+    _FPDF_RenderPage_Continue: vi.fn(() => 0),
+    _FPDF_RenderPage_Close: vi.fn(),
+
+    // Progressive Loading
+    _FPDF_LoadCustomDocument: vi.fn(() => 0),
 
     // Annotations
     _FPDFPage_GetAnnotCount: vi.fn(() => 0),
@@ -168,10 +313,13 @@ export function createMockWasmModule() {
     _FPDFAnnot_GetAttachmentPoints: vi.fn(() => 0),
     _FPDFAnnot_SetAttachmentPoints: vi.fn(() => 0),
     _FPDFAnnot_AppendAttachmentPoints: vi.fn(() => 0),
+    _FPDFAnnot_GetObject: vi.fn(() => 0),
     _FPDFAnnot_GetObjectCount: vi.fn(() => 0),
     _FPDFAnnot_AppendObject: vi.fn(() => 0),
     _FPDFAnnot_UpdateObject: vi.fn(() => 0),
     _FPDFAnnot_RemoveObject: vi.fn(() => 0),
+    _FPDFAnnot_GetValueType: vi.fn(() => 1),
+    _FPDFAnnot_GetNumberValue: vi.fn(() => 0),
     _FPDFAnnot_GetLink: vi.fn(() => 0),
     _FPDFAnnot_SetURI: vi.fn(() => 0),
     _FPDFAnnot_GetFontSize: vi.fn(() => 0),
@@ -200,13 +348,19 @@ export function createMockWasmModule() {
     _FPDF_StructElement_GetType: vi.fn(() => 0),
     _FPDF_StructElement_GetTitle: vi.fn(() => 0),
     _FPDF_StructElement_GetAltText: vi.fn(() => 0),
+    _FPDF_StructElement_GetLang: vi.fn(() => 0),
+    _FPDF_StructElement_CountChildren: vi.fn(() => 0),
+    _FPDF_StructElement_GetChildAtIndex: vi.fn(() => 0),
 
     // Text Search
     _FPDFText_FindStart: vi.fn(() => 0),
     _FPDFText_FindNext: vi.fn(() => 0),
+    _FPDFText_FindPrev: vi.fn(() => 0),
     _FPDFText_FindClose: vi.fn(),
     _FPDFText_GetSchResultIndex: vi.fn(() => 0),
     _FPDFText_GetSchCount: vi.fn(() => 0),
+    _FPDFText_GetMatrix: vi.fn(() => 0),
+    _FPDFText_LoadFont: vi.fn(() => 0),
 
     // Links
     _FPDFLink_GetLinkAtPoint: vi.fn(() => 0),
@@ -221,12 +375,18 @@ export function createMockWasmModule() {
     // biome-ignore lint/suspicious/noExplicitAny: Mock args
     _FPDFLink_Enumerate: vi.fn((..._args: any[]) => 0),
     _FPDFLink_GetAnnotRect: vi.fn(() => 0),
+    _FPDFLink_GetAnnot: vi.fn(() => 0),
+    _FPDFLink_CountQuadPoints: vi.fn(() => 0),
+    _FPDFLink_GetQuadPoints: vi.fn(() => 0),
     _FPDFLink_GetAction: vi.fn(() => 0),
     _FPDFLink_GetDest: vi.fn(() => 0),
     _FPDFBookmark_GetFirstChild: vi.fn(() => 0),
     _FPDFBookmark_GetNextSibling: vi.fn(() => 0),
     _FPDFBookmark_GetTitle: vi.fn(() => 0),
     _FPDFBookmark_GetDest: vi.fn(() => 0),
+    _FPDFBookmark_GetCount: vi.fn(() => 0),
+    _FPDFBookmark_Find: vi.fn(() => 0),
+    _FPDFBookmark_GetAction: vi.fn(() => 0),
     _FPDFDest_GetDestPageIndex: vi.fn(() => -1),
     _FPDFDest_GetView: vi.fn(() => 0),
     // biome-ignore lint/suspicious/noExplicitAny: Mock args
@@ -236,6 +396,7 @@ export function createMockWasmModule() {
     _FPDFAction_GetType: vi.fn(() => 0),
     _FPDFAction_GetURIPath: vi.fn(() => 0),
     _FPDFAction_GetFilePath: vi.fn(() => 0),
+    _FPDFAction_GetDest: vi.fn(() => 0),
 
     // Attachments
     _FPDFDoc_GetAttachmentCount: vi.fn(() => 0),
@@ -266,6 +427,9 @@ export function createMockWasmModule() {
     _FPDF_ImportNPagesToOne: vi.fn(() => 100),
     _FPDF_CopyViewerPreferences: vi.fn(() => 1),
 
+    // Document
+    _FPDFDoc_GetPageMode: vi.fn(() => 0),
+
     // Form Fill
     _FPDF_GetFormType: vi.fn(() => 0),
     _FORM_ForceToKillFocus: vi.fn(() => 0),
@@ -274,6 +438,7 @@ export function createMockWasmModule() {
 
     // Saving
     _FPDF_SaveAsCopy: vi.fn(() => 0),
+    _FPDF_SaveWithVersion: vi.fn(() => 0),
 
     // Named Dests
     _FPDF_CountNamedDests: vi.fn(() => 0),
@@ -295,5 +460,15 @@ export function createMockWasmModule() {
     _FPDFJavaScriptAction_GetName: vi.fn(() => 0),
     _FPDFJavaScriptAction_GetScript: vi.fn(() => 0),
     _FPDFDoc_CloseJavaScriptAction: vi.fn(),
+
+    // Progressive Loading
+    _FPDFAvail_Create: vi.fn(() => 700), // Return dummy avail handle
+    _FPDFAvail_Destroy: vi.fn(),
+    _FPDFAvail_IsDocAvail: vi.fn(() => 1), // Available
+    _FPDFAvail_GetDocument: vi.fn(() => 100), // Return dummy doc handle
+    _FPDFAvail_GetFirstPageNum: vi.fn(() => 0),
+    _FPDFAvail_IsPageAvail: vi.fn(() => 1), // Available
+    _FPDFAvail_IsFormAvail: vi.fn(() => 1), // Available
+    _FPDFAvail_IsLinearized: vi.fn(() => 1), // Linearised
   };
 }

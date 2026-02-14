@@ -2,17 +2,10 @@ import { render, screen } from '@testing-library/react';
 import { describe, it } from 'vitest';
 import { PDFiumProvider } from '../../hooks/usePDFium';
 import { MixerLab } from './MixerLab';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-
-const createTestQueryClient = () => new QueryClient({
-  defaultOptions: { queries: { retry: false } },
-});
 
 function renderWithProviders(ui: React.ReactElement) {
   return render(
-    <QueryClientProvider client={createTestQueryClient()}>
-      <PDFiumProvider>{ui}</PDFiumProvider>
-    </QueryClientProvider>
+    <PDFiumProvider>{ui}</PDFiumProvider>
   );
 }
 

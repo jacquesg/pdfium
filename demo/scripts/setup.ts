@@ -131,6 +131,71 @@ function setupViteDemo(): void {
     log("demo/vite/public/sample.pdf already exists");
   }
 
+  // Copy demo-specific fixture PDFs (kept for backwards compat with labs that hardcode root paths)
+  const fixtureDir = join(REPO_ROOT, "test", "fixtures");
+  const pdfiumFixtureDir = join(fixtureDir, "pdfium");
+
+  const demoPdfs: Array<{ source: string; target: string }> = [
+    { source: join(pdfiumFixtureDir, "annots.pdf"), target: join(vitePublicDir, "annots.pdf") },
+    { source: join(fixtureDir, "test_1_pass_12345678.pdf"), target: join(vitePublicDir, "protected.pdf") },
+  ];
+
+  for (const { source, target } of demoPdfs) {
+    if (!existsSync(source)) {
+      error(`Fixture not found: ${source}. Run tests first or check test/fixtures/.`);
+      process.exit(1);
+    }
+    if (!existsSync(target)) {
+      copyFileSync(source, target);
+      log(`Copied ${source} -> ${target}`);
+    }
+  }
+
+  // Copy all sample PDFs into public/samples/ for the sample picker
+  const samplesDir = join(vitePublicDir, "samples");
+  if (!existsSync(samplesDir)) {
+    mkdirSync(samplesDir, { recursive: true });
+  }
+
+  // Copy sample.pdf into samples/
+  const sampleTarget = join(samplesDir, "sample.pdf");
+  if (!existsSync(sampleTarget)) {
+    copyFileSync(sourcePdf, sampleTarget);
+    log("Copied sample.pdf to public/samples/");
+  }
+
+  // Copy reference.pdf into samples/
+  const referenceSource = join(vitePublicDir, "reference.pdf");
+  const referenceTarget = join(samplesDir, "reference.pdf");
+  if (!existsSync(referenceTarget) && existsSync(referenceSource)) {
+    copyFileSync(referenceSource, referenceTarget);
+    log("Copied reference.pdf to public/samples/");
+  }
+
+  // Copy protected PDF into samples/
+  const protectedSource = join(fixtureDir, "test_1_pass_12345678.pdf");
+  const protectedTarget = join(samplesDir, "protected.pdf");
+  if (!existsSync(protectedTarget) && existsSync(protectedSource)) {
+    copyFileSync(protectedSource, protectedTarget);
+    log("Copied protected.pdf to public/samples/");
+  }
+
+  // Copy all pdfium fixture PDFs into samples/
+  if (existsSync(pdfiumFixtureDir)) {
+    const pdfiumFiles = readdirSync(pdfiumFixtureDir);
+    let sampleCount = 0;
+    for (const file of pdfiumFiles) {
+      if (file.endsWith(".pdf")) {
+        const dest = join(samplesDir, file);
+        if (!existsSync(dest)) {
+          copyFileSync(join(pdfiumFixtureDir, file), dest);
+          sampleCount++;
+        }
+      }
+    }
+    log(`Copied ${sampleCount} fixture PDFs to public/samples/`);
+  }
+
   // Copy all JS chunks from dist to public
   // This ensures the worker can load its dependencies (split chunks)
   const files = readdirSync(distDir);

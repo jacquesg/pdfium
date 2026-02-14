@@ -23,7 +23,7 @@ description: A modern TypeScript wrapper for PDFium WebAssembly
 | **Render pages** | Convert PDF pages to RGBA pixel data |
 | **Extract text** | Get text content with position information |
 | **Search text** | Find text with bounding rectangles |
-| **Read annotations** | Access all 28 annotation types |
+| **Annotations** | Read, create, and modify all 28 annotation types |
 | **Read bookmarks** | Navigate document outlines |
 | **Extract attachments** | Get embedded files |
 | **Read structure** | Access tagged PDF structure trees |

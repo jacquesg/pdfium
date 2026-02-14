@@ -1,26 +1,50 @@
-import { render, screen } from '@testing-library/react';
-import { describe, it } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { describe, expect, it } from 'vitest';
 import { PDFiumProvider } from '../../hooks/usePDFium';
 import { RenderLab } from './RenderLab';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-
-const createTestQueryClient = () => new QueryClient({
-  defaultOptions: { queries: { retry: false } },
-});
 
 function renderWithProviders(ui: React.ReactElement) {
   return render(
-    <QueryClientProvider client={createTestQueryClient()}>
-      <PDFiumProvider>{ui}</PDFiumProvider>
-    </QueryClientProvider>
+    <PDFiumProvider>{ui}</PDFiumProvider>
   );
 }
 
 describe('RenderLab', () => {
+  async function openRenderControls() {
+    fireEvent.click(await screen.findByRole('button', { name: /Open Render Controls/i }, { timeout: 5000 }));
+    await screen.findByRole('button', { name: /Close Render Controls/i }, { timeout: 5000 });
+  }
+
   it('renders navigator and controls', async () => {
     renderWithProviders(<RenderLab />);
-    await screen.findByText(/Navigator/i);
-    await screen.findByText(/Progressive Test/i);
-    await screen.findByRole('button', { name: /Start Render/i });
+    await openRenderControls();
+    await screen.findByRole('heading', { name: /Page Minimap/i }, { timeout: 5000 });
+    await screen.findByRole('heading', { name: /Render Demos/i }, { timeout: 5000 });
+    await screen.findByRole('heading', { name: /Page Boxes/i }, { timeout: 5000 });
+  });
+
+  it('displays minimap navigator canvas', async () => {
+    renderWithProviders(<RenderLab />);
+    await openRenderControls();
+    const minimapNavigator = await screen.findByRole('button', { name: /minimap navigator/i }, { timeout: 5000 });
+    expect(minimapNavigator.querySelector('canvas')).not.toBeNull();
+  });
+
+  it('shows viewport readout when demos are enabled', async () => {
+    renderWithProviders(<RenderLab />);
+    await openRenderControls();
+    fireEvent.click(await screen.findByRole('button', { name: /Show Clip & Scale Demos/i }, { timeout: 5000 }));
+    await screen.findByText(/Viewport:\s*\[/i, {}, { timeout: 5000 });
+    await screen.findByRole('button', { name: /Hide Demos/i }, { timeout: 5000 });
+  });
+
+  it('renders Fetch Page Info button', async () => {
+    renderWithProviders(<RenderLab />);
+    await screen.findByRole('button', { name: /Fetch Page Info/i }, { timeout: 5000 });
+  });
+
+  it('renders clip and scale demo hint', async () => {
+    renderWithProviders(<RenderLab />);
+    await screen.findByText(/Toggle to see clip-rect viewport and scaled render/i, {}, { timeout: 5000 });
   });
 });

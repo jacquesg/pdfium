@@ -179,6 +179,76 @@ describe('PDFiumError', () => {
     const error = new PDFiumError(PDFiumErrorCode.DOC_FORMAT_INVALID, 'msg', ctx);
     expect(error.context).toBe(ctx);
   });
+
+  it('sanitises internal context keys in production mode', () => {
+    // Save current __DEV__ mode
+    const originalDev = (globalThis as Record<string, unknown>).__DEV__;
+
+    // Mock production mode
+    Object.defineProperty(globalThis, '__DEV__', {
+      value: false,
+      writable: true,
+      configurable: true,
+    });
+
+    try {
+      const context = {
+        ptr: 12345,
+        heapSize: 1024,
+        alignment: 8,
+        userKey: 'value',
+      };
+      const error = new PDFiumError(PDFiumErrorCode.MEMORY_ALLOCATION_FAILED, 'Test', context);
+
+      // In production, internal keys should be stripped
+      expect(error.context).toBeDefined();
+      expect(error.context).not.toHaveProperty('ptr');
+      expect(error.context).not.toHaveProperty('heapSize');
+      expect(error.context).not.toHaveProperty('alignment');
+      expect(error.context).toHaveProperty('userKey');
+      expect(error.context?.userKey).toBe('value');
+    } finally {
+      // Restore __DEV__ mode
+      Object.defineProperty(globalThis, '__DEV__', {
+        value: originalDev,
+        writable: true,
+        configurable: true,
+      });
+    }
+  });
+
+  it('preserves all context keys in dev mode', () => {
+    // Ensure we're in dev mode
+    const originalDev = (globalThis as Record<string, unknown>).__DEV__;
+    Object.defineProperty(globalThis, '__DEV__', {
+      value: true,
+      writable: true,
+      configurable: true,
+    });
+
+    try {
+      const context = {
+        ptr: 12345,
+        heapSize: 1024,
+        alignment: 8,
+        userKey: 'value',
+      };
+      const error = new PDFiumError(PDFiumErrorCode.MEMORY_ALLOCATION_FAILED, 'Test', context);
+
+      // In dev mode, all keys should be preserved
+      expect(error.context).toBe(context);
+      expect(error.context?.ptr).toBe(12345);
+      expect(error.context?.heapSize).toBe(1024);
+      expect(error.context?.alignment).toBe(8);
+      expect(error.context?.userKey).toBe('value');
+    } finally {
+      Object.defineProperty(globalThis, '__DEV__', {
+        value: originalDev,
+        writable: true,
+        configurable: true,
+      });
+    }
+  });
 });
 
 describe('Error subclasses', () => {

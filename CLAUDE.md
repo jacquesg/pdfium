@@ -106,6 +106,58 @@ Declared in `src/env.d.ts`, injected by tsup's `define`:
 
 `src/core/plugin.ts` — simple lifecycle hooks (`onDocumentOpened`). Registered via `registerPlugin()`.
 
+### React Integration Layer
+
+`src/react/` exports a full React SDK (`@scaryterry/pdfium/react`) for building PDF viewers. All PDFium operations run off-main-thread via the Worker backend.
+
+#### Provider and Context
+
+`PDFiumProvider` (`src/react/context.tsx`) initialises `WorkerPDFium`, manages document lifecycle, and exposes split contexts:
+- `PDFiumInstanceContext` — worker instance (stable after init)
+- `PDFiumDocumentContext` — current document, revision counter, password flow, load/dispose
+
+Three consumer hooks: `usePDFiumInstance()`, `usePDFiumDocument()`, `usePDFium()` (merged convenience).
+
+#### State Management (QueryStore + RenderStore)
+
+Two `useSyncExternalStore`-backed stores replace traditional React state for data fetching:
+
+- **QueryStore** (`src/react/internal/query-store.ts`) — heterogeneous cache (pending/success/error entries). All data hooks use `useStoreQuery` which reads from this store, fetches on cache miss, and supports `keepPreviousData`.
+- **LRURenderStore** (`src/react/internal/render-store.ts`) — LRU cache for rendered bitmaps (default 30 pages). `touch()` must be called from `useLayoutEffect`, never from `getSnapshot`.
+
+Cache keys use null-byte (`\0`) separator: `buildCacheKey(docId, hookName, revision, ...params)` (`src/react/internal/cache-key.ts`). The `documentRevision` counter invalidates all caches when bumped (e.g. after form fills or annotation edits). Purge on document swap uses `purgeByPrefix(docId + '\0')`.
+
+#### Hook Categories
+
+- **Data hooks** (14): `usePageInfo`, `useTextContent`, `useAnnotations`, `useBookmarks`, `useLinks`, `useWebLinks`, `useFormWidgets`, `usePageObjects`, `useStructureTree`, `useAttachments`, `useNamedDestinations`, `useDocumentInfo`, `useTextSearch`, `usePageLabel` — all follow the `useStoreQuery(key, fetcher)` pattern
+- **Interaction hooks**: `usePageNavigation`, `useVisiblePages`, `useZoom`, `useFitZoom`, `useKeyboardShortcuts`, `useCharacterInspector`
+- **Form hooks**: `useDocumentFormActions`, `usePageFormActions` — call `bumpDocumentRevision()` after mutations
+- **Rendering**: `useRenderPage` (writes to `LRURenderStore`)
+- **Utility**: `useDownload`, `useDocumentSearch` (cross-page incremental search)
+
+#### Components
+
+- `PDFDocumentView` — scroll container with virtualised pages (continuous + single-page modes)
+- `PDFPageView` — single page with canvas + overlay layers
+- `PDFCanvas` — bitmap renderer consuming `renderKey` from `useRenderPage`
+- `ThumbnailStrip` — virtualised thumbnail sidebar
+- `SearchPanel` — headless search UI for `useDocumentSearch`
+- `TextLayer`, `TextOverlay` — selectable text overlay
+- `SearchHighlightOverlay`, `AnnotationOverlay` — canvas overlays
+- `DragDropZone` — file drop target with accessibility
+- `PDFiumErrorBoundary` — error boundary with retry
+
+#### Coordinate Transforms
+
+`src/react/coordinates.ts` — PDF uses bottom-left origin, screen uses top-left. Three functions: `pdfToScreen`, `screenToPdf`, `pdfRectToScreen`. All require `{ scale, originalHeight }`.
+
+#### Cache Invalidation Pattern
+
+1. Mutation hooks call `bumpDocumentRevision()` after modifying the document
+2. All cache keys include `revision` — bumping it produces new keys
+3. `useStoreQuery` sees a cache miss on the new key and re-fetches
+4. `clearCache()` purges both stores but does NOT trigger re-fetches — always call `bumpDocumentRevision()` after it
+
 ## Code Style
 
 - **Biome** for linting/formatting (120 char lines, 2 spaces, single quotes, semicolons, trailing commas)
@@ -122,11 +174,11 @@ Vitest with three workspace projects (configured in `vitest.config.ts`):
 - `integration` — tests requiring WASM module in `test/integration/` (15s timeout)
 - `visual` — visual regression tests in `test/visual/` (30s timeout, forks pool)
 
-Test fixtures (PDF files) in `test/fixtures/`. Setup file: `test/setup.ts`.
+Test fixtures (PDF files) in `test/fixtures/`. External ground-truth PDFs from chromium/pdfium in `test/fixtures/pdfium/`. Setup file: `test/setup.ts`.
 
 Snapshot test at `test/unit/api.test.ts` tracks all public API symbols — update with `pnpm vitest run --project unit --update` when exports change.
 
-Coverage thresholds: 65% lines, 50% branches, 75% functions.
+Coverage thresholds: 95% lines, 90% branches, 95% functions, 95% statements.
 
 ## Critical Gotchas
 

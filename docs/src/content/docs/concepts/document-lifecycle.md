@@ -33,8 +33,7 @@ PDFium.init()
     │       ├── addPage()
     │       │       │
     │       │       ├── addText()
-    │       │       ├── addRect()
-    │       │       └── finalize()
+    │       │       └── addRectangle()
     │       │       │
     │       │       └── pageBuilder.dispose()
     │       │
@@ -195,36 +194,23 @@ using builder = pdfium.createDocument();
 {
   using page = builder.addPage();
   page.addText('Hello', 72, 720, font, 24);
-  page.finalize(); // REQUIRED before dispose
 } // page builder disposed
 
-// Save document
+// Save document — content is generated automatically
 const bytes = builder.save();
 // builder disposed when scope ends
 ```
 
 ### Page Builder Rules
 
-1. Must call `finalize()` before scope ends
-2. Cannot modify after `finalize()`
-3. Disposed when block scope ends
+1. Content is generated automatically when saving — no explicit finalisation needed
+2. Disposed when block scope ends
 
 ```typescript
 {
   using page = builder.addPage();
   page.addText('Title', 72, 720, font, 24);
-  // page.finalize(); // MISSING - page will be incomplete!
-}
-
-// Better pattern
-{
-  using page = builder.addPage();
-  try {
-    page.addText('Title', 72, 720, font, 24);
-    page.addRect(72, 700, 200, 50, style);
-  } finally {
-    page.finalize(); // Always called
-  }
+  page.addRectangle(72, 700, 200, 50, style);
 }
 ```
 
@@ -329,7 +315,7 @@ async function openDocument(data: Uint8Array): Promise<PDFiumDocument> {
 2. **Process, don't store** pages and temporary resources
 3. **Dispose in reverse order** of creation
 4. **Keep scopes tight** for memory efficiency
-5. **Always call `finalize()`** on page builders
+5. **Content is generated automatically** when saving — no explicit finalisation needed on page builders
 
 ## See Also
 

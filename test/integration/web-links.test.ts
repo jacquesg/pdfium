@@ -75,6 +75,39 @@ describe('Web Links', () => {
     });
   });
 
+  describe('Web Links (weblinks.pdf)', () => {
+    test('should detect and read web links with valid properties', async ({ openDocument }) => {
+      using doc = await openDocument('pdfium/weblinks.pdf');
+      using page = doc.getPage(0);
+
+      // Should detect links
+      const count = page.webLinkCount;
+      expect(count).toBeGreaterThan(0);
+
+      // Should read link details
+      const links = page.getWebLinks();
+      expect(links.length).toBeGreaterThan(0);
+      expect(links.length).toBe(count);
+
+      for (const link of links) {
+        // URL should be non-empty
+        expect(link.url).toBeTypeOf('string');
+        expect(link.url.length).toBeGreaterThan(0);
+
+        // Rects should have valid bounds
+        expect(link.rects).toBeInstanceOf(Array);
+        for (const rect of link.rects) {
+          expect(rect.left).toBeTypeOf('number');
+          expect(rect.top).toBeTypeOf('number');
+          expect(rect.right).toBeTypeOf('number');
+          expect(rect.bottom).toBeTypeOf('number');
+          expect(rect.right).toBeGreaterThanOrEqual(rect.left);
+          expect(rect.top).toBeGreaterThanOrEqual(rect.bottom);
+        }
+      }
+    });
+  });
+
   describe('WebLink structure', () => {
     test('should have sequential indices', async ({ testPage }) => {
       const webLinks = testPage.getWebLinks();

@@ -231,7 +231,7 @@ page.addText('Title', 72, positionFromTop(72, 792), font, 24);
 
 ```typescript
 // Origin is bottom-left corner of rectangle
-page.addRect(72, 700, 200, 50, style);
+page.addRectangle(72, 700, 200, 50, style);
 // Creates rectangle at (72, 700) with width 200, height 50
 // Bottom edge at y=700, top edge at y=750
 ```

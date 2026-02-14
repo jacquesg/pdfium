@@ -17,9 +17,27 @@
  */
 
 export type {
+  CharAtPosResponse,
+  CreateNUpResponse,
+  DocumentInfoResponse,
   LoadPageResponse,
   OpenDocumentResponse,
+  PageInfoResponse,
   RenderPageResponse,
+  SerialisedAction,
+  SerialisedAnnotation,
+  SerialisedAttachment,
+  SerialisedDestination,
+  SerialisedFormWidget,
+  SerialisedImageObjectData,
+  SerialisedLink,
+  SerialisedLinkTarget,
+  SerialisedPageObject,
+  SerialisedPathObjectData,
+  SerialisedPathSegment,
+  SerialisedQuadPoints,
+  SerialisedTextObjectData,
+  SerialisedWidgetData,
   WorkerRequest,
   WorkerResponse,
 } from './context/protocol.js';

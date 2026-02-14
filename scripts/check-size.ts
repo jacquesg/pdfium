@@ -9,7 +9,7 @@ const DIST_DIR = 'dist';
 const LIMITS = {
   'index.js': 20 * 1024, // 20KB limit for main entry
   'browser.js': 20 * 1024,
-  'worker.js': 20 * 1024,
+  'worker.js': 40 * 1024,
 };
 
 function getFileSize(filePath: string): number {

@@ -6,6 +6,8 @@ import * as WasmLoader from '../../../src/wasm/index.js';
 import { PDFiumNativeErrorCode } from '../../../src/wasm/index.js';
 import { createMockWasmModule } from '../../utils/mock-wasm.js';
 
+type WriteBlockCallback = (pThis: number, pData: number, size: number) => number;
+
 vi.mock('../../../src/wasm/index.js', async (importOriginal) => {
   const actual = await importOriginal<typeof WasmLoader>();
   return {
@@ -122,13 +124,98 @@ describe('PDFium Document (Full Coverage)', () => {
 
   describe('Import/Export', () => {
     it('should throw on save failure', async () => {
-      // @ts-expect-error - Adding property to mock
       mockModule.addFunction = vi.fn(() => 1);
-      // @ts-expect-error - Adding property to mock
       mockModule.removeFunction = vi.fn();
       using doc = await pdfium.openDocument(new Uint8Array(10));
       mockModule._FPDF_SaveAsCopy.mockReturnValue(0);
       expect(() => doc.save()).toThrow(DocumentError);
+    });
+
+    it('should handle WriteBlock callback error during save', async () => {
+      using doc = await pdfium.openDocument(new Uint8Array(10));
+
+      let writeBlockCallback: WriteBlockCallback | null = null;
+
+      // Capture the WriteBlock callback when addFunction is called
+      mockModule.addFunction.mockImplementation((callback: WriteBlockCallback, signature: string) => {
+        if (signature === 'iiii') {
+          writeBlockCallback = callback;
+        }
+        return 1001; // Return dummy function pointer
+      });
+
+      // Mock HEAPU8.slice to throw when called
+      const originalSlice = mockModule.HEAPU8.slice;
+      mockModule.HEAPU8.slice = vi.fn(() => {
+        throw new Error('Memory access error');
+      });
+
+      (mockModule._FPDF_SaveAsCopy as ReturnType<typeof vi.fn>).mockImplementation(
+        (_docHandle: number, fileWritePtr: number, _flags: number) => {
+          // Simulate PDFium calling the WriteBlock callback
+          if (writeBlockCallback) {
+            const result = writeBlockCallback(fileWritePtr, 100, 10);
+            // Callback should return 0 on error (catches the exception)
+            expect(result).toBe(0);
+          }
+          // Return success (1) so the save doesn't fail for other reasons
+          return 1;
+        },
+      );
+
+      // Capture the expected warning about WriteBlock callback error
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+      // Save should succeed (returns 1) even though callback had an error
+      const result = doc.save();
+      expect(result).toBeInstanceOf(Uint8Array);
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('WriteBlock callback error'), expect.any(Error));
+
+      // Restore
+      warnSpy.mockRestore();
+      mockModule.HEAPU8.slice = originalSlice;
+    });
+
+    it('should handle WriteBlock callback with zero size or null pointer', async () => {
+      using doc = await pdfium.openDocument(new Uint8Array(10));
+
+      let writeBlockCallback: WriteBlockCallback | null = null;
+
+      // Capture the WriteBlock callback when addFunction is called
+      mockModule.addFunction.mockImplementation((callback: WriteBlockCallback, signature: string) => {
+        if (signature === 'iiii') {
+          writeBlockCallback = callback;
+        }
+        return 1001; // Return dummy function pointer
+      });
+
+      // Track whether HEAPU8.slice was called (should NOT be called for zero size/pointer)
+      const sliceSpy = vi.spyOn(mockModule.HEAPU8, 'slice');
+
+      (mockModule._FPDF_SaveAsCopy as ReturnType<typeof vi.fn>).mockImplementation(
+        (_docHandle: number, fileWritePtr: number, _flags: number) => {
+          if (writeBlockCallback) {
+            // Call with zero size - should skip chunk push and return 1
+            const result1 = writeBlockCallback(fileWritePtr, 100, 0);
+            expect(result1).toBe(1);
+
+            // Call with zero pData - should skip chunk push and return 1
+            const result2 = writeBlockCallback(fileWritePtr, 0, 10);
+            expect(result2).toBe(1);
+
+            // Normal call with valid data
+            writeBlockCallback(fileWritePtr, 100, 5);
+          }
+          return 1;
+        },
+      );
+
+      const result = doc.save();
+      expect(result).toBeInstanceOf(Uint8Array);
+
+      // Verify slice was only called once (for the valid call, not for zero size/pointer)
+      expect(sliceSpy).toHaveBeenCalledTimes(1);
+      expect(sliceSpy).toHaveBeenCalledWith(100, 105); // pData=100, size=5
     });
 
     it('should throw on importPages failure', async () => {
@@ -151,6 +238,55 @@ describe('PDFium Document (Full Coverage)', () => {
       expect(
         doc.createNUpDocument({ outputWidth: 100, outputHeight: 100, pagesPerRow: 2, pagesPerColumn: 1 }),
       ).toBeUndefined();
+    });
+  });
+
+  describe('Form Fill Environment', () => {
+    it('should handle MemoryError during form fill init silently', async () => {
+      // Mock _malloc to return 0 specifically for the form fill info allocation (256 bytes)
+      // This will trigger a MemoryError in FSFormFillInfo constructor
+      // The document constructor catches MemoryError and continues without form fill
+      mockModule._malloc.mockImplementation((size: number) => {
+        if (size === 256) {
+          return 0; // Fail allocation for FORM_FILL_INFO_SIZE (line 199-202)
+        }
+        // Success for all other allocations (document data, etc.)
+        const mockPtr = 8 + Math.floor(Math.random() * 1000);
+        return mockPtr;
+      });
+
+      // Should not throw, form fill environment just won't be initialised
+      using doc = await pdfium.openDocument(new Uint8Array(10));
+      expect(doc).toBeDefined();
+    });
+
+    it('should dispose form info when document is disposed', async () => {
+      using doc = await pdfium.openDocument(new Uint8Array(10));
+      // Form info is created during construction
+      // When we dispose, line 176 should be hit (formInfo disposal)
+      expect(doc).toBeDefined();
+      // Disposal happens automatically via 'using'
+    });
+
+    it('should re-throw non-MemoryError during form fill init', async () => {
+      // Mock _FPDFDOC_InitFormFillEnvironment to throw a generic TypeError
+      // This exercises line 202 (re-throw non-MemoryError)
+      (mockModule._FPDFDOC_InitFormFillEnvironment as ReturnType<typeof vi.fn>).mockImplementation(() => {
+        throw new TypeError('Unexpected null pointer');
+      });
+
+      await expect(pdfium.openDocument(new Uint8Array(10))).rejects.toThrow(TypeError);
+    });
+  });
+
+  describe('Attachment Validation', () => {
+    it('should throw DocumentError when getAttachment index is NaN', async () => {
+      using doc = await pdfium.openDocument(new Uint8Array(10));
+      mockModule._FPDFDoc_GetAttachmentCount.mockReturnValue(5);
+
+      expect(() => doc.getAttachment(Number.NaN)).toThrow(DocumentError);
+      expect(() => doc.getAttachment(Number.POSITIVE_INFINITY)).toThrow(DocumentError);
+      expect(() => doc.getAttachment(1.5)).toThrow(DocumentError);
     });
   });
 });

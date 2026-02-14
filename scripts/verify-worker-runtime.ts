@@ -18,12 +18,10 @@ async function main(): Promise<void> {
     readFile(new URL('../test/fixtures/test_1.pdf', import.meta.url)),
   ]);
 
-  const wasmBinary = toArrayBuffer(wasmBytes);
-
   await using workerPdfium = await PDFium.init({
     useWorker: true,
     workerUrl: new URL('../dist/worker.js', import.meta.url),
-    wasmBinary,
+    wasmBinary: toArrayBuffer(wasmBytes),
   });
 
   const isAlive = await workerPdfium.ping();
@@ -49,7 +47,7 @@ async function main(): Promise<void> {
   // Also verify default worker script resolution from dist/index.js
   await using defaultWorkerPdfium = await PDFium.init({
     useWorker: true,
-    wasmBinary,
+    wasmBinary: toArrayBuffer(wasmBytes),
   });
   const defaultAlive = await defaultWorkerPdfium.ping();
   if (!defaultAlive) {

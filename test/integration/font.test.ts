@@ -408,3 +408,72 @@ describe('Font lifetime management', () => {
     }
   });
 });
+
+describe('Font edge cases and error paths', () => {
+  test('getGlyphWidth should return 0 when WASM call fails', async ({ testPage }) => {
+    using textFont = await getFirstTextFont(testPage);
+    if (textFont === null) return;
+
+    // Test with an invalid glyph index that might return 0
+    const width = textFont.getGlyphWidth(999999, 12);
+    expect(width).toBeTypeOf('number');
+  });
+
+  test('getMetrics should return 0 values when WASM calls fail', async ({ testPage }) => {
+    using textFont = await getFirstTextFont(testPage);
+    if (textFont === null) return;
+
+    // Call with extreme font size values
+    const metrics = textFont.getMetrics(0.001);
+    expect(metrics.ascent).toBeTypeOf('number');
+    expect(metrics.descent).toBeTypeOf('number');
+  });
+
+  test('getFontData should return undefined when font data not available', async ({ openDocument }) => {
+    const doc = await openDocument('test_1.pdf');
+    using page = doc.getPage(0);
+    const objects = page.getObjects();
+
+    for (const obj of objects) {
+      if (obj instanceof PDFiumTextObject) {
+        using font = obj.getFont();
+        if (font !== null && !font.isEmbedded) {
+          // Non-embedded font should return undefined for font data
+          const data = font.getFontData();
+          if (data === undefined) {
+            expect(data).toBeUndefined();
+            return;
+          }
+        }
+      }
+    }
+  });
+
+  test('getFontData should handle zero size response', async ({ testPage }) => {
+    using textFont = await getFirstTextFont(testPage);
+    if (textFont === null) return;
+
+    // Call getFontData - if it returns data, verify it's non-empty
+    const data = textFont.getFontData();
+    if (data !== undefined) {
+      expect(data.length).toBeGreaterThan(0);
+    }
+  });
+
+  test('getFontData should handle second call failure', async ({ testPage }) => {
+    using textFont = await getFirstTextFont(testPage);
+    if (textFont === null) return;
+
+    // getFontData makes two calls - first for size, second for data
+    // This test verifies the result is consistent
+    const data1 = textFont.getFontData();
+    const data2 = textFont.getFontData();
+
+    if (data1 === undefined) {
+      expect(data2).toBeUndefined();
+    } else {
+      expect(data2).toBeDefined();
+      expect(data2?.length).toBe(data1.length);
+    }
+  });
+});

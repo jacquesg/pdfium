@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { ConsoleLogger, getLogger, SilentLogger, setLogger } from '../../../src/core/logger.js';
+import { ConsoleLogger, getLogger, resetLogger, SilentLogger, setLogger } from '../../../src/core/logger.js';
 
 describe('Logger', () => {
   describe('ConsoleLogger', () => {
@@ -48,6 +48,15 @@ describe('Logger', () => {
 
       setLogger(original);
       expect(getLogger()).toBe(original);
+    });
+
+    it('resetLogger should restore default ConsoleLogger', () => {
+      const silent = new SilentLogger();
+      setLogger(silent);
+      expect(getLogger()).toBe(silent);
+
+      resetLogger();
+      expect(getLogger()).toBeInstanceOf(ConsoleLogger);
     });
   });
 });

@@ -272,7 +272,6 @@ async function createPDF(): Promise<Uint8Array> {
   {
     using page = builder.addPage();
     page.addText('Hello', 72, 720, font, 24);
-    page.finalize();
   } // Page builder disposed
 
   return builder.save(); // Document builder disposed after save

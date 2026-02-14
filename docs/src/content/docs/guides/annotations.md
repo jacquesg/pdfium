@@ -199,7 +199,7 @@ import { AnnotationType } from '@scaryterry/pdfium';
 interface AnnotationSummary {
   pageIndex: number;
   type: AnnotationType;
-  bounds: AnnotationBounds;
+  bounds: Rect;
 }
 
 function getAllAnnotations(document: PDFiumDocument): AnnotationSummary[] {
@@ -269,7 +269,7 @@ Currently, `renderFormFields` primarily affects interactive form widgets. Other 
 
 ```typescript
 function boundsToPixels(
-  bounds: AnnotationBounds,
+  bounds: Rect,
   pageHeight: number,
   scale: number
 ) {

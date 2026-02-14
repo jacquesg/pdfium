@@ -65,3 +65,36 @@ for (const action of jsActions) {
 ```
 
 This is particularly useful for security scanning to detect malicious scripts embedded in PDFs.
+
+### Annotation-Level JavaScript
+
+Form field widgets can have JavaScript attached to specific events (e.g., formatting, validation). Use `getFormAdditionalActionJavaScript()` to read these scripts:
+
+```typescript
+import { FormFieldActionEvent, AnnotationType } from '@scaryterry/pdfium';
+
+using page = document.getPage(0);
+
+for (const annot of page.getAnnotations()) {
+  if (annot.type !== AnnotationType.Widget) continue;
+
+  const formatJs = annot.getFormAdditionalActionJavaScript(FormFieldActionEvent.Format);
+  if (formatJs) {
+    console.log(`Field "${annot.getFormFieldName()}" has Format JS: ${formatJs}`);
+  }
+
+  const validateJs = annot.getFormAdditionalActionJavaScript(FormFieldActionEvent.Validate);
+  if (validateJs) {
+    console.log(`Field "${annot.getFormFieldName()}" has Validate JS: ${validateJs}`);
+  }
+}
+```
+
+The `FormFieldActionEvent` enum includes:
+
+| Event | Description |
+|-------|-------------|
+| `KeyStroke` | Triggered on each keystroke in a text field |
+| `Format` | Triggered to format the field value for display |
+| `Validate` | Triggered to validate the field value |
+| `Calculate` | Triggered to recalculate dependent field values |

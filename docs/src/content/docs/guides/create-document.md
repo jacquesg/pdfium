@@ -13,8 +13,7 @@ Document creation workflow:
 2. Load fonts with `builder.loadStandardFont()`
 3. Add pages with `builder.addPage()`
 4. Add content to each page
-5. Call `page.finalize()` for each page
-6. Save with `builder.save()`
+5. Save with `builder.save()`
 
 ## Basic Example
 
@@ -31,7 +30,6 @@ async function createSimplePDF() {
   {
     using page = builder.addPage(); // US Letter size (default)
     page.addText('Hello, World!', 72, 720, font, 24);
-    page.finalize();
   }
 
   const pdfBytes = builder.save();
@@ -170,18 +168,18 @@ page.addText('Body text content...', 72, 650, bodyFont, 12);
 
 ```typescript
 // Filled rectangle
-page.addRect(72, 700, 200, 50, {
+page.addRectangle(72, 700, 200, 50, {
   fill: { r: 200, g: 220, b: 255, a: 255 },
 });
 
 // Border only
-page.addRect(72, 600, 200, 50, {
+page.addRectangle(72, 600, 200, 50, {
   stroke: { r: 0, g: 0, b: 0, a: 255 },
   strokeWidth: 1,
 });
 
 // Fill and border
-page.addRect(72, 500, 200, 50, {
+page.addRectangle(72, 500, 200, 50, {
   fill: { r: 255, g: 255, b: 200, a: 255 },
   stroke: { r: 0, g: 0, b: 0, a: 255 },
   strokeWidth: 2,
@@ -192,40 +190,13 @@ page.addRect(72, 500, 200, 50, {
 
 ```typescript
 // Horizontal line (thin rectangle)
-page.addRect(72, 650, 468, 1, {
+page.addRectangle(72, 650, 468, 1, {
   fill: { r: 0, g: 0, b: 0, a: 255 },
 });
 
 // Thicker line
-page.addRect(72, 600, 468, 3, {
+page.addRectangle(72, 600, 468, 3, {
   fill: { r: 100, g: 100, b: 100, a: 255 },
-});
-```
-
-### Paths (Polygons)
-
-```typescript
-// Triangle
-page.addPath([
-  { x: 200, y: 400 },
-  { x: 300, y: 500 },
-  { x: 100, y: 500 },
-  { x: 200, y: 400 }, // Close path
-], {
-  fill: { r: 255, g: 200, b: 100, a: 255 },
-  stroke: { r: 0, g: 0, b: 0, a: 255 },
-  strokeWidth: 1,
-});
-
-// Diamond
-page.addPath([
-  { x: 400, y: 350 },
-  { x: 450, y: 400 },
-  { x: 400, y: 450 },
-  { x: 350, y: 400 },
-  { x: 400, y: 350 },
-], {
-  fill: { r: 100, g: 200, b: 255, a: 255 },
 });
 ```
 
@@ -250,7 +221,6 @@ for (let i = 0; i < 5; i++) {
     10
   );
 
-  page.finalize();
 }
 ```
 
@@ -289,7 +259,7 @@ async function createInvoice() {
     using page = builder.addPage();
 
     // Header background
-    page.addRect(0, 742, 612, 50, {
+    page.addRectangle(0, 742, 612, 50, {
       fill: { r: 50, g: 100, b: 150, a: 255 },
     });
 
@@ -314,7 +284,7 @@ async function createInvoice() {
 
     // Table header
     const tableTop = 520;
-    page.addRect(72, tableTop - 20, 468, 25, {
+    page.addRectangle(72, tableTop - 20, 468, 25, {
       fill: { r: 240, g: 240, b: 240, a: 255 },
     });
     page.addText('Description', 80, tableTop - 10, bold, 10);
@@ -345,7 +315,7 @@ async function createInvoice() {
     }
 
     // Separator line
-    page.addRect(72, y - 10, 468, 1, {
+    page.addRectangle(72, y - 10, 468, 1, {
       fill: { r: 0, g: 0, b: 0, a: 255 },
     });
 
@@ -362,7 +332,7 @@ async function createInvoice() {
     page.addText(`$${tax.toFixed(2)}`, 475, y, regular, 10);
 
     y -= 18;
-    page.addRect(370, y - 5, 170, 25, {
+    page.addRectangle(370, y - 5, 170, 25, {
       fill: { r: 50, g: 100, b: 150, a: 255 },
     });
     page.addText('TOTAL:', 380, y + 5, bold, 11);
@@ -372,7 +342,6 @@ async function createInvoice() {
     page.addText('Payment terms: Net 30', 72, 100, regular, 9);
     page.addText('Thank you for your business!', 72, 85, regular, 9);
 
-    page.finalize();
   }
 
   const bytes = builder.save({ version: 17 });

@@ -24,7 +24,21 @@ export default defineConfig({
           name: 'unit',
           environment: 'node',
           include: ['test/unit/**/*.test.ts'],
+          exclude: ['test/unit/react/**'],
           setupFiles: ['test/setup.ts'],
+        },
+        define: {
+          __PACKAGE_VERSION__: JSON.stringify(packageVersion),
+          __WASM_HASH__: JSON.stringify('test'),
+          __DEV__: JSON.stringify(true),
+        },
+      },
+      {
+        test: {
+          name: 'react',
+          include: ['test/unit/react/**/*.test.{ts,tsx}'],
+          environment: 'happy-dom',
+          setupFiles: ['test/setup.ts', 'test/react-setup.ts'],
         },
         define: {
           __PACKAGE_VERSION__: JSON.stringify(packageVersion),
@@ -36,7 +50,7 @@ export default defineConfig({
         test: {
           name: 'integration',
           environment: 'node',
-          include: ['test/integration/**/*.test.ts'],
+          include: ['test/integration/**/*.test.ts', 'test/integration/react/**/*.test.{ts,tsx}'],
           setupFiles: ['test/setup.ts'],
           testTimeout: 15000,
         },
@@ -65,20 +79,28 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html', 'lcov'],
-      include: ['src/core/**/*.ts', 'src/wasm/**/*.ts', 'src/document/**/*.ts', 'src/context/**/*.ts', 'src/pdfium.ts'],
+      include: [
+        'src/core/**/*.ts',
+        'src/wasm/**/*.ts',
+        'src/document/**/*.ts',
+        'src/context/**/*.ts',
+        'src/pdfium.ts',
+        'src/react/**/*.{ts,tsx}',
+      ],
       exclude: [
         'src/**/*.d.ts',
         'src/**/index.ts',
         'src/core/types.ts',
         'src/wasm/bindings/**/*.ts', // Pure interfaces, no executable code
         'src/context/protocol.ts', // Pure type definitions
+        'src/core/interfaces.ts', // Pure interfaces, no executable code
         'src/document/native-*.ts', // Requires native binding (tested in native CI jobs)
       ],
       thresholds: {
-        lines: 65,
-        branches: 50,
-        functions: 75,
-        statements: 65,
+        lines: 95,
+        branches: 90,
+        functions: 95,
+        statements: 95,
       },
     },
   },

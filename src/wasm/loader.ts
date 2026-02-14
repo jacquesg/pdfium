@@ -157,6 +157,14 @@ async function loadVendorCJS(): Promise<{ default: unknown }> {
     ? nodePath.join(__dirname, '..', 'vendor', 'pdfium.cjs')
     : nodePath.join(__dirname, 'vendor', 'pdfium.cjs');
 
+  // Bust the require cache so each call gets a fresh WASM module instance.
+  // PDFium's FPDF_InitLibraryWithConfig/FPDF_DestroyLibrary are not safe to
+  // call multiple times on the same WASM instance — internal C++ state
+  // (including the Emscripten function table) gets corrupted after repeated
+  // init/destroy cycles on a shared module.
+  const resolvedPath = require.resolve(vendorPath);
+  delete require.cache[resolvedPath];
+
   return { default: require(vendorPath) };
 }
 

@@ -1,49 +1,20 @@
-import { useEffect, useRef } from 'react';
+/**
+ * Re-export of the library's PDFCanvas component with the demo's default
+ * Tailwind styling applied. The library's version has no default className.
+ */
 
-interface PDFCanvasProps {
-  width: number;
-  height: number;
-  data?: Uint8Array; // RGBA data
-  className?: string;
-  style?: React.CSSProperties;
-  onMouseDown?: (e: React.MouseEvent<HTMLCanvasElement>) => void;
-  onMouseMove?: (e: React.MouseEvent<HTMLCanvasElement>) => void;
-  onMouseUp?: (e: React.MouseEvent<HTMLCanvasElement>) => void;
-}
+import { PDFCanvas as LibPDFCanvas } from '@scaryterry/pdfium/react';
+import type { PDFCanvasProps } from '@scaryterry/pdfium/react';
+import { cn } from '../lib/utils';
 
-export function PDFCanvas({ width, height, data, style, ...props }: PDFCanvasProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas || !data) return;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    // Create ImageData from the RGBA buffer
-    // Note: Uint8ClampedArray is required for ImageData
-    const clampedData = new Uint8ClampedArray(data);
-    const imageData = new ImageData(clampedData, width, height);
-    
-    ctx.putImageData(imageData, 0, 0);
-  }, [width, height, data]);
-
+function PDFCanvas({ className, ...props }: PDFCanvasProps) {
   return (
-    <canvas
-      ref={canvasRef}
-      width={width}
-      height={height}
-      style={{
-        border: '1px solid #e5e7eb',
-        boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
-        maxWidth: '100%',
-        height: 'auto',
-        userSelect: 'none',
-        WebkitUserSelect: 'none',
-        ...style
-      }}
+    <LibPDFCanvas
+      className={cn('border border-gray-200 shadow-md max-w-full h-auto select-none', className)}
       {...props}
     />
   );
 }
+
+export { PDFCanvas };
+export type { PDFCanvasProps };

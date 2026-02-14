@@ -10,12 +10,47 @@ import { AsyncDisposable } from '../core/disposable.js';
 import { isNodeEnvironment } from '../core/env.js';
 import { InitialisationError, PDFiumError, PDFiumErrorCode, WorkerError } from '../core/errors.js';
 import { getLogger } from '../core/logger.js';
-import type { ProgressCallback, RenderOptions, RenderResult, SerialisedError } from '../core/types.js';
 import type {
+  Bookmark,
+  CharacterInfo,
+  CharBox,
+  Colour,
+  DocumentMetadata,
+  DocumentPermissions,
+  FlattenFlags,
+  FlattenResult,
+  FormFieldType,
+  ImportPagesOptions,
+  JavaScriptAction,
+  NamedDestination,
+  NUpLayoutOptions,
+  ProgressCallback,
+  RenderOptions,
+  RenderResult,
+  SaveOptions,
+  SerialisedError,
+  StructureElement,
+  TextSearchFlags,
+  TextSearchResult,
+  ViewerPreferences,
+  WebLink,
+} from '../core/types.js';
+import type {
+  CharAtPosResponse,
+  CreateNUpResponse,
+  DocumentInfoResponse,
+  ExtendedDocumentInfoResponse,
   LoadPageResponse,
   OpenDocumentResponse,
+  PageInfoResponse,
   PageSizeResponse,
   RenderPageResponse,
+  SerialisedAnnotation,
+  SerialisedAttachment,
+  SerialisedFormWidget,
+  SerialisedLink,
+  SerialisedPageObject,
+  SerialisedSignature,
   WorkerRequest,
   WorkerResponse,
 } from './protocol.js';
@@ -210,7 +245,7 @@ export class WorkerProxy extends AsyncDisposable {
       const proxy = new WorkerProxy(worker, timeout, renderTimeout, destroyTimeout);
 
       try {
-        await proxy.#sendRequest<void>('INIT', { wasmBinary }, [], timeout);
+        await proxy.#sendRequest<void>('INIT', { wasmBinary }, [wasmBinary], timeout);
       } catch (error) {
         worker.terminate();
         throw new InitialisationError(
@@ -324,6 +359,33 @@ export class WorkerProxy extends AsyncDisposable {
   }
 
   /**
+   * Render a page in one round-trip: load, render, close — all inside the worker.
+   *
+   * Eliminates 2 round-trips compared to loadPage → renderPage → closePage.
+   */
+  async renderPageStandalone(
+    documentId: string,
+    pageIndex: number,
+    options: RenderOptions = {},
+    onProgress?: ProgressCallback,
+  ): Promise<RenderResult> {
+    const response = await this.#sendRequest<RenderPageResponse>(
+      'RENDER_PAGE_STANDALONE',
+      { documentId, pageIndex, options },
+      [],
+      this.#renderTimeout,
+      onProgress,
+    );
+    return {
+      width: response.width,
+      height: response.height,
+      originalWidth: response.originalWidth,
+      originalHeight: response.originalHeight,
+      data: new Uint8Array(response.data),
+    };
+  }
+
+  /**
    * Get text content from a page.
    *
    * @param pageId - Page ID
@@ -342,6 +404,166 @@ export class WorkerProxy extends AsyncDisposable {
    */
   async getTextLayout(pageId: string): Promise<{ text: string; rects: Float32Array }> {
     return this.#sendRequest('GET_TEXT_LAYOUT', { pageId });
+  }
+
+  // ────────────────────────────────────────────────────────────
+  // Document-level queries
+  // ────────────────────────────────────────────────────────────
+
+  async getDocumentInfo(documentId: string): Promise<DocumentInfoResponse> {
+    return this.#sendRequest<DocumentInfoResponse>('GET_DOCUMENT_INFO', { documentId });
+  }
+
+  async getBookmarks(documentId: string): Promise<Bookmark[]> {
+    return this.#sendRequest<Bookmark[]>('GET_BOOKMARKS', { documentId });
+  }
+
+  async getAttachments(documentId: string): Promise<SerialisedAttachment[]> {
+    return this.#sendRequest<SerialisedAttachment[]>('GET_ATTACHMENTS', { documentId });
+  }
+
+  async getNamedDestinations(documentId: string): Promise<NamedDestination[]> {
+    return this.#sendRequest<NamedDestination[]>('GET_NAMED_DESTINATIONS', { documentId });
+  }
+
+  async getNamedDestinationByName(documentId: string, name: string): Promise<NamedDestination | null> {
+    return this.#sendRequest<NamedDestination | null>('GET_NAMED_DEST_BY_NAME', { documentId, name });
+  }
+
+  async getPageLabel(documentId: string, pageIndex: number): Promise<string | null> {
+    return this.#sendRequest<string | null>('GET_PAGE_LABEL', { documentId, pageIndex });
+  }
+
+  async saveDocument(documentId: string, options?: SaveOptions): Promise<ArrayBuffer> {
+    return this.#sendRequest<ArrayBuffer>('SAVE_DOCUMENT', { documentId, options });
+  }
+
+  // ────────────────────────────────────────────────────────────
+  // Page-level read queries
+  // ────────────────────────────────────────────────────────────
+
+  async getPageInfo(pageId: string): Promise<PageInfoResponse> {
+    return this.#sendRequest<PageInfoResponse>('GET_PAGE_INFO', { pageId });
+  }
+
+  async getAnnotations(pageId: string): Promise<SerialisedAnnotation[]> {
+    return this.#sendRequest<SerialisedAnnotation[]>('GET_ANNOTATIONS', { pageId });
+  }
+
+  async getPageObjects(pageId: string): Promise<SerialisedPageObject[]> {
+    return this.#sendRequest<SerialisedPageObject[]>('GET_PAGE_OBJECTS', { pageId });
+  }
+
+  async getLinks(pageId: string): Promise<SerialisedLink[]> {
+    return this.#sendRequest<SerialisedLink[]>('GET_LINKS', { pageId });
+  }
+
+  async getWebLinks(pageId: string): Promise<WebLink[]> {
+    return this.#sendRequest<WebLink[]>('GET_WEB_LINKS', { pageId });
+  }
+
+  async getStructureTree(pageId: string): Promise<StructureElement[] | null> {
+    return this.#sendRequest<StructureElement[] | null>('GET_STRUCTURE_TREE', { pageId });
+  }
+
+  async getCharAtPos(pageId: string, x: number, y: number): Promise<CharAtPosResponse | null> {
+    return this.#sendRequest<CharAtPosResponse | null>('GET_CHAR_AT_POS', { pageId, x, y });
+  }
+
+  async getTextInRect(pageId: string, left: number, top: number, right: number, bottom: number): Promise<string> {
+    return this.#sendRequest<string>('GET_TEXT_IN_RECT', { pageId, left, top, right, bottom });
+  }
+
+  async findText(pageId: string, query: string, flags?: TextSearchFlags): Promise<TextSearchResult[]> {
+    return this.#sendRequest<TextSearchResult[]>('FIND_TEXT', { pageId, query, flags });
+  }
+
+  async getCharacterInfo(pageId: string, charIndex: number): Promise<CharacterInfo | undefined> {
+    return this.#sendRequest<CharacterInfo | undefined>('GET_CHARACTER_INFO', { pageId, charIndex });
+  }
+
+  async getCharBox(pageId: string, charIndex: number): Promise<CharBox | undefined> {
+    return this.#sendRequest<CharBox | undefined>('GET_CHAR_BOX', { pageId, charIndex });
+  }
+
+  // ────────────────────────────────────────────────────────────
+  // Page-level mutations
+  // ────────────────────────────────────────────────────────────
+
+  async flattenPage(pageId: string, flags?: FlattenFlags): Promise<FlattenResult> {
+    return this.#sendRequest<FlattenResult>('FLATTEN_PAGE', { pageId, flags });
+  }
+
+  async getFormWidgets(pageId: string): Promise<SerialisedFormWidget[]> {
+    return this.#sendRequest<SerialisedFormWidget[]>('GET_FORM_WIDGETS', { pageId });
+  }
+
+  // ────────────────────────────────────────────────────────────
+  // Form operations
+  // ────────────────────────────────────────────────────────────
+
+  async getFormSelectedText(pageId: string): Promise<string | null> {
+    return this.#sendRequest<string | null>('GET_FORM_SELECTED_TEXT', { pageId });
+  }
+
+  async canFormUndo(pageId: string): Promise<boolean> {
+    return this.#sendRequest<boolean>('CAN_FORM_UNDO', { pageId });
+  }
+
+  async formUndo(pageId: string): Promise<boolean> {
+    return this.#sendRequest<boolean>('FORM_UNDO', { pageId });
+  }
+
+  async killFormFocus(documentId: string): Promise<boolean> {
+    return this.#sendRequest<boolean>('KILL_FORM_FOCUS', { documentId });
+  }
+
+  // ────────────────────────────────────────────────────────────
+  // Document operations
+  // ────────────────────────────────────────────────────────────
+
+  async setFormHighlight(documentId: string, fieldType: FormFieldType, colour: Colour, alpha: number): Promise<void> {
+    return this.#sendRequest<void>('SET_FORM_HIGHLIGHT', { documentId, fieldType, colour, alpha });
+  }
+
+  async importPages(targetDocId: string, sourceDocId: string, options?: ImportPagesOptions): Promise<void> {
+    return this.#sendRequest<void>('IMPORT_PAGES', { targetDocId, sourceDocId, options });
+  }
+
+  async createNUp(documentId: string, options: NUpLayoutOptions): Promise<CreateNUpResponse> {
+    return this.#sendRequest<CreateNUpResponse>('CREATE_N_UP', { documentId, options });
+  }
+
+  async getAllPageDimensions(documentId: string): Promise<Array<{ width: number; height: number }>> {
+    return this.#sendRequest<Array<{ width: number; height: number }>>('GET_ALL_PAGE_DIMENSIONS', { documentId });
+  }
+
+  async getMetadata(documentId: string): Promise<DocumentMetadata> {
+    return this.#sendRequest<DocumentMetadata>('GET_METADATA', { documentId });
+  }
+
+  async getPermissions(documentId: string): Promise<DocumentPermissions> {
+    return this.#sendRequest<DocumentPermissions>('GET_PERMISSIONS', { documentId });
+  }
+
+  async getViewerPreferences(documentId: string): Promise<ViewerPreferences> {
+    return this.#sendRequest<ViewerPreferences>('GET_VIEWER_PREFERENCES', { documentId });
+  }
+
+  async getJavaScriptActions(documentId: string): Promise<JavaScriptAction[]> {
+    return this.#sendRequest<JavaScriptAction[]>('GET_JAVASCRIPT_ACTIONS', { documentId });
+  }
+
+  async getSignatures(documentId: string): Promise<SerialisedSignature[]> {
+    return this.#sendRequest<SerialisedSignature[]>('GET_SIGNATURES', { documentId });
+  }
+
+  async getPrintPageRanges(documentId: string): Promise<number[] | undefined> {
+    return this.#sendRequest<number[] | undefined>('GET_PRINT_PAGE_RANGES', { documentId });
+  }
+
+  async getExtendedDocumentInfo(documentId: string): Promise<ExtendedDocumentInfoResponse> {
+    return this.#sendRequest<ExtendedDocumentInfoResponse>('GET_EXTENDED_DOCUMENT_INFO', { documentId });
   }
 
   /**
@@ -414,6 +636,7 @@ export class WorkerProxy extends AsyncDisposable {
 
     const pending = this.#pending.get(id);
     if (pending === undefined) {
+      if (__DEV__) console.warn(`[PDFium] Received response for unknown request ID: ${id}`);
       return;
     }
 

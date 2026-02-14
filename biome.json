@@ -7,7 +7,7 @@
   },
   "files": {
     "maxSize": 10485760,
-    "includes": ["src/**/*.ts", "test/**/*.ts", "*.ts", "*.json"]
+    "includes": ["src/**/*.{ts,tsx}", "test/**/*.{ts,tsx}", "*.ts", "*.json"]
   },
   "linter": {
     "enabled": true,
@@ -33,7 +33,7 @@
   },
   "overrides": [
     {
-      "includes": ["test/**/*.ts"],
+      "includes": ["test/**/*.{ts,tsx}"],
       "linter": {
         "rules": {
           "style": {

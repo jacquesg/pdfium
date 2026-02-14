@@ -9,8 +9,45 @@
 
 import { AsyncDisposable } from '../core/disposable.js';
 import { PDFiumError, PDFiumErrorCode } from '../core/errors.js';
-import type { OpenDocumentOptions, ProgressCallback, RenderOptions, RenderResult } from '../core/types.js';
-import type { WorkerRequest, WorkerResponse } from './protocol.js';
+import type {
+  Bookmark,
+  CharacterInfo,
+  CharBox,
+  Colour,
+  DocumentMetadata,
+  DocumentPermissions,
+  FlattenFlags,
+  FlattenResult,
+  FormFieldType,
+  ImportPagesOptions,
+  JavaScriptAction,
+  NamedDestination,
+  NUpLayoutOptions,
+  OpenDocumentOptions,
+  ProgressCallback,
+  RenderOptions,
+  RenderResult,
+  SaveOptions,
+  StructureElement,
+  TextSearchFlags,
+  TextSearchResult,
+  ViewerPreferences,
+  WebLink,
+} from '../core/types.js';
+import type {
+  CharAtPosResponse,
+  DocumentInfoResponse,
+  ExtendedDocumentInfoResponse,
+  PageInfoResponse,
+  SerialisedAnnotation,
+  SerialisedAttachment,
+  SerialisedFormWidget,
+  SerialisedLink,
+  SerialisedPageObject,
+  SerialisedSignature,
+  WorkerRequest,
+  WorkerResponse,
+} from './protocol.js';
 import { WorkerProxy, type WorkerProxyOptions, type WorkerTransport } from './worker-proxy.js';
 
 function toOwnedArrayBuffer(data: Uint8Array | ArrayBuffer): ArrayBuffer {
@@ -156,7 +193,8 @@ export class WorkerPDFiumDocument extends AsyncDisposable {
   /**
    * High-level convenience rendering method.
    *
-   * Loads the page, renders it, and closes the page automatically.
+   * Uses a single worker round-trip to load, render, and close the page
+   * (instead of 3 sequential round-trips).
    */
   async renderPage(
     pageIndex: number,
@@ -164,8 +202,111 @@ export class WorkerPDFiumDocument extends AsyncDisposable {
     onProgress?: ProgressCallback,
   ): Promise<RenderResult> {
     this.ensureNotDisposed();
-    await using page = await this.getPage(pageIndex);
-    return page.render(options, onProgress);
+    return this.#proxy.renderPageStandalone(this.#documentId, pageIndex, options, onProgress);
+  }
+
+  // ────────────────────────────────────────────────────────────
+  // Document-level queries
+  // ────────────────────────────────────────────────────────────
+
+  async getDocumentInfo(): Promise<DocumentInfoResponse> {
+    this.ensureNotDisposed();
+    return this.#proxy.getDocumentInfo(this.#documentId);
+  }
+
+  async getBookmarks(): Promise<Bookmark[]> {
+    this.ensureNotDisposed();
+    return this.#proxy.getBookmarks(this.#documentId);
+  }
+
+  async getAttachments(): Promise<SerialisedAttachment[]> {
+    this.ensureNotDisposed();
+    return this.#proxy.getAttachments(this.#documentId);
+  }
+
+  async getNamedDestinations(): Promise<NamedDestination[]> {
+    this.ensureNotDisposed();
+    return this.#proxy.getNamedDestinations(this.#documentId);
+  }
+
+  async getNamedDestinationByName(name: string): Promise<NamedDestination | null> {
+    this.ensureNotDisposed();
+    return this.#proxy.getNamedDestinationByName(this.#documentId, name);
+  }
+
+  async getPageLabel(pageIndex: number): Promise<string | null> {
+    this.ensureNotDisposed();
+    return this.#proxy.getPageLabel(this.#documentId, pageIndex);
+  }
+
+  async getAllPageDimensions(): Promise<Array<{ width: number; height: number }>> {
+    this.ensureNotDisposed();
+    return this.#proxy.getAllPageDimensions(this.#documentId);
+  }
+
+  async save(options?: SaveOptions): Promise<Uint8Array> {
+    this.ensureNotDisposed();
+    const buffer = await this.#proxy.saveDocument(this.#documentId, options);
+    return new Uint8Array(buffer);
+  }
+
+  async killFormFocus(): Promise<boolean> {
+    this.ensureNotDisposed();
+    return this.#proxy.killFormFocus(this.#documentId);
+  }
+
+  async setFormHighlight(fieldType: FormFieldType, colour: Colour, alpha: number): Promise<void> {
+    this.ensureNotDisposed();
+    return this.#proxy.setFormHighlight(this.#documentId, fieldType, colour, alpha);
+  }
+
+  async importPages(sourceDocument: WorkerPDFiumDocument, options?: ImportPagesOptions): Promise<void> {
+    this.ensureNotDisposed();
+    return this.#proxy.importPages(this.#documentId, sourceDocument.id, options);
+  }
+
+  async createNUp(options: NUpLayoutOptions): Promise<WorkerPDFiumDocument> {
+    this.ensureNotDisposed();
+    const response = await this.#proxy.createNUp(this.#documentId, options);
+    const document = new WorkerPDFiumDocument(this.#proxy, response.documentId, response.pageCount, () => {
+      // The new document is independent — no parent tracking needed
+    });
+    return document;
+  }
+
+  async getMetadata(): Promise<DocumentMetadata> {
+    this.ensureNotDisposed();
+    return this.#proxy.getMetadata(this.#documentId);
+  }
+
+  async getPermissions(): Promise<DocumentPermissions> {
+    this.ensureNotDisposed();
+    return this.#proxy.getPermissions(this.#documentId);
+  }
+
+  async getViewerPreferences(): Promise<ViewerPreferences> {
+    this.ensureNotDisposed();
+    return this.#proxy.getViewerPreferences(this.#documentId);
+  }
+
+  async getJavaScriptActions(): Promise<JavaScriptAction[]> {
+    this.ensureNotDisposed();
+    return this.#proxy.getJavaScriptActions(this.#documentId);
+  }
+
+  async getSignatures(): Promise<SerialisedSignature[]> {
+    this.ensureNotDisposed();
+    return this.#proxy.getSignatures(this.#documentId);
+  }
+
+  async getPrintPageRanges(): Promise<number[] | undefined> {
+    this.ensureNotDisposed();
+    return this.#proxy.getPrintPageRanges(this.#documentId);
+  }
+
+  async getExtendedDocumentInfo(): Promise<ExtendedDocumentInfoResponse> {
+    this.ensureNotDisposed();
+    return this.#proxy.getExtendedDocumentInfo(this.#documentId);
   }
 
   protected async disposeInternalAsync(): Promise<void> {
@@ -251,6 +392,98 @@ export class WorkerPDFiumPage extends AsyncDisposable {
   async getTextLayout(): Promise<{ text: string; rects: Float32Array }> {
     this.ensureNotDisposed();
     return this.#proxy.getTextLayout(this.#pageId);
+  }
+
+  // ────────────────────────────────────────────────────────────
+  // Page-level queries
+  // ────────────────────────────────────────────────────────────
+
+  async getPageInfo(): Promise<PageInfoResponse> {
+    this.ensureNotDisposed();
+    return this.#proxy.getPageInfo(this.#pageId);
+  }
+
+  async getAnnotations(): Promise<SerialisedAnnotation[]> {
+    this.ensureNotDisposed();
+    return this.#proxy.getAnnotations(this.#pageId);
+  }
+
+  async getPageObjects(): Promise<SerialisedPageObject[]> {
+    this.ensureNotDisposed();
+    return this.#proxy.getPageObjects(this.#pageId);
+  }
+
+  async getLinks(): Promise<SerialisedLink[]> {
+    this.ensureNotDisposed();
+    return this.#proxy.getLinks(this.#pageId);
+  }
+
+  async getWebLinks(): Promise<WebLink[]> {
+    this.ensureNotDisposed();
+    return this.#proxy.getWebLinks(this.#pageId);
+  }
+
+  async getStructureTree(): Promise<StructureElement[] | null> {
+    this.ensureNotDisposed();
+    return this.#proxy.getStructureTree(this.#pageId);
+  }
+
+  async getCharAtPos(x: number, y: number): Promise<CharAtPosResponse | null> {
+    this.ensureNotDisposed();
+    return this.#proxy.getCharAtPos(this.#pageId, x, y);
+  }
+
+  async getTextInRect(left: number, top: number, right: number, bottom: number): Promise<string> {
+    this.ensureNotDisposed();
+    return this.#proxy.getTextInRect(this.#pageId, left, top, right, bottom);
+  }
+
+  async findText(query: string, flags?: TextSearchFlags): Promise<TextSearchResult[]> {
+    this.ensureNotDisposed();
+    return this.#proxy.findText(this.#pageId, query, flags);
+  }
+
+  async getCharacterInfo(charIndex: number): Promise<CharacterInfo | undefined> {
+    this.ensureNotDisposed();
+    return this.#proxy.getCharacterInfo(this.#pageId, charIndex);
+  }
+
+  async getCharBox(charIndex: number): Promise<CharBox | undefined> {
+    this.ensureNotDisposed();
+    return this.#proxy.getCharBox(this.#pageId, charIndex);
+  }
+
+  // ────────────────────────────────────────────────────────────
+  // Page-level mutations
+  // ────────────────────────────────────────────────────────────
+
+  async flatten(flags?: FlattenFlags): Promise<FlattenResult> {
+    this.ensureNotDisposed();
+    return this.#proxy.flattenPage(this.#pageId, flags);
+  }
+
+  async getFormWidgets(): Promise<SerialisedFormWidget[]> {
+    this.ensureNotDisposed();
+    return this.#proxy.getFormWidgets(this.#pageId);
+  }
+
+  // ────────────────────────────────────────────────────────────
+  // Form operations
+  // ────────────────────────────────────────────────────────────
+
+  async getFormSelectedText(): Promise<string | null> {
+    this.ensureNotDisposed();
+    return this.#proxy.getFormSelectedText(this.#pageId);
+  }
+
+  async canFormUndo(): Promise<boolean> {
+    this.ensureNotDisposed();
+    return this.#proxy.canFormUndo(this.#pageId);
+  }
+
+  async formUndo(): Promise<boolean> {
+    this.ensureNotDisposed();
+    return this.#proxy.formUndo(this.#pageId);
   }
 
   protected async disposeInternalAsync(): Promise<void> {

@@ -352,7 +352,7 @@ async function createReport(data: ReportData, outputPath: string) {
     using page = builder.addPage({ width: pageWidth, height: pageHeight });
 
     // Header
-    page.addRect(0, pageHeight - 100, pageWidth, 100, {
+    page.addRectangle(0, pageHeight - 100, pageWidth, 100, {
       fill: { r: 51, g: 102, b: 153, a: 255 },
     });
 
@@ -392,12 +392,11 @@ async function createReport(data: ReportData, outputPath: string) {
     }
 
     // Footer
-    page.addRect(margin, 36, pageWidth - 2 * margin, 1, {
+    page.addRectangle(margin, 36, pageWidth - 2 * margin, 1, {
       fill: { r: 200, g: 200, b: 200, a: 255 },
     });
     page.addText('Generated with @scaryterry/pdfium', margin, 20, regular, 8);
 
-    page.finalize();
   }
 
   const bytes = builder.save({ version: 17 });
