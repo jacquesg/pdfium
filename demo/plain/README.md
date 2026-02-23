@@ -53,7 +53,7 @@ A minimal browser example demonstrating how to use `@scaryterry/pdfium` without 
    npm install @scaryterry/pdfium
    cp node_modules/@scaryterry/pdfium/dist/browser.js .
    cp node_modules/@scaryterry/pdfium/dist/vendor/pdfium.wasm .
-   cp node_modules/@scaryterry/pdfium/src/vendor/pdfium.cjs .
+   cp node_modules/@scaryterry/pdfium/dist/vendor/pdfium.cjs .
    ```
 
 3. Serve and open:

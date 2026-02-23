@@ -1,8 +1,13 @@
+---
+title: React Examples
+description: End-to-end React recipes for PDFViewer, hooks, and custom viewer integrations.
+---
+
 # React Examples & Recipes
 
 Comprehensive examples for `@scaryterry/pdfium/react`. Each recipe includes a description, complete TSX code, and a list of key APIs used.
 
-> All examples assume you have configured `PDFiumProvider` with the correct `workerUrl` and `wasmUrl` (or `wasmBinary`). See the [Quick Start guide](../src/content/docs/quick-start.md) for initial setup.
+> All examples assume you have configured `PDFiumProvider` with the correct `workerUrl` and `wasmUrl` (or `wasmBinary`). See the [Quick Start guide](../quick-start.md) for initial setup.
 
 ---
 

@@ -1,33 +1,61 @@
 # Documentation
 
-This website is built using [Starlight](https://starlight.astro.build/), a documentation framework powered by [Astro](https://astro.build/).
+This directory contains the Starlight/Astro docs site for `@scaryterry/pdfium`.
 
-### Installation
+## Prerequisites
 
-```
-pnpm install
-```
+- Node.js 22+
+- pnpm
+- Repository dependencies installed (`pnpm install` from repo root)
 
-### Local Development
+## Local Development
 
-```
-pnpm dev
-```
+Run from repository root:
 
-This command starts a local development server. Most changes are reflected live without having to restart the server.
-
-### Build
-
-```
-pnpm build
+```bash
+pnpm --dir docs dev
 ```
 
-This command generates static content into the `dist` directory and can be served using any static contents hosting service.
+This starts the docs dev server with hot reload.
 
-### Preview
+## API Docs Generation
 
+The API reference under `docs/src/content/docs/api/` is generated from TypeScript sources.
+From repository root:
+
+```bash
+pnpm docs:gen
 ```
-pnpm preview
+
+This runs TypeDoc and post-processes generated pages for Starlight consistency.
+
+## Validation Commands
+
+Run from repository root:
+
+```bash
+pnpm docs:build:strict
 ```
 
-Serves the built site locally for testing before deployment.
+This performs:
+
+- `docs` production build
+- strict warning checks
+- internal route link validation (`pnpm docs:check-links`)
+
+To run link checks only (requires an up-to-date `docs/dist` build):
+
+```bash
+pnpm docs:check-links
+```
+
+## Production Build
+
+From repository root:
+
+```bash
+pnpm --dir docs build
+pnpm --dir docs preview
+```
+
+`build` writes static output to `docs/dist/`.

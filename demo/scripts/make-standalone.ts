@@ -129,7 +129,7 @@ npm start
 
 ## Learn More
 
-See the main repository: https://github.com/nickadam/pdfium
+See the main repository: https://github.com/jacquesg/pdfium
 `;
 
   writeFileSync(join(outputDir, 'README.md'), readme);
@@ -172,7 +172,7 @@ This is a standalone demo that uses \`@scaryterry/pdfium\` without any build too
    \`\`\`bash
    cp node_modules/@scaryterry/pdfium/dist/browser.js .
    cp node_modules/@scaryterry/pdfium/dist/vendor/pdfium.wasm .
-   cp node_modules/@scaryterry/pdfium/src/vendor/pdfium.cjs .
+   cp node_modules/@scaryterry/pdfium/dist/vendor/pdfium.cjs .
    \`\`\`
 
 3. Serve the directory with any HTTP server:
@@ -190,7 +190,7 @@ This is a standalone demo that uses \`@scaryterry/pdfium\` without any build too
 
 ## Learn More
 
-See the main repository: https://github.com/nickadam/pdfium
+See the main repository: https://github.com/jacquesg/pdfium
 `;
 
   writeFileSync(join(outputDir, 'README.md'), readme);
@@ -269,7 +269,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-const pdfiumCjs = join(__dirname, 'node_modules', '@scaryterry', 'pdfium', 'src', 'vendor', 'pdfium.cjs');
+const pdfiumCjs = join(__dirname, 'node_modules', '@scaryterry', 'pdfium', 'dist', 'vendor', 'pdfium.cjs');
 const publicDir = join(__dirname, 'public');
 const targetCjs = join(publicDir, 'pdfium.cjs');
 
@@ -321,7 +321,7 @@ export default defineConfig({
 
 ## Learn More
 
-See the main repository: https://github.com/nickadam/pdfium
+See the main repository: https://github.com/jacquesg/pdfium
 `;
 
   writeFileSync(join(outputDir, 'README.md'), readme);

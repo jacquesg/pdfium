@@ -14,7 +14,7 @@ export default defineConfig({
         {
           label: 'Getting Started',
           items: [
-            { label: 'Introduction', slug: '' },
+            { label: 'Introduction', link: '/' },
             { label: 'Installation', slug: 'installation' },
             { label: 'Quick Start', slug: 'quick-start' },
             { label: 'TypeScript Setup', slug: 'typescript-setup' },
@@ -137,6 +137,16 @@ export default defineConfig({
             { label: 'Node.js', slug: 'examples/nodejs' },
             { label: 'Browser', slug: 'examples/browser' },
             { label: 'Common Patterns', slug: 'examples/patterns' },
+          ],
+        },
+        {
+          label: 'React',
+          items: [
+            { label: 'PDFViewer', slug: 'react/pdf-viewer' },
+            { label: 'Toolbar', slug: 'react/toolbar' },
+            { label: 'useViewerSetup', slug: 'react/use-viewer-setup' },
+            { label: 'Examples', slug: 'react/examples' },
+            { label: 'Styling', slug: 'react/styling' },
           ],
         },
       ],

@@ -1,3 +1,8 @@
+---
+title: useViewerSetup
+description: Compose navigation, zoom, fit, and container behavior with a single viewer orchestration hook.
+---
+
 # useViewerSetup()
 
 `useViewerSetup()` is the single orchestration hook for building PDF viewer UIs. It composes five lower-level hooks (`usePageNavigation`, `useZoom`, `useFitZoom`, `useWheelZoom`, `usePageDimensions`) into one unified result object with logically grouped state slices. The result plugs directly into `<PDFToolbar>` and `<PDFDocumentView>`.

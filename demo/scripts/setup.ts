@@ -38,7 +38,7 @@ function error(message: string): void {
 function checkPrerequisites(): SetupResult {
   const distDir = join(REPO_ROOT, "dist");
   const wasmFile = join(distDir, "vendor", "pdfium.wasm");
-  const cjsFile = join(REPO_ROOT, "src", "vendor", "pdfium.cjs");
+  const cjsFile = join(distDir, "vendor", "pdfium.cjs");
 
   if (!existsSync(distDir)) {
     return {
@@ -59,7 +59,7 @@ function checkPrerequisites(): SetupResult {
     return {
       success: false,
       message:
-        "pdfium.cjs not found in src/vendor/. The WASM binary may not have been downloaded correctly.",
+        "pdfium.cjs not found in dist/vendor/. Run \"pnpm build\" after downloading PDFium artifacts.",
     };
   }
 
@@ -94,7 +94,7 @@ function setupNodeDemo(): void {
 }
 
 function setupPlainDemo(): void {
-  const sourceCjs = join(REPO_ROOT, "src", "vendor", "pdfium.cjs");
+  const sourceCjs = join(REPO_ROOT, "dist", "vendor", "pdfium.cjs");
   const targetCjs = join(REPO_ROOT, "pdfium.cjs");
 
   if (!existsSync(targetCjs)) {
@@ -108,7 +108,7 @@ function setupPlainDemo(): void {
 function setupViteDemo(): void {
   const vitePublicDir = join(DEMO_ROOT, "vite", "public");
   const distDir = join(REPO_ROOT, "dist");
-  const sourceCjs = join(REPO_ROOT, "src", "vendor", "pdfium.cjs");
+  const sourceCjs = join(REPO_ROOT, "dist", "vendor", "pdfium.cjs");
   const sourcePdf = join(DEMO_ROOT, "shared", "sample.pdf");
   const targetCjs = join(vitePublicDir, "pdfium.cjs");
   const targetPdf = join(vitePublicDir, "sample.pdf");

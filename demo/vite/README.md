@@ -208,7 +208,7 @@ Tests use Vitest with `@testing-library/react` in browser mode (Playwright). Eac
 
 **Solution**: Run the setup script (`pnpm tsx demo/scripts/setup.ts`) or manually copy:
 ```bash
-cp ../../src/vendor/pdfium.cjs public/
+cp ../../dist/vendor/pdfium.cjs public/
 ```
 
 ### Error: sample.pdf not found
@@ -242,6 +242,6 @@ optimizeDeps: {
 ## Related Resources
 
 - [Main README](../../README.md) — Full API documentation
-- [Documentation Site](https://pdfium.scaryterry.dev) — Guides and API reference
+- [Documentation Site](https://jacquesg.github.io/pdfium/) — Guides and API reference
 - [Node Demo](../node/) — Node.js server-side example
 - [Plain Demo](../plain/) — Browser example without build tools
