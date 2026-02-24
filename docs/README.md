@@ -2,6 +2,12 @@
 
 This directory contains the Starlight/Astro docs site for `@scaryterry/pdfium`.
 
+## Source Of Truth
+
+- Author published documentation in `docs/src/content/docs/**`.
+- `docs/src/content/docs/api/**` is generated (do not hand-edit).
+- Do not place product docs in parallel trees (for example `docs/react/**`); they will not be published.
+
 ## Prerequisites
 
 - Node.js 22+
@@ -42,6 +48,14 @@ This performs:
 - `docs` production build
 - strict warning checks
 - internal route link validation (`pnpm docs:check-links`)
+
+Run docs-focused unit tests:
+
+```bash
+pnpm test -- test/unit/docs/*.test.ts
+```
+
+This enforces docs structure, frontmatter completeness, and TypeScript snippet syntax.
 
 To run link checks only (requires an up-to-date `docs/dist` build):
 

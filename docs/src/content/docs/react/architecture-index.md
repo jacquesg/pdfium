@@ -1,3 +1,8 @@
+---
+title: React Architecture Map
+description: Module-to-layer map for React components, hooks, controllers, and models.
+---
+
 # React Architecture Index
 
 This index maps major React modules to the intended layers.

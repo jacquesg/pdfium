@@ -142,11 +142,26 @@ export default defineConfig({
         {
           label: 'React',
           items: [
-            { label: 'PDFViewer', slug: 'react/pdf-viewer' },
-            { label: 'Toolbar', slug: 'react/toolbar' },
-            { label: 'useViewerSetup', slug: 'react/use-viewer-setup' },
-            { label: 'Examples', slug: 'react/examples' },
-            { label: 'Styling', slug: 'react/styling' },
+            { label: 'Overview', slug: 'react' },
+            {
+              label: 'Usage',
+              items: [
+                { label: 'PDFViewer', slug: 'react/pdf-viewer' },
+                { label: 'Toolbar', slug: 'react/toolbar' },
+                { label: 'useViewerSetup', slug: 'react/use-viewer-setup' },
+                { label: 'Examples', slug: 'react/examples' },
+                { label: 'Styling', slug: 'react/styling' },
+              ],
+            },
+            {
+              label: 'Engineering',
+              items: [
+                { label: 'Architecture', slug: 'react/architecture' },
+                { label: 'Architecture Map', slug: 'react/architecture-index' },
+                { label: 'Testing', slug: 'react/testing' },
+                { label: 'Contributor Playbook', slug: 'react/contributor-playbook' },
+              ],
+            },
           ],
         },
       ],

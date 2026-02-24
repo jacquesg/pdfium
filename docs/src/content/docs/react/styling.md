@@ -226,11 +226,13 @@ Set CSS custom properties on a parent with a dark-mode selector:
 For the canvas-drawn overlays, pass colour props:
 
 ```tsx
-<TextOverlay selectionColour="rgba(96, 165, 250, 0.35)" />
-<SearchHighlightOverlay
-  currentMatchColour="rgba(251, 191, 36, 0.5)"
-  otherMatchColour="rgba(253, 224, 71, 0.3)"
-/>
+<>
+  <TextOverlay selectionColour="rgba(96, 165, 250, 0.35)" />
+  <SearchHighlightOverlay
+    currentMatchColour="rgba(251, 191, 36, 0.5)"
+    otherMatchColour="rgba(253, 224, 71, 0.3)"
+  />
+</>
 ```
 
 ### Tailwind CSS integration

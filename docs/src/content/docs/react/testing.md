@@ -1,3 +1,8 @@
+---
+title: React Testing
+description: React testing standards for deterministic race coverage and lifecycle safety.
+---
+
 # React Testing Guide
 
 ## Baseline commands

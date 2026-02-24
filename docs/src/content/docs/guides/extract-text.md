@@ -1,5 +1,6 @@
 ---
 title: Extract Text from PDF Page
+description: Extract and search text content from PDF pages
 ---
 
 You can extract text from pages using the `getText()` method.

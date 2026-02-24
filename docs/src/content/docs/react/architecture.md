@@ -1,7 +1,12 @@
+---
+title: React Architecture
+description: Layering model and design rules for React viewer code.
+---
+
 # React Architecture Notes
 
-See `docs/react-architecture-index.md` for a concrete module-to-layer map.
-See `docs/react-contributor-playbook.md` for required file shapes and test gates.
+See [Architecture Map](./architecture-index.md) for a concrete module-to-layer map.
+See [Contributor Playbook](./contributor-playbook.md) for required file shapes and test gates.
 
 ## Layering
 

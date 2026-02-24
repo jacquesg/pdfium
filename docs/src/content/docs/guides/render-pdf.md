@@ -1,5 +1,6 @@
 ---
 title: Render PDF to Image
+description: Render PDF pages to images with scale, dimensions, and render options
 ---
 
 ## Load PDF document

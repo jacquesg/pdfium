@@ -8,6 +8,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../../..');
 const LINK_PATTERN = /\[[^\]]*\]\(([^)]+)\)/gu;
 const EXCLUDED_PREFIXES = ['docs/src/content/docs/api/'];
+const FORBIDDEN_DOC_PATTERNS = [/^docs\/react\//u, /^docs\/react-[^/]+\.md$/u, /^docs\/(?!README\.md$)[^/]+\.md$/u];
 
 function listTrackedMarkdownFiles(): string[] {
   const output = execFileSync('git', ['ls-files', '*.md', '*.mdx'], {
@@ -19,6 +20,7 @@ function listTrackedMarkdownFiles(): string[] {
     .split('\n')
     .map((line) => line.trim())
     .filter((line) => line.length > 0)
+    .filter((line) => existsSync(join(REPO_ROOT, line)))
     .filter((line) => !EXCLUDED_PREFIXES.some((prefix) => line.startsWith(prefix)));
 }
 
@@ -56,6 +58,12 @@ function targetExists(sourceFile: string, target: string): boolean {
 }
 
 describe('tracked markdown relative links', () => {
+  test('no orphan product docs exist outside canonical docs content tree', () => {
+    const files = listTrackedMarkdownFiles();
+    const orphans = files.filter((file) => FORBIDDEN_DOC_PATTERNS.some((pattern) => pattern.test(file)));
+    expect(orphans).toEqual([]);
+  });
+
   test('all relative markdown links resolve to existing files', () => {
     const brokenLinks: string[] = [];
     const files = listTrackedMarkdownFiles();

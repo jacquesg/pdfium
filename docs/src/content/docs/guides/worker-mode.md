@@ -342,28 +342,38 @@ module.exports = {
 Add progress callbacks for long operations:
 
 ```typescript
-// Worker side
-case 'renderPage': {
+import type { PDFiumDocument } from '@scaryterry/pdfium';
+
+function handleRenderPage(
+  id: string,
+  payload: { docId: string; pageIndex: number; options?: { scale?: number } },
+  documents: Map<string, PDFiumDocument>,
+): void {
   const { docId, pageIndex, options } = payload;
   const document = documents.get(docId);
+  if (!document) {
+    throw new Error('Document not found');
+  }
 
   // Report start
   self.postMessage({ id, type: 'progress', stage: 'loading' });
 
   using page = document.getPage(pageIndex);
-
   self.postMessage({ id, type: 'progress', stage: 'rendering' });
 
   const result = page.render(options);
-
   self.postMessage({ id, type: 'progress', stage: 'transferring' });
 
-  respond(id, 'renderPage', {
-    data: result.data.buffer,
-    width: result.width,
-    height: result.height,
-  }, [result.data.buffer]);
-  break;
+  respond(
+    id,
+    'renderPage',
+    {
+      data: result.data.buffer,
+      width: result.width,
+      height: result.height,
+    },
+    [result.data.buffer],
+  );
 }
 ```
 

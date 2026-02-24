@@ -1,3 +1,8 @@
+---
+title: React Contributor Playbook
+description: Required layering, testing, and verification rules for React changes.
+---
+
 # React Contributor Playbook
 
 This project uses strict React layering to prevent race regressions and architecture drift.

@@ -108,7 +108,10 @@ type DocumentHandle = number & { readonly __brand: 'DocumentHandle' };
 type PageHandle = number & { readonly __brand: 'PageHandle' };
 
 // TypeScript prevents mixing them
-function closeDocument(handle: DocumentHandle) { ... }
+function closeDocument(handle: DocumentHandle): void {
+  console.log(handle);
+}
+const pageHandle = 1 as PageHandle;
 closeDocument(pageHandle); // Error!
 ```
 
