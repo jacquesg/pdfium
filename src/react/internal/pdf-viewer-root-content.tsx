@@ -1,5 +1,3 @@
-'use client';
-
 import type { CSSProperties, ReactNode } from 'react';
 import type { PanelEntry } from '../components/panels/types.js';
 import type { PageOverlayInfo } from '../components/pdf-page-view.js';

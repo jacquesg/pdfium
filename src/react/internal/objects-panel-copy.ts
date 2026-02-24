@@ -1,5 +1,3 @@
-'use client';
-
 import type { PageObjectType } from '../../core/types.js';
 
 const OBJECTS_PANEL_COPY = {

@@ -19,6 +19,12 @@ description: Build viewer UIs with the PDFViewer compound component, slots, and 
 
 ## Quick Start
 
+The snippets below assume you already have an `ArrayBuffer` named `pdfBytes` (from file input or fetch).
+They also assume `workerUrl` and `wasmUrl` are already resolved as shown in [React setup](./index.md#setup-wasm--worker-assets).
+Use the canonical setup snippets from:
+[Worker entry snippet](./index.md#worker-entry-snippet-canonical) and
+[provider bootstrap snippet](./index.md#provider-bootstrap-snippet-canonical).
+
 ### Zero-config
 
 ```tsx
@@ -26,7 +32,11 @@ import { PDFiumProvider, PDFViewer } from '@scaryterry/pdfium/react';
 
 function App() {
   return (
-    <PDFiumProvider src="/document.pdf">
+    <PDFiumProvider
+      wasmUrl={wasmUrl}
+      workerUrl={workerUrl}
+      initialDocument={{ data: pdfBytes, name: 'document.pdf' }}
+    >
       <PDFViewer />
     </PDFiumProvider>
   );
@@ -36,15 +46,20 @@ function App() {
 ### Styled with classNames
 
 ```tsx
-<PDFiumProvider src="/document.pdf">
+<PDFiumProvider
+  wasmUrl={wasmUrl}
+  workerUrl={workerUrl}
+  initialDocument={{ data: pdfBytes, name: 'document.pdf' }}
+>
   <PDFViewer
+    panels={['thumbnails', 'bookmarks']}
     classNames={{
       root: 'flex flex-col h-full',
       toolbar: 'bg-gray-100 border-b px-4 py-2',
       search: 'border-b px-4 py-2',
       content: 'flex flex-1 overflow-hidden',
-      sidebar: 'w-48 border-r overflow-y-auto',
-      bookmarks: 'w-56 border-r overflow-y-auto',
+      activityBar: 'border-r',
+      panel: 'w-56 border-r overflow-y-auto',
       pages: 'flex-1 min-h-0',
     }}
   />
@@ -60,10 +75,12 @@ function App() {
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
 | `initialScale` | `number` | `1` | Initial zoom scale applied when the viewer mounts. |
-| `initialScrollMode` | `'continuous' \| 'single'` | `'continuous'` | Scroll mode on mount. `'continuous'` renders all pages in a scrollable column; `'single'` shows one page at a time. |
+| `initialScrollMode` | `'continuous' \| 'single' \| 'horizontal'` | `'continuous'` | Scroll mode on mount. |
+| `initialSpreadMode` | `SpreadMode` | `'none'` | Initial spread mode for page layout. |
+| `initialInteractionMode` | `InteractionMode` | `'pointer'` | Initial interaction mode (for tools such as marquee/select workflows). |
 | `showSearch` | `boolean` | `true` | Whether the search panel toggle is available. When `false`, the Ctrl/Cmd+F shortcut is also disabled. |
-| `showThumbnails` | `boolean` | `false` | Whether the thumbnail sidebar is initially visible. The user can still toggle it via `toggleThumbnails()`. |
-| `showBookmarks` | `boolean` | `false` | Whether the bookmark sidebar is initially visible. The user can still toggle it via `toggleBookmarks()`. |
+| `panels` | `readonly PanelEntry[]` | `undefined` | Enables panel mode and defines which panel tabs are available in the activity bar. Use built-in IDs (`'thumbnails'`, `'bookmarks'`, etc.) or custom panel configs. |
+| `initialPanel` | `PanelId \| string` | `undefined` | Panel to open on mount when panel mode is enabled. |
 | `showTextLayer` | `boolean` | `true` | Render the selectable text overlay on each page. |
 | `showAnnotations` | `boolean` | `true` | Render annotation overlays on each page. |
 | `showLinks` | `boolean` | `true` | Render clickable link regions on each page. |
@@ -72,10 +89,10 @@ function App() {
 | `bufferPages` | `number` | `1` | Number of pages to render above and below the viewport for smoother scrolling. |
 | `keyboardShortcuts` | `boolean` | `true` | Enable built-in keyboard shortcuts for navigation, zoom, and search. See [Keyboard Shortcuts](#keyboard-shortcuts). |
 | `renderPageOverlay` | `(info: PageOverlayInfo) => ReactNode` | `undefined` | Callback to render custom content on top of each page. Receives page geometry and a `transformRect` helper for coordinate conversion. |
-| `className` | `string` | `undefined` | CSS class applied to the root element. Ignored when `classNames.root` is set. |
+| `className` | `string` | `undefined` | CSS class applied to the root element. Merged with `classNames.root` when both are provided. |
 | `classNames` | `PDFViewerClassNames` | `undefined` | Per-slot CSS class overrides. See [classNames Reference](#classnames-reference). |
 | `style` | `CSSProperties` | `undefined` | Inline styles for the root element (merged with the default flex-column layout). |
-| `children` | `ReactNode \| ((state: PDFViewerState) => ReactNode)` | `undefined` | Override the entire viewer body. Pass a `ReactNode` to replace the default layout, or a render function to receive `PDFViewerState` for full headless control. When `children` is provided, the default toolbar, search panel, thumbnails, and page view are **not** rendered. |
+| `children` | `ReactNode \| ((state: PDFViewerState & PDFPanelState) => ReactNode)` | `undefined` | Override the entire viewer body. Pass a `ReactNode` to replace the default layout, or a render function to receive viewer + panel state for full headless control. |
 
 #### `PageOverlayInfo`
 
@@ -102,13 +119,13 @@ Each key targets a specific element in the default layout.
 
 | Key | HTML Element | Description |
 |-----|-------------|-------------|
-| `root` | Outermost `<div>` | The root container. Uses `display: flex; flex-direction: column; height: 100%` by default. Takes precedence over the `className` prop. |
+| `root` | Outermost `<div>` | The root container. Uses `display: flex; flex-direction: column; height: 100%` by default. Merged with the `className` prop. |
 | `toolbar` | `<div role="toolbar">` | The `<DefaultToolbar>` wrapper. |
 | `search` | `<div>` | The `<SearchPanel>` wrapper, rendered only when search is open. |
 | `content` | `<div>` | The middle row containing the sidebar and page area. Uses `display: flex; flex: 1; overflow: hidden`. |
-| `sidebar` | `<div role="listbox">` | The `<ThumbnailStrip>` wrapper, rendered only when thumbnails are open. |
-| `bookmarks` | `<div role="tree">` | The `<BookmarkPanel>` wrapper, rendered only when bookmarks are open. |
-| `pages` | `<div role="document">` | The `<PDFDocumentView>` scroll container. Uses `flex: 1; min-height: 0`. |
+| `activityBar` | `<div>` | The activity bar wrapper (panel mode only). |
+| `panel` | `<div>` | The currently open panel container (panel mode only). |
+| `pages` | `<div>` | The `PDFViewer.Pages` wrapper that hosts `<PDFDocumentView>`. Uses `flex: 1; min-height: 0`. |
 
 ---
 
@@ -219,10 +236,10 @@ function CustomToolbar() {
 | `setSearchQuery` | `(query: string) => void` | Update the search query (triggers a debounced search). |
 | `isSearchOpen` | `boolean` | Whether the search panel is currently visible. |
 | `toggleSearch` | `() => void` | Toggle search panel visibility. Clears the query when closing. |
-| `isThumbnailsOpen` | `boolean` | Whether the thumbnail sidebar is currently visible. |
-| `toggleThumbnails` | `() => void` | Toggle thumbnail sidebar visibility. |
-| `isBookmarksOpen` | `boolean` | Whether the bookmark sidebar is currently visible. |
-| `toggleBookmarks` | `() => void` | Toggle bookmark sidebar visibility. |
+| `activePanel` | `string \| null` | Currently open panel ID, or `null` when no panel is open. |
+| `togglePanel` | `(id: string) => void` | Toggle a panel by ID (open if closed, close if already active). |
+| `setPanelOverlay` | `(renderer: ((info: PageOverlayInfo) => ReactNode) \| null) => void` | Register/clear a panel-specific page overlay renderer. |
+| `hasPanelBar` | `boolean` | Whether panel mode is enabled (`panels` prop provided and non-empty). |
 | `documentViewRef` | `RefObject<PDFDocumentViewHandle \| null>` | Imperative handle for the page scroll container. Exposes `scrollToPage(pageIndex, behaviour?)`. |
 
 ### `UseViewerSetupResult`
@@ -283,14 +300,18 @@ The `viewer` field is a composite of five state groups:
 
 ### 1. Zero-config
 
-The simplest possible viewer. The default layout includes `DefaultToolbar`, search, thumbnails (hidden by default), and a full-page scroll area.
+The simplest possible viewer. The default layout includes `DefaultToolbar`, search, and a full-page scroll area.
 
 ```tsx
 import { PDFiumProvider, PDFViewer } from '@scaryterry/pdfium/react';
 
 function App() {
   return (
-    <PDFiumProvider src="/report.pdf">
+    <PDFiumProvider
+      wasmUrl={wasmUrl}
+      workerUrl={workerUrl}
+      initialDocument={{ data: pdfBytes, name: 'report.pdf' }}
+    >
       <PDFViewer />
     </PDFiumProvider>
   );
@@ -306,15 +327,21 @@ import { PDFiumProvider, PDFViewer } from '@scaryterry/pdfium/react';
 
 function App() {
   return (
-    <PDFiumProvider src="/report.pdf">
+    <PDFiumProvider
+      wasmUrl={wasmUrl}
+      workerUrl={workerUrl}
+      initialDocument={{ data: pdfBytes, name: 'report.pdf' }}
+    >
       <PDFViewer
-        showThumbnails
+        panels={['thumbnails', 'bookmarks']}
+        initialPanel="thumbnails"
         classNames={{
           root: 'flex flex-col h-screen bg-gray-50',
           toolbar: 'flex items-center gap-2 bg-white border-b border-gray-200 px-4 py-2 shadow-sm',
           search: 'bg-yellow-50 border-b border-yellow-200 px-4 py-2',
           content: 'flex flex-1 overflow-hidden',
-          sidebar: 'w-52 bg-gray-100 border-r border-gray-200 overflow-y-auto',
+          activityBar: 'bg-white border-r border-gray-200',
+          panel: 'bg-gray-100 border-r border-gray-200 overflow-y-auto',
           pages: 'flex-1 min-h-0 bg-gray-200',
         }}
       />
@@ -353,7 +380,11 @@ function CustomToolbar() {
 
 function App() {
   return (
-    <PDFiumProvider src="/report.pdf">
+    <PDFiumProvider
+      wasmUrl={wasmUrl}
+      workerUrl={workerUrl}
+      initialDocument={{ data: pdfBytes, name: 'report.pdf' }}
+    >
       <PDFViewer>
         <div className="flex flex-col h-screen">
           <CustomToolbar />
@@ -383,7 +414,11 @@ function DownloadButton() {
 
 function App() {
   return (
-    <PDFiumProvider src="/report.pdf">
+    <PDFiumProvider
+      wasmUrl={wasmUrl}
+      workerUrl={workerUrl}
+      initialDocument={{ data: pdfBytes, name: 'report.pdf' }}
+    >
       <PDFViewer>
         <div className="flex flex-col h-screen">
           <DefaultToolbar>
@@ -406,8 +441,12 @@ import { PDFiumProvider, PDFViewer } from '@scaryterry/pdfium/react';
 
 function App() {
   return (
-    <PDFiumProvider src="/report.pdf">
-      <PDFViewer>
+    <PDFiumProvider
+      wasmUrl={wasmUrl}
+      workerUrl={workerUrl}
+      initialDocument={{ data: pdfBytes, name: 'report.pdf' }}
+    >
+      <PDFViewer panels={['thumbnails', 'bookmarks']}>
         {(state) => (
           <div className="flex flex-col h-screen">
             <div className="p-4 bg-gray-800 text-white flex items-center gap-4">
@@ -424,17 +463,17 @@ function App() {
               <button onClick={state.toggleSearch}>
                 {state.isSearchOpen ? 'Close' : 'Find'}
               </button>
-              <button onClick={state.toggleThumbnails}>
-                {state.isThumbnailsOpen ? 'Hide Thumbnails' : 'Show Thumbnails'}
+              <button onClick={() => state.togglePanel('thumbnails')}>
+                {state.activePanel === 'thumbnails' ? 'Hide Thumbnails' : 'Show Thumbnails'}
               </button>
-              <button onClick={state.toggleBookmarks}>
-                {state.isBookmarksOpen ? 'Hide Bookmarks' : 'Show Bookmarks'}
+              <button onClick={() => state.togglePanel('bookmarks')}>
+                {state.activePanel === 'bookmarks' ? 'Hide Bookmarks' : 'Show Bookmarks'}
               </button>
             </div>
             {state.isSearchOpen && <PDFViewer.Search />}
             <div className="flex flex-1 overflow-hidden">
-              {state.isThumbnailsOpen && <PDFViewer.Thumbnails className="w-48 border-r" />}
-              {state.isBookmarksOpen && <PDFViewer.Bookmarks className="w-56 border-r" />}
+              {state.activePanel === 'thumbnails' && <PDFViewer.Thumbnails className="w-48 border-r" />}
+              {state.activePanel === 'bookmarks' && <PDFViewer.Bookmarks className="w-56 border-r" />}
               <PDFViewer.Pages className="flex-1 min-h-0" showTextLayer showAnnotations />
             </div>
           </div>
@@ -503,3 +542,10 @@ The default layout applies the following ARIA roles:
 | Bookmark panel (`<BookmarkPanel>`) | `tree` | WAI-ARIA TreeView with `treeitem` nodes, `aria-expanded`, `aria-level`, `aria-setsize`, `aria-posinset`. Full keyboard navigation (Arrow keys, Home, End, Enter, Space, `*`). |
 
 The `<DefaultToolbar>` renders native `<button>`, `<input>`, and `<select>` elements, which are keyboard-focusable and screen-reader-accessible by default. Custom toolbars should preserve equivalent semantics.
+
+## See also
+
+- [Toolbar](./toolbar.md) - `DefaultToolbar` and headless `PDFToolbar` composition model.
+- [useViewerSetup](./use-viewer-setup.md) - Orchestration hook that powers viewer navigation and zoom state.
+- [Styling Guide](./styling.md) - `classNames` targeting and CSS variable theming.
+- [Examples](./examples.md) - End-to-end integration patterns.

@@ -1,5 +1,3 @@
-'use client';
-
 import type { CSSProperties, ReactNode, RefObject } from 'react';
 import { useId } from 'react';
 import type { UseResizeHandleProps } from '../hooks/use-resize.js';

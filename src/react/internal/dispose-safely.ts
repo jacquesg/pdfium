@@ -1,5 +1,3 @@
-'use client';
-
 interface DisposableLike {
   dispose: () => void | Promise<void>;
 }

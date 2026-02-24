@@ -1,6 +1,5 @@
-'use client';
-
 import { type CSSProperties, useDeferredValue, useMemo } from 'react';
+import { mergeClassNames } from '../internal/component-api.js';
 
 interface TextSpan {
   text: string;
@@ -119,7 +118,7 @@ function TextOverlay({
 
   return (
     <div
-      className={['pdfium-text-layer', className].filter(Boolean).join(' ')}
+      className={mergeClassNames('pdfium-text-layer', className)}
       // biome-ignore lint/a11y/noNoninteractiveTabindex: tabIndex enables keyboard-based text selection
       tabIndex={0}
       style={{

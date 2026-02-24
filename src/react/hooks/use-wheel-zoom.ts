@@ -1,5 +1,3 @@
-'use client';
-
 import type { RefObject } from 'react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { ZoomAnchor } from './use-visible-pages.js';

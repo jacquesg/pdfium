@@ -1,5 +1,3 @@
-'use client';
-
 import type { DocumentInfoResponse, ExtendedDocumentInfoResponse } from '../../context/protocol.js';
 import type { DocumentMetadata, ViewerPreferences } from '../../core/types.js';
 import { INFO_PANEL_COPY } from './info-panel-copy.js';

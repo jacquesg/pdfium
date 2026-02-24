@@ -1,5 +1,3 @@
-'use client';
-
 import { usePDFViewerPipeline } from '../internal/pdf-viewer-pipeline.js';
 import { createPDFViewerCompound } from './pdf-viewer-compound.js';
 import {

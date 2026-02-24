@@ -24,15 +24,15 @@ vi.mock('../../../../src/react/components/pdf-viewer-slot-wrappers.js', () => ({
 }));
 
 vi.mock('../../../../src/react/components/viewer-shell-layout.js', () => ({
-  ViewerPanelLayout: (props: { toolbar: ReactNode; search: ReactNode; pages: ReactNode }) => (
-    <div data-testid="panel-layout">
+  ViewerPanelLayout: (props: { toolbar: ReactNode; search: ReactNode; pages: ReactNode; className?: string }) => (
+    <div data-testid="panel-layout" data-classname={props.className ?? ''}>
       <div data-testid="toolbar-slot">{props.toolbar}</div>
       <div data-testid="search-slot">{props.search}</div>
       <div data-testid="pages-slot">{props.pages}</div>
     </div>
   ),
-  ViewerDefaultLayout: (props: { toolbar: ReactNode; search: ReactNode; pages: ReactNode }) => (
-    <div data-testid="default-layout">
+  ViewerDefaultLayout: (props: { toolbar: ReactNode; search: ReactNode; pages: ReactNode; className?: string }) => (
+    <div data-testid="default-layout" data-classname={props.className ?? ''}>
       <div data-testid="toolbar-slot">{props.toolbar}</div>
       <div data-testid="search-slot">{props.search}</div>
       <div data-testid="pages-slot">{props.pages}</div>
@@ -94,6 +94,7 @@ describe('buildPanelLayout', () => {
     render(node);
 
     expect(screen.getByTestId('panel-layout')).toBeDefined();
+    expect(screen.getByTestId('panel-layout').getAttribute('data-classname')).toBe('root');
     expect(screen.getByTestId('custom-toolbar')).toBeDefined();
     expect(screen.queryByTestId('default-toolbar')).toBeNull();
     expect(screen.getByTestId('search').className).toBe('search-class');
@@ -142,6 +143,38 @@ describe('buildPanelLayout', () => {
     const pagesProps = capturedPagesProps.at(-1)!;
     expect(pagesProps.renderPageOverlay).toBe(panelOverlay);
   });
+
+  it('merges className with classNames.root for panel layout', () => {
+    const node = buildPanelLayout({
+      fullscreenRef: createRef<HTMLDivElement>(),
+      className: 'root-a',
+      classNames: { root: 'root-b' },
+      style: undefined,
+      isResizing: false,
+      isSearchOpen: false,
+      children: undefined,
+      panels: ['thumbnails'],
+      activePanel: null,
+      togglePanel: vi.fn(),
+      lastFocusedButtonRef: createRef<HTMLButtonElement>(),
+      panelContainerRef: createRef<HTMLDivElement>(),
+      sidebarWidth: 280,
+      resizeHandleProps,
+      gap: undefined,
+      bufferPages: undefined,
+      showTextLayer: true,
+      showAnnotations: true,
+      showLinks: true,
+      renderFormFields: false,
+      renderPageOverlay: undefined,
+      panelOverlay: null,
+      overlayVersion: 1,
+    });
+
+    render(node);
+
+    expect(screen.getByTestId('panel-layout').getAttribute('data-classname')).toBe('root-a root-b');
+  });
 });
 
 describe('buildDefaultLayout', () => {
@@ -166,6 +199,7 @@ describe('buildDefaultLayout', () => {
     render(node);
 
     expect(screen.getByTestId('default-layout')).toBeDefined();
+    expect(screen.getByTestId('default-layout').getAttribute('data-classname')).toBe('root');
     expect(screen.getByTestId('default-toolbar').className).toBe('toolbar-class');
     expect(screen.getByTestId('search').className).toBe('search-class');
 
@@ -175,5 +209,26 @@ describe('buildDefaultLayout', () => {
     expect(pagesProps.showAnnotations).toBe(false);
     expect(pagesProps.renderFormFields).toBe(true);
     expect(pagesProps.renderPageOverlay).toBe(externalOverlay);
+  });
+
+  it('merges className with classNames.root', () => {
+    const node = buildDefaultLayout({
+      fullscreenRef: createRef<HTMLDivElement>(),
+      className: 'root-a',
+      classNames: { root: 'root-b' },
+      style: undefined,
+      isSearchOpen: false,
+      gap: undefined,
+      bufferPages: undefined,
+      showTextLayer: true,
+      showAnnotations: true,
+      showLinks: true,
+      renderFormFields: false,
+      renderPageOverlay: undefined,
+    });
+
+    render(node);
+
+    expect(screen.getByTestId('default-layout').getAttribute('data-classname')).toBe('root-a root-b');
   });
 });

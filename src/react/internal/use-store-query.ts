@@ -1,5 +1,3 @@
-'use client';
-
 import { useEffect, useRef, useSyncExternalStore } from 'react';
 import { PDFiumError, PDFiumErrorCode } from '../../core/errors.js';
 import { usePDFiumStores } from './stores-context.js';

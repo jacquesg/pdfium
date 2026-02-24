@@ -1,5 +1,3 @@
-'use client';
-
 const DEFAULT_TOOLBAR_ICON_SIZE = 18;
 
 function ContinuousScrollIcon() {

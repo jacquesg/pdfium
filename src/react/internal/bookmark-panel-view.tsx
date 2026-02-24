@@ -1,5 +1,3 @@
-'use client';
-
 import type { CSSProperties, KeyboardEvent, MutableRefObject } from 'react';
 import { BookmarkNode, type BookmarkNodeClassNames } from './bookmark-node.js';
 import type { RootBookmarkNodeModel } from './bookmark-node-model.js';
@@ -11,6 +9,7 @@ import {
   BOOKMARK_PANEL_ROOT_GROUP_STYLE,
   BOOKMARK_PANEL_TREE_STYLE,
 } from './bookmark-panel-view-styles.js';
+import { mergeClassNames } from './component-api.js';
 
 interface BookmarkPanelViewClassNames extends BookmarkNodeClassNames {
   container?: string | undefined;
@@ -46,8 +45,10 @@ function BookmarkPanelView({
   onTreeKeyDown,
   rootNodeModels,
 }: BookmarkPanelViewProps) {
+  const containerClassName = mergeClassNames(className, classNames?.container);
+
   return (
-    <div className={classNames?.container ?? className} style={{ ...BOOKMARK_PANEL_CONTAINER_STYLE, ...style }}>
+    <div className={containerClassName} style={{ ...BOOKMARK_PANEL_CONTAINER_STYLE, ...style }}>
       {showFilter && (
         <>
           <input

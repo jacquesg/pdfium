@@ -1,5 +1,3 @@
-'use client';
-
 import type { ChangeEventHandler, CSSProperties, ReactNode } from 'react';
 import type { FullscreenState } from '../hooks/use-fullscreen.js';
 import type { InteractionModeState } from '../hooks/use-interaction-mode.js';

@@ -1,5 +1,3 @@
-'use client';
-
 import type { SerialisedFormWidget } from '../../context/protocol.js';
 import type { FlattenResult } from '../../core/types.js';
 import { FORMS_PANEL_COPY } from './forms-panel-copy.js';

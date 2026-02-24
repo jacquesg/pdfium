@@ -1,5 +1,3 @@
-'use client';
-
 import { createContext, useContext } from 'react';
 import { QueryStore } from './query-store.js';
 import { LRURenderStore } from './render-store.js';

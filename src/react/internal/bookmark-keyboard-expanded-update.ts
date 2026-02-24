@@ -1,5 +1,3 @@
-'use client';
-
 import type { BookmarkKeyboardAction } from './bookmark-keyboard.js';
 import { reduceBookmarkKeyboardAction } from './bookmark-keyboard-reducer.js';
 

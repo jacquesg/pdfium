@@ -1,5 +1,3 @@
-'use client';
-
 import { type Dispatch, type SetStateAction, useCallback } from 'react';
 import type { Bookmark } from '../../core/types.js';
 import { applyBookmarkKeyboardExpandedUpdate } from './bookmark-keyboard-expanded-update.js';

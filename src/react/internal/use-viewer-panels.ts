@@ -1,5 +1,3 @@
-'use client';
-
 import type { MutableRefObject, ReactNode } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { PageOverlayInfo } from '../components/pdf-page-view.js';

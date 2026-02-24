@@ -491,3 +491,9 @@ interface ToolbarSearchState {
   toggle: () => void;
 }
 ```
+
+## See also
+
+- [PDFViewer](./pdf-viewer.md) - High-level viewer API and default toolbar integration.
+- [useViewerSetup](./use-viewer-setup.md) - Source of grouped viewer state used by `PDFToolbar`.
+- [Examples](./examples.md) - Custom toolbar and layout compositions in production-like setups.

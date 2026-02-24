@@ -1,5 +1,3 @@
-'use client';
-
 import type { Bookmark } from '../../core/types.js';
 import { type BookmarkKeyboardAction, getBookmarkKeyboardAction } from './bookmark-keyboard.js';
 import { type BookmarkKeyboardReduction, reduceBookmarkKeyboardAction } from './bookmark-keyboard-reducer.js';

@@ -1,5 +1,3 @@
-'use client';
-
 const BOOKMARK_TREE_INDENT_VAR = 'var(--pdfium-bookmark-indent, 16px)';
 const BOOKMARK_TREE_ITEM_HORIZONTAL_PADDING = '8px';
 const BOOKMARK_TREE_ITEM_VERTICAL_PADDING = '4px';

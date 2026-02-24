@@ -1,5 +1,3 @@
-'use client';
-
 import { useBookmarks } from '../hooks/use-bookmarks.js';
 import { usePDFPanelOptional, usePDFViewer } from './pdf-viewer-context.js';
 import {

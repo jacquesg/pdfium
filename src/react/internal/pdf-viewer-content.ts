@@ -1,5 +1,3 @@
-'use client';
-
 import type { ReactNode } from 'react';
 import type { PDFPanelState, PDFViewerState } from '../components/pdf-viewer-context.js';
 import type { ViewerLayoutMode } from './viewer-layout.js';

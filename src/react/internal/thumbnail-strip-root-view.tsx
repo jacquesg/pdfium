@@ -1,5 +1,3 @@
-'use client';
-
 import { type CSSProperties, type KeyboardEvent, memo, useCallback, useEffect, useRef } from 'react';
 import type { WorkerPDFiumDocument } from '../../context/worker-client.js';
 import { PDFCanvas } from '../components/pdf-canvas.js';
@@ -7,6 +5,7 @@ import { useDevicePixelRatio } from '../hooks/use-device-pixel-ratio.js';
 import { usePageDimensions } from '../hooks/use-page-dimensions.js';
 import { useVisiblePages } from '../hooks/use-visible-pages.js';
 import { useRenderPage } from '../use-render.js';
+import { mergeClassNames } from './component-api.js';
 import { resolveThumbnailPageCount, resolveThumbnailTargetPage } from './thumbnail-strip-model.js';
 
 interface ThumbnailStripClassNames {
@@ -166,6 +165,7 @@ function ThumbnailStripRootView({
     gap: 24,
     bufferPages: 3,
   });
+  const containerClassName = mergeClassNames(className, classNames?.container);
 
   if (!document) return null;
 
@@ -176,7 +176,7 @@ function ThumbnailStripRootView({
       aria-label="Page thumbnails"
       tabIndex={0}
       onKeyDown={handleKeyDown}
-      className={classNames?.container ?? className}
+      className={containerClassName}
       style={{ overflow: 'auto', padding: '4px 0', ...style }}
     >
       <div style={{ position: 'relative', height: totalHeight }}>

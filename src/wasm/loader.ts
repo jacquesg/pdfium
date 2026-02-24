@@ -9,6 +9,10 @@ import { InitialisationError, NetworkError, PDFiumErrorCode } from '../core/erro
 import type { PDFiumWASM, WASMLoadOptions } from './bindings/index.js';
 import { REQUIRED_SYMBOLS } from './manifest.js';
 
+function importRuntimeModule<T>(specifier: string): Promise<T> {
+  return import(specifier) as Promise<T>;
+}
+
 /**
  * Check if the environment supports WebAssembly SIMD.
  */
@@ -141,21 +145,9 @@ async function fetchWASMBinary(url: string): Promise<ArrayBuffer> {
  */
 async function loadVendorCJS(): Promise<{ default: unknown }> {
   // Dynamic imports to avoid bundler errors in browser environments
-  const nodeModule = await import('node:module');
-  const nodePath = await import('node:path');
-  const nodeUrl = await import('node:url');
-
-  const __filename = nodeUrl.fileURLToPath(import.meta.url);
-  const __dirname = nodePath.dirname(__filename);
+  const nodeModule = await importRuntimeModule<typeof import('node:module')>('node:module');
   const require = nodeModule.createRequire(import.meta.url);
-
-  // Determine vendor path based on environment:
-  // - Source (src/wasm/loader.ts): vendor is at ../vendor/pdfium.cjs
-  // - Built (dist/xxx.js): vendor is at ./vendor/pdfium.cjs
-  const isSourceDir = __dirname.includes('/src/wasm') || __dirname.includes('\\src\\wasm');
-  const vendorPath = isSourceDir
-    ? nodePath.join(__dirname, '..', 'vendor', 'pdfium.cjs')
-    : nodePath.join(__dirname, 'vendor', 'pdfium.cjs');
+  const vendorPath = require.resolve('../vendor/pdfium.cjs');
 
   // Bust the require cache so each call gets a fresh WASM module instance.
   // PDFium's FPDF_InitLibraryWithConfig/FPDF_DestroyLibrary are not safe to

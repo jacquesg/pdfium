@@ -24,6 +24,7 @@ beforeEach(() => {
 // after each test to avoid cross-test retention in long runs.
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.clearAllMocks();
   vi.restoreAllMocks();
   vi.resetModules();

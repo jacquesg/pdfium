@@ -1,5 +1,3 @@
-'use client';
-
 import type { CSSProperties, KeyboardEvent, RefObject } from 'react';
 import { useCallback, useMemo, useRef } from 'react';
 import type { PanelEntry } from '../components/panels/types.js';

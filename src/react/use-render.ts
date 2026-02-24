@@ -1,5 +1,3 @@
-'use client';
-
 import { useCallback, useEffect, useLayoutEffect, useReducer, useRef, useSyncExternalStore } from 'react';
 import type { WorkerPDFiumDocument } from '../context/worker-client.js';
 import type { RenderOptions, RenderResult } from '../core/types.js';

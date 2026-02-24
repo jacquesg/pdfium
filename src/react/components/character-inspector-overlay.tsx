@@ -1,5 +1,3 @@
-'use client';
-
 import { type CSSProperties, type ReactNode, useEffect, useLayoutEffect } from 'react';
 import type { WorkerPDFiumDocument } from '../../context/worker-client.js';
 import type { CharacterInfo, CharBox } from '../../core/types.js';

@@ -1,5 +1,3 @@
-'use client';
-
 const STRUCTURE_PANEL_COPY = {
   structureTabLabel: 'Structure',
   namedDestinationsTabLabel: 'Named Dests',

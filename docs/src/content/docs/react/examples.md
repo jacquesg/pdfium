@@ -7,7 +7,14 @@ description: End-to-end React recipes for PDFViewer, hooks, and custom viewer in
 
 Comprehensive examples for `@scaryterry/pdfium/react`. Each recipe includes a description, complete TSX code, and a list of key APIs used.
 
-> All examples assume you have configured `PDFiumProvider` with the correct `workerUrl` and `wasmUrl` (or `wasmBinary`). See the [Quick Start guide](../quick-start.md) for initial setup.
+> All examples assume you have configured `PDFiumProvider` with valid `workerUrl` and `wasmUrl` (or `wasmBinary`).  
+> In these snippets, `workerUrl` refers to your app's emitted worker entry URL.  
+> Typical setup: `const workerUrl = new URL('./pdfium.worker.ts', import.meta.url).toString()`.  
+> `wasmUrl` is the URL for `pdfium.wasm` (for example, imported via `?url` or served from `public/`).  
+> See [React setup](./index.md#setup-wasm--worker-assets) for the exact worker/WASM wiring steps.
+> Copy-paste snippets live in one place:
+> [Worker entry snippet](./index.md#worker-entry-snippet-canonical) and
+> [provider bootstrap snippet](./index.md#provider-bootstrap-snippet-canonical).
 
 ---
 
@@ -56,8 +63,8 @@ import { PDFiumProvider, PDFViewer } from '@scaryterry/pdfium/react';
 function App() {
   return (
     <PDFiumProvider
-      wasmUrl="/pdfium.wasm"
-      workerUrl="/pdfium-worker.js"
+      wasmUrl={wasmUrl}
+      workerUrl={workerUrl}
       initialDocument={{ data: pdfBytes, name: 'document.pdf' }}
     >
       <div style={{ height: '100vh' }}>
@@ -81,14 +88,15 @@ import { PDFiumProvider, PDFViewer } from '@scaryterry/pdfium/react';
 
 function StyledViewer() {
   return (
-    <PDFiumProvider wasmUrl="/pdfium.wasm" workerUrl="/pdfium-worker.js">
+    <PDFiumProvider wasmUrl={wasmUrl} workerUrl={workerUrl}>
       <PDFViewer
         classNames={{
           root: 'flex flex-col h-full bg-slate-50',
           toolbar: 'flex items-center gap-2 px-4 py-2 bg-white border-b shadow-sm',
           search: 'px-4 py-2 bg-yellow-50 border-b',
           content: 'flex flex-1 overflow-hidden',
-          sidebar: 'w-48 border-r bg-white overflow-y-auto',
+          activityBar: 'bg-white border-r',
+          panel: 'w-48 border-r bg-white overflow-y-auto',
           pages: 'flex-1 min-h-0',
         }}
       />
@@ -103,19 +111,20 @@ function StyledViewer() {
 
 ### 3. Viewer with Thumbnails
 
-Enable the thumbnail sidebar with the `showThumbnails` prop. Users can click a thumbnail to jump to that page.
+Enable panel mode and open the thumbnail panel on mount. Users can click a thumbnail to jump to that page.
 
 ```tsx
 import { PDFiumProvider, PDFViewer } from '@scaryterry/pdfium/react';
 
 function ViewerWithThumbnails() {
   return (
-    <PDFiumProvider wasmUrl="/pdfium.wasm" workerUrl="/pdfium-worker.js">
+    <PDFiumProvider wasmUrl={wasmUrl} workerUrl={workerUrl}>
       <div style={{ height: '100vh' }}>
         <PDFViewer
-          showThumbnails
+          panels={['thumbnails', 'bookmarks']}
+          initialPanel="thumbnails"
           classNames={{
-            sidebar: 'thumbnail-sidebar',
+            panel: 'thumbnail-sidebar',
             pages: 'main-pages',
           }}
         />
@@ -125,7 +134,7 @@ function ViewerWithThumbnails() {
 }
 ```
 
-**Key APIs:** `PDFViewer` (`showThumbnails` prop), `ThumbnailStrip` (rendered internally)
+**Key APIs:** `PDFViewer` (`panels`, `initialPanel`), `ThumbnailStrip` (rendered internally)
 
 ---
 
@@ -138,7 +147,7 @@ import { PDFiumProvider, PDFViewer } from '@scaryterry/pdfium/react';
 
 function ViewerWithSearch() {
   return (
-    <PDFiumProvider wasmUrl="/pdfium.wasm" workerUrl="/pdfium-worker.js">
+    <PDFiumProvider wasmUrl={wasmUrl} workerUrl={workerUrl}>
       <div style={{ height: '100vh' }}>
         <PDFViewer
           showSearch
@@ -194,7 +203,7 @@ function DownloadButton() {
 
 function ViewerWithDownload() {
   return (
-    <PDFiumProvider wasmUrl="/pdfium.wasm" workerUrl="/pdfium-worker.js">
+    <PDFiumProvider wasmUrl={wasmUrl} workerUrl={workerUrl}>
       <div style={{ height: '100vh' }}>
         <PDFViewer>
           <DefaultToolbar>
@@ -219,7 +228,7 @@ Build a completely custom toolbar using `usePDFViewer()` to access the grouped v
 import { PDFiumProvider, PDFViewer, usePDFViewer } from '@scaryterry/pdfium/react';
 
 function MyToolbar() {
-  const { viewer, toggleSearch, isSearchOpen, isThumbnailsOpen, toggleThumbnails } = usePDFViewer();
+  const { viewer, toggleSearch, isSearchOpen, activePanel, togglePanel } = usePDFViewer();
   const { navigation, zoom, fit, scroll } = viewer;
 
   return (
@@ -274,8 +283,8 @@ function MyToolbar() {
       <span aria-hidden="true">|</span>
 
       {/* Toggles */}
-      <button type="button" onClick={toggleThumbnails}>
-        {isThumbnailsOpen ? 'Hide Thumbnails' : 'Show Thumbnails'}
+      <button type="button" onClick={() => togglePanel('thumbnails')}>
+        {activePanel === 'thumbnails' ? 'Hide Thumbnails' : 'Show Thumbnails'}
       </button>
       <button type="button" onClick={toggleSearch}>
         {isSearchOpen ? 'Close Search' : 'Search'}
@@ -286,15 +295,15 @@ function MyToolbar() {
 
 function CustomToolbarViewer() {
   return (
-    <PDFiumProvider wasmUrl="/pdfium.wasm" workerUrl="/pdfium-worker.js">
+    <PDFiumProvider wasmUrl={wasmUrl} workerUrl={workerUrl}>
       <div style={{ height: '100vh' }}>
-        <PDFViewer showThumbnails>
-          {({ viewer, isSearchOpen, isThumbnailsOpen, documentViewRef }) => (
+        <PDFViewer panels={['thumbnails', 'bookmarks']}>
+          {({ isSearchOpen, activePanel }) => (
             <div style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
               <MyToolbar />
               {isSearchOpen && <PDFViewer.Search />}
               <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-                {isThumbnailsOpen && <PDFViewer.Thumbnails />}
+                {activePanel === 'thumbnails' && <PDFViewer.Thumbnails />}
                 <PDFViewer.Pages style={{ flex: 1, minHeight: 0 }} />
               </div>
             </div>
@@ -413,7 +422,7 @@ function CustomLayout() {
 
 function App() {
   return (
-    <PDFiumProvider wasmUrl="/pdfium.wasm" workerUrl="/pdfium-worker.js">
+    <PDFiumProvider wasmUrl={wasmUrl} workerUrl={workerUrl}>
       <div style={{ height: '100vh' }}>
         <CustomLayout />
       </div>
@@ -488,7 +497,7 @@ function TextSearchViewer() {
 
 function App() {
   return (
-    <PDFiumProvider wasmUrl="/pdfium.wasm" workerUrl="/pdfium-worker.js">
+    <PDFiumProvider wasmUrl={wasmUrl} workerUrl={workerUrl}>
       <div style={{ height: '100vh' }}>
         <TextSearchViewer />
       </div>
@@ -569,7 +578,7 @@ function AnnotationPageOverlay(info: PageOverlayInfo) {
 
 function App() {
   return (
-    <PDFiumProvider wasmUrl="/pdfium.wasm" workerUrl="/pdfium-worker.js">
+    <PDFiumProvider wasmUrl={wasmUrl} workerUrl={workerUrl}>
       <div style={{ height: '100vh' }}>
         <PDFViewer
           showAnnotations={false}
@@ -649,7 +658,7 @@ function FormControls() {
 
 function FormViewer() {
   return (
-    <PDFiumProvider wasmUrl="/pdfium.wasm" workerUrl="/pdfium-worker.js">
+    <PDFiumProvider wasmUrl={wasmUrl} workerUrl={workerUrl}>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
         <PDFViewer renderFormFields style={{ flex: 1 }}>
           {() => (
@@ -727,7 +736,7 @@ function BookmarkList() {
 
 function BookmarkViewer() {
   return (
-    <PDFiumProvider wasmUrl="/pdfium.wasm" workerUrl="/pdfium-worker.js">
+    <PDFiumProvider wasmUrl={wasmUrl} workerUrl={workerUrl}>
       <PDFViewer>
         {() => (
           <div style={{ display: 'flex', height: '100vh' }}>
@@ -792,7 +801,7 @@ function PageHighlights(info: PageOverlayInfo) {
 
 function OverlayViewer() {
   return (
-    <PDFiumProvider wasmUrl="/pdfium.wasm" workerUrl="/pdfium-worker.js">
+    <PDFiumProvider wasmUrl={wasmUrl} workerUrl={workerUrl}>
       <div style={{ height: '100vh' }}>
         <PDFViewer renderPageOverlay={(info) => <PageHighlights {...info} />} />
       </div>
@@ -865,7 +874,7 @@ function SinglePagePreview({ pageIndex, scale = 1 }: { pageIndex: number; scale?
 
 function App() {
   return (
-    <PDFiumProvider wasmUrl="/pdfium.wasm" workerUrl="/pdfium-worker.js">
+    <PDFiumProvider wasmUrl={wasmUrl} workerUrl={workerUrl}>
       <div style={{ display: 'flex', gap: 16, padding: 24 }}>
         <SinglePagePreview pageIndex={0} scale={2} />
         <SinglePagePreview pageIndex={1} scale={2} />
@@ -955,7 +964,7 @@ function ThumbnailGrid() {
 
 function App() {
   return (
-    <PDFiumProvider wasmUrl="/pdfium.wasm" workerUrl="/pdfium-worker.js">
+    <PDFiumProvider wasmUrl={wasmUrl} workerUrl={workerUrl}>
       <ThumbnailGrid />
     </PDFiumProvider>
   );
@@ -968,59 +977,54 @@ function App() {
 
 ### 15. Document Creator
 
-Use `useSyncPDFium` to obtain a main-thread `PDFium` instance for synchronous operations like creating new documents. The created document can then be loaded into the viewer with `loadDocument`.
+Use `usePDFiumInstance` to access the worker-backed `WorkerPDFium` instance and create documents without leaving the worker runtime.
 
 ```tsx
 import {
   PDFiumProvider,
   PDFViewer,
-  useSyncPDFium,
   usePDFiumDocument,
+  usePDFiumInstance,
 } from '@scaryterry/pdfium/react';
-import { useCallback } from 'react';
+import { useCallback, useState } from 'react';
 
 function CreateDocumentButton() {
-  const { instance, isInitialising } = useSyncPDFium();
+  const { instance } = usePDFiumInstance();
   const { loadDocument } = usePDFiumDocument();
+  const [isCreating, setIsCreating] = useState(false);
 
   const handleCreate = useCallback(async () => {
     if (!instance) return;
+    setIsCreating(true);
+    try {
+      await using builder = await instance.createDocumentBuilder();
 
-    // Create a new blank PDF document
-    using builder = instance.createDocument();
+      // Add an A4 page (595 x 842 points)
+      const page = await builder.addPage({ width: 595, height: 842 });
 
-    // Add an A4 page (595 x 842 points)
-    const page = builder.addPage({ width: 595, height: 842 });
+      // Add text using a standard font
+      const font = await builder.loadStandardFont('Helvetica');
+      await page.addText('Hello from PDFium!', 72, 770, font, 24);
+      await page.addText('This document was created in a worker.', 72, 740, font, 14);
 
-    // Add text using a standard font
-    const font = builder.loadStandardFont('Helvetica');
-    page.addText('Hello from PDFium!', font, {
-      x: 72,
-      y: 770,
-      fontSize: 24,
-    });
-
-    page.addText('This document was created programmatically.', font, {
-      x: 72,
-      y: 740,
-      fontSize: 14,
-    });
-
-    // Save to bytes and load into the viewer
-    const bytes = builder.save();
-    await loadDocument(bytes, 'created-document.pdf');
+      // Save to bytes and load into the viewer
+      const bytes = await builder.save();
+      await loadDocument(bytes, 'created-document.pdf');
+    } finally {
+      setIsCreating(false);
+    }
   }, [instance, loadDocument]);
 
   return (
-    <button type="button" onClick={handleCreate} disabled={isInitialising || !instance}>
-      {isInitialising ? 'Initialising...' : 'Create Document'}
+    <button type="button" onClick={handleCreate} disabled={isCreating || !instance}>
+      {isCreating ? 'Creating...' : 'Create Document'}
     </button>
   );
 }
 
 function App() {
   return (
-    <PDFiumProvider wasmUrl="/pdfium.wasm" workerUrl="/pdfium-worker.js">
+    <PDFiumProvider wasmUrl={wasmUrl} workerUrl={workerUrl}>
       <div style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
         <div style={{ padding: 12, borderBottom: '1px solid #e5e7eb' }}>
           <CreateDocumentButton />
@@ -1034,7 +1038,7 @@ function App() {
 }
 ```
 
-**Key APIs:** `useSyncPDFium`, `PDFiumDocumentBuilder` (`addPage`, `loadStandardFont`, `save`), `usePDFiumDocument` (`loadDocument`)
+**Key APIs:** `usePDFiumInstance`, `WorkerPDFiumDocumentBuilder` (`addPage`, `loadStandardFont`, `save`), `usePDFiumDocument` (`loadDocument`)
 
 ---
 
@@ -1074,7 +1078,7 @@ function FitOnLoad() {
 
 function ResponsiveViewer() {
   return (
-    <PDFiumProvider wasmUrl="/pdfium.wasm" workerUrl="/pdfium-worker.js">
+    <PDFiumProvider wasmUrl={wasmUrl} workerUrl={workerUrl}>
       <div style={{ height: '100vh' }}>
         <PDFViewer>
           {() => (
@@ -1236,7 +1240,7 @@ function ResilientViewer() {
 
 function App() {
   return (
-    <PDFiumProvider wasmUrl="/pdfium.wasm" workerUrl="/pdfium-worker.js">
+    <PDFiumProvider wasmUrl={wasmUrl} workerUrl={workerUrl}>
       <div style={{ height: '100vh' }}>
         <ResilientViewer />
       </div>
@@ -1246,3 +1250,9 @@ function App() {
 ```
 
 **Key APIs:** `PDFiumErrorBoundary` (`resetKeys`, `fallbackRender`), `DragDropZone` (`onFileSelect`), `usePDFiumDocument` (`password`, `loadDocument`, `error`, `documentRevision`)
+
+## See also
+
+- [PDFViewer](./pdf-viewer.md) - Component tiers, slot APIs, and viewer state surface.
+- [useViewerSetup](./use-viewer-setup.md) - Hook-level orchestration for custom viewer layouts.
+- [Styling Guide](./styling.md) - CSS custom properties and class targeting strategy.

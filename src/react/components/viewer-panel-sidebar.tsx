@@ -1,5 +1,3 @@
-'use client';
-
 import type { ReactNode, RefObject } from 'react';
 import { AnnotationsPanel } from './panels/annotations-panel.js';
 import { AttachmentsPanel } from './panels/attachments-panel.js';

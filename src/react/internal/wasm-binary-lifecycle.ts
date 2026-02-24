@@ -1,5 +1,3 @@
-'use client';
-
 import { toError } from './error-normalization.js';
 
 interface StartWasmBinaryFetchOptions {

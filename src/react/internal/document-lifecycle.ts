@@ -1,5 +1,3 @@
-'use client';
-
 import type { WorkerPDFiumDocument } from '../../context/worker-client.js';
 
 interface PendingDocumentRequest {

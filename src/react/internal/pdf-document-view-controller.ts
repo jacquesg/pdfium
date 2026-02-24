@@ -1,5 +1,3 @@
-'use client';
-
 import { type RefObject, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 import type { PageRotation, TextSearchResult } from '../../core/types.js';
 import { usePDFiumDocument } from '../context.js';

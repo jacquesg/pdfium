@@ -1,5 +1,3 @@
-'use client';
-
 const INFO_PANEL_COPY = {
   emptyStateMessage: 'Load a PDF to inspect its metadata and properties.',
   loadingMessage: 'Loading...',

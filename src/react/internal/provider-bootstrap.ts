@@ -1,5 +1,3 @@
-'use client';
-
 interface FetchResponseLike {
   ok: boolean;
   status: number;

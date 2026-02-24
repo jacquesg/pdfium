@@ -1,5 +1,3 @@
-'use client';
-
 import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { usePDFViewer } from '../components/pdf-viewer.js';
 import { useLinks } from '../hooks/use-links.js';

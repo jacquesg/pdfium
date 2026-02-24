@@ -1,5 +1,3 @@
-'use client';
-
 import type { SerialisedLink } from '../../context/protocol.js';
 import { formatLinkDestinationPage } from './links-panel-copy.js';
 

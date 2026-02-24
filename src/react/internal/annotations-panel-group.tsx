@@ -1,5 +1,3 @@
-'use client';
-
 import { useState } from 'react';
 import type { SerialisedAnnotation } from '../../context/protocol.js';
 import { formatAnnotationListBounds } from './annotations-panel-helpers.js';

@@ -11,6 +11,55 @@ description: React viewer documentation for usage, customization, architecture, 
 - `useViewerSetup` + slot components for custom layout control.
 - Low-level hooks/components for full headless composition.
 
+## Setup: WASM + Worker Assets
+
+`PDFiumProvider` requires:
+
+- `workerUrl` (URL to a module worker entry)
+- One of `wasmUrl` or `wasmBinary`
+- Optional `initialDocument`
+
+### Recommended (bundler-managed worker module)
+
+#### Worker Entry Snippet (Canonical)
+
+Create a worker entry in your app:
+
+```ts
+// src/pdfium.worker.ts
+import '@scaryterry/pdfium/worker';
+```
+
+#### Provider Bootstrap Snippet (Canonical)
+
+Then wire the provider:
+
+```tsx
+import wasmUrl from '@scaryterry/pdfium/pdfium.wasm?url';
+import { PDFiumProvider, PDFViewer } from '@scaryterry/pdfium/react';
+
+const workerUrl = new URL('./pdfium.worker.ts', import.meta.url).toString();
+
+function App() {
+  return (
+    <PDFiumProvider
+      wasmUrl={wasmUrl}
+      workerUrl={workerUrl}
+      initialDocument={{ data: pdfBytes, name: 'document.pdf' }}
+    >
+      <PDFViewer />
+    </PDFiumProvider>
+  );
+}
+```
+
+### If you serve assets from `public/`
+
+- Copy `node_modules/@scaryterry/pdfium/dist/vendor/pdfium.wasm` to `public/pdfium.wasm`
+- Keep the worker as a bundled module (`src/pdfium.worker.ts`) and pass its emitted URL as `workerUrl`
+
+Do not copy only `dist/worker.js` by itself; it imports sibling modules.
+
 ## Usage
 
 - [PDFViewer](./pdf-viewer.md) — Compound viewer component and state surface.

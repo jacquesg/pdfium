@@ -1,5 +1,3 @@
-'use client';
-
 import type { UseResizeHandleProps } from '../hooks/use-resize.js';
 
 interface ResizeHandleProps {

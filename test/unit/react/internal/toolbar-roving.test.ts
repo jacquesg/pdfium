@@ -60,6 +60,65 @@ describe('toolbar-roving', () => {
     container.remove();
   });
 
+  it('returns null when no focusable controls exist', () => {
+    const container = document.createElement('div');
+    const active = getToolbarInitialTabStop(container, []);
+    expect(active).toBeNull();
+  });
+
+  it('falls back to the first item when focus is outside the toolbar', () => {
+    const container = document.createElement('div');
+    const first = document.createElement('button');
+    const second = document.createElement('button');
+    first.setAttribute('tabindex', '-1');
+    second.setAttribute('tabindex', '-1');
+    container.append(first, second);
+    document.body.append(container);
+
+    const outsider = document.createElement('button');
+    document.body.append(outsider);
+    const activeElementDescriptor = Object.getOwnPropertyDescriptor(document, 'activeElement');
+    Object.defineProperty(document, 'activeElement', {
+      configurable: true,
+      get: () => outsider,
+    });
+
+    const active = getToolbarInitialTabStop(container, [first, second]);
+    expect(active).toBe(first);
+
+    if (activeElementDescriptor) {
+      Object.defineProperty(document, 'activeElement', activeElementDescriptor);
+    } else {
+      delete (document as { activeElement?: Element | null }).activeElement;
+    }
+    outsider.remove();
+    container.remove();
+  });
+
+  it('falls back to the first item when there is no active element', () => {
+    const container = document.createElement('div');
+    const first = document.createElement('button');
+    const second = document.createElement('button');
+    first.setAttribute('tabindex', '-1');
+    second.setAttribute('tabindex', '-1');
+    container.append(first, second);
+
+    const activeElementDescriptor = Object.getOwnPropertyDescriptor(document, 'activeElement');
+    Object.defineProperty(document, 'activeElement', {
+      configurable: true,
+      get: () => null,
+    });
+
+    const active = getToolbarInitialTabStop(container, [first, second]);
+    expect(active).toBe(first);
+
+    if (activeElementDescriptor) {
+      Object.defineProperty(document, 'activeElement', activeElementDescriptor);
+    } else {
+      delete (document as { activeElement?: Element | null }).activeElement;
+    }
+  });
+
   it('applies roving tabindex attributes to focusable elements', () => {
     const first = document.createElement('button');
     const second = document.createElement('button');

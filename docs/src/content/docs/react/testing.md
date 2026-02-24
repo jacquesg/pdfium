@@ -53,3 +53,9 @@ For async lifecycle tests:
 - Global mutable mocks without reset.
 - File-local `afterEach(cleanup)` duplication.
 - Time-dependent async tests that rely on real timers and wall-clock waits.
+
+## See also
+
+- [React Contributor Playbook](./contributor-playbook.md) - Merge requirements and local verification checklist.
+- [React Architecture](./architecture.md) - Layer boundaries that keep tests deterministic.
+- [Architecture Map](./architecture-index.md) - Module index for targeting coverage updates.

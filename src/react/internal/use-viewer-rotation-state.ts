@@ -1,5 +1,3 @@
-'use client';
-
 import { useEffect } from 'react';
 import type { WorkerPDFiumDocument } from '../../context/worker-client.js';
 import { useRotation } from '../hooks/use-rotation.js';

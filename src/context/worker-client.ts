@@ -28,6 +28,7 @@ import type {
   RenderOptions,
   RenderResult,
   SaveOptions,
+  ShapeStyle,
   StructureElement,
   TextSearchFlags,
   TextSearchResult,
@@ -80,6 +81,7 @@ export interface WorkerPDFiumOptions extends WorkerProxyOptions {
 export class WorkerPDFium extends AsyncDisposable {
   readonly #proxy: WorkerProxy;
   readonly #documents = new Set<WorkerPDFiumDocument>();
+  readonly #builders = new Set<WorkerPDFiumDocumentBuilder>();
 
   private constructor(proxy: WorkerProxy) {
     super('WorkerPDFium');
@@ -127,6 +129,19 @@ export class WorkerPDFium extends AsyncDisposable {
   }
 
   /**
+   * Create a worker-side document builder for creating PDFs from scratch.
+   */
+  async createDocumentBuilder(): Promise<WorkerPDFiumDocumentBuilder> {
+    this.ensureNotDisposed();
+    const response = await this.#proxy.createDocumentBuilder();
+    const builder = new WorkerPDFiumDocumentBuilder(this.#proxy, response.builderId, () => {
+      this.#builders.delete(builder);
+    });
+    this.#builders.add(builder);
+    return builder;
+  }
+
+  /**
    * Health-check the worker transport.
    */
   async ping(timeout = 5_000): Promise<boolean> {
@@ -135,6 +150,15 @@ export class WorkerPDFium extends AsyncDisposable {
   }
 
   protected async disposeInternalAsync(): Promise<void> {
+    for (const builder of this.#builders) {
+      try {
+        await builder.dispose();
+      } catch {
+        // Best-effort teardown: continue disposing remaining resources.
+      }
+    }
+    this.#builders.clear();
+
     for (const document of this.#documents) {
       try {
         await document.dispose();
@@ -144,6 +168,111 @@ export class WorkerPDFium extends AsyncDisposable {
     }
     this.#documents.clear();
     await this.#proxy.dispose();
+  }
+}
+
+/**
+ * Font handle for worker document builder operations.
+ */
+export class WorkerPDFiumBuilderFont {
+  readonly #fontId: string;
+
+  /** @internal */
+  constructor(fontId: string) {
+    this.#fontId = fontId;
+  }
+
+  /** @internal */
+  get id(): string {
+    return this.#fontId;
+  }
+}
+
+/**
+ * Worker-side page builder for creating page content.
+ */
+export class WorkerPDFiumPageBuilder {
+  readonly #proxy: WorkerProxy;
+  readonly #pageBuilderId: string;
+
+  /** @internal */
+  constructor(proxy: WorkerProxy, pageBuilderId: string) {
+    this.#proxy = proxy;
+    this.#pageBuilderId = pageBuilderId;
+  }
+
+  async addRectangle(x: number, y: number, w: number, h: number, style?: ShapeStyle): Promise<this> {
+    await this.#proxy.builderPageAddRectangle(this.#pageBuilderId, x, y, w, h, style);
+    return this;
+  }
+
+  async addText(
+    text: string,
+    x: number,
+    y: number,
+    font: WorkerPDFiumBuilderFont,
+    fontSize: number,
+    colour?: Colour,
+  ): Promise<this> {
+    await this.#proxy.builderPageAddText(this.#pageBuilderId, text, x, y, font.id, fontSize, colour);
+    return this;
+  }
+
+  async addLine(x1: number, y1: number, x2: number, y2: number, style?: ShapeStyle): Promise<this> {
+    await this.#proxy.builderPageAddLine(this.#pageBuilderId, x1, y1, x2, y2, style);
+    return this;
+  }
+
+  async addEllipse(cx: number, cy: number, rx: number, ry: number, style?: ShapeStyle): Promise<this> {
+    await this.#proxy.builderPageAddEllipse(this.#pageBuilderId, cx, cy, rx, ry, style);
+    return this;
+  }
+}
+
+/**
+ * Worker-side document builder for creating PDFs from scratch.
+ */
+export class WorkerPDFiumDocumentBuilder extends AsyncDisposable {
+  readonly #proxy: WorkerProxy;
+  readonly #builderId: string;
+  readonly #onDispose: () => void;
+
+  /** @internal */
+  constructor(proxy: WorkerProxy, builderId: string, onDispose: () => void) {
+    super('WorkerPDFiumDocumentBuilder');
+    this.#proxy = proxy;
+    this.#builderId = builderId;
+    this.#onDispose = onDispose;
+  }
+
+  async addPage(options?: { width?: number; height?: number }): Promise<WorkerPDFiumPageBuilder> {
+    this.ensureNotDisposed();
+    const response = await this.#proxy.builderAddPage(this.#builderId, options);
+    return new WorkerPDFiumPageBuilder(this.#proxy, response.pageBuilderId);
+  }
+
+  async loadStandardFont(fontName: string): Promise<WorkerPDFiumBuilderFont> {
+    this.ensureNotDisposed();
+    const response = await this.#proxy.builderLoadStandardFont(this.#builderId, fontName);
+    return new WorkerPDFiumBuilderFont(response.fontId);
+  }
+
+  async save(options?: SaveOptions): Promise<Uint8Array> {
+    this.ensureNotDisposed();
+    const buffer = await this.#proxy.builderSave(this.#builderId, options);
+    return new Uint8Array(buffer);
+  }
+
+  protected async disposeInternalAsync(): Promise<void> {
+    try {
+      await this.#proxy.disposeDocumentBuilder(this.#builderId);
+    } catch (error) {
+      if (!(error instanceof PDFiumError && error.code === PDFiumErrorCode.DOC_ALREADY_CLOSED)) {
+        throw error;
+      }
+    } finally {
+      this.#onDispose();
+    }
   }
 }
 

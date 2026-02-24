@@ -53,3 +53,9 @@ This project uses strict React layering to prevent race regressions and architec
 - `pnpm test test/unit/react`
 - `pnpm test:react:stable`
 - `pnpm test:react:memory-regression`
+
+## See also
+
+- [React Architecture](./architecture.md) - Layer boundaries and composition rules.
+- [Architecture Map](./architecture-index.md) - Concrete examples of the intended layer split.
+- [React Testing](./testing.md) - Required race tests and shared teardown contract.

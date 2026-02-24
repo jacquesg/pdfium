@@ -1,5 +1,3 @@
-'use client';
-
 import type { ReactNode } from 'react';
 import type { PanelEntry } from '../components/panels/types.js';
 import { getViewportEffects } from '../components/panels/types.js';

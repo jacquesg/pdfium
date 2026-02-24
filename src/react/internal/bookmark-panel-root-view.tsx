@@ -1,5 +1,3 @@
-'use client';
-
 import type { CSSProperties } from 'react';
 import type { Bookmark } from '../../core/types.js';
 import { BOOKMARK_PANEL_COPY } from './bookmark-panel-copy.js';

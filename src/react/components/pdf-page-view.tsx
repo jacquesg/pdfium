@@ -1,5 +1,3 @@
-'use client';
-
 import { type CSSProperties, memo, type ReactNode, useMemo } from 'react';
 import type { WorkerPDFiumDocument } from '../../context/worker-client.js';
 import { PageRotation, type TextSearchResult } from '../../core/types.js';

@@ -235,13 +235,22 @@ For off-main-thread processing:
 ```typescript
 import { PDFium } from '@scaryterry/pdfium';
 
+const workerUrl = new URL('./pdfium.worker.ts', import.meta.url).toString();
+
 await using pdfium = await PDFium.init({
   useWorker: true,
-  workerUrl: '/worker.js',
+  workerUrl,
   wasmUrl: '/pdfium.wasm',
 });
 await using document = await pdfium.openDocument(pdfArrayBuffer);
 const result = await document.renderPage(0, { scale: 2 });
+```
+
+Worker entry module:
+
+```ts
+// src/pdfium.worker.ts
+import '@scaryterry/pdfium/worker';
 ```
 
 Need low-level control? Use `WorkerProxy` directly with `openDocument() -> loadPage() -> renderPage() -> closePage()`.

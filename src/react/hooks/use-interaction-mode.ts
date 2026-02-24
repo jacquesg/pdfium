@@ -1,5 +1,3 @@
-'use client';
-
 import { type RefObject, useCallback, useEffect, useRef, useState } from 'react';
 import {
   createMarqueeRect,

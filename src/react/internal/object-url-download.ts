@@ -1,5 +1,3 @@
-'use client';
-
 interface TriggerObjectUrlDownloadOptions {
   readonly blob: Blob;
   readonly filename: string;

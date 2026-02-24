@@ -1,5 +1,3 @@
-'use client';
-
 import { disposeSafely } from './dispose-safely.js';
 import { toError } from './error-normalization.js';
 

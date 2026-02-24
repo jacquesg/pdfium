@@ -210,10 +210,14 @@ import { PDFium } from '@scaryterry/pdfium/browser';
 import { PDFium } from '@scaryterry/pdfium/node';
 ```
 
-**Worker entry** — pass the URL of this entry point when creating a `WorkerProxy`. It is self-executing and should not be imported directly:
+**Worker entry** — create a local worker module that imports `@scaryterry/pdfium/worker`, then pass that emitted URL to worker mode:
 
 ```typescript
-const workerUrl = new URL('@scaryterry/pdfium/worker', import.meta.url);
+// src/pdfium.worker.ts
+import '@scaryterry/pdfium/worker';
+
+// app code
+const workerUrl = new URL('./pdfium.worker.ts', import.meta.url).toString();
 ```
 
 **Types entry** — use for type-only imports in libraries that depend on PDFium types without importing runtime code:
@@ -355,8 +359,6 @@ import { PDFium } from '@scaryterry/pdfium/node';
 
 await using pdfium = await PDFium.init({
   useWorker: true,
-  workerUrl: new URL('./pdf-worker.js', import.meta.url),
-  wasmBinary,
 });
 await using document = await pdfium.openDocument(pdfData);
 const page = await document.renderPage(0, { scale: 2 });

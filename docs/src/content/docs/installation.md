@@ -47,6 +47,21 @@ const wasmBinary = await wasmResponse.arrayBuffer();
 using pdfium = await PDFium.init({ wasmBinary });
 ```
 
+If you use worker mode (`PDFium.init({ useWorker: true, ... })`) or the React provider (`PDFiumProvider`), you must also provide a `workerUrl`.
+
+Create an app worker module:
+
+```ts
+// src/pdfium.worker.ts
+import '@scaryterry/pdfium/worker';
+```
+
+Then pass its emitted URL:
+
+```ts
+const workerUrl = new URL('./pdfium.worker.ts', import.meta.url).toString();
+```
+
 ## Bundler Configuration
 
 ### Vite
@@ -71,6 +86,13 @@ import wasmUrl from '@scaryterry/pdfium/pdfium.wasm?url';
 const response = await fetch(wasmUrl);
 const wasmBinary = await response.arrayBuffer();
 using pdfium = await PDFium.init({ wasmBinary });
+```
+
+When using workers, use the emitted worker module URL:
+
+```typescript
+const workerUrl = new URL('./pdfium.worker.ts', import.meta.url).toString();
+await using pdfium = await PDFium.init({ useWorker: true, workerUrl, wasmUrl });
 ```
 
 ### Webpack
@@ -110,8 +132,10 @@ module.exports = {
 Copy WASM to public folder:
 
 ```bash
-cp node_modules/@scaryterry/pdfium/pdfium.wasm public/
+cp node_modules/@scaryterry/pdfium/dist/vendor/pdfium.wasm public/
 ```
+
+For worker mode, keep the worker as a bundled module (`src/pdfium.worker.ts`) and pass its emitted URL as `workerUrl`.
 
 ## WASM Loading Options
 

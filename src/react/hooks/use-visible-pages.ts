@@ -1,5 +1,3 @@
-'use client';
-
 import type { RefObject } from 'react';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { PageRotation } from '../../core/types.js';

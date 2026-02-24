@@ -1,5 +1,3 @@
-'use client';
-
 import type { TreeNode } from './tree-view-model.js';
 
 interface TreeItemsRendererProps {

@@ -1,5 +1,3 @@
-'use client';
-
 import type { PageRotation } from '../../core/types.js';
 import type { PageDimension } from '../hooks/use-page-dimensions.js';
 import type { ScrollMode } from './visible-pages-geometry.js';

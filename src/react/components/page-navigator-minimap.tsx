@@ -1,5 +1,3 @@
-'use client';
-
 import { type CSSProperties, type MouseEvent, useCallback, useRef } from 'react';
 import type { WorkerPDFiumDocument } from '../../context/worker-client.js';
 import type { Rect } from '../../core/types.js';

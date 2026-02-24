@@ -1,5 +1,3 @@
-'use client';
-
 import { type KeyboardEvent, useCallback, useEffect, useState } from 'react';
 import type { CharacterInfo, CharBox } from '../../core/types.js';
 import { CharacterInspectorOverlay } from '../components/character-inspector-overlay.js';

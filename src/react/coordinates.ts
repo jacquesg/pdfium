@@ -1,5 +1,3 @@
-'use client';
-
 interface ScaleParams {
   scale: number;
   originalHeight: number;

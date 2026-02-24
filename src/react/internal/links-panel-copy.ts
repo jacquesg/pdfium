@@ -1,5 +1,3 @@
-'use client';
-
 import type { Rect } from '../../core/types.js';
 
 const LINKS_PANEL_COPY = {

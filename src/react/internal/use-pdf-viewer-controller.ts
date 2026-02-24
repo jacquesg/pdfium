@@ -1,5 +1,3 @@
-'use client';
-
 import type { MutableRefObject, ReactNode, RefObject } from 'react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import type { PanelEntry, PanelId } from '../components/panels/types.js';

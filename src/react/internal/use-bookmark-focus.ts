@@ -1,5 +1,3 @@
-'use client';
-
 import { type MutableRefObject, useCallback, useState } from 'react';
 
 interface UseBookmarkFocusOptions {

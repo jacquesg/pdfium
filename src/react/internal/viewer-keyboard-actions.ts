@@ -1,5 +1,3 @@
-'use client';
-
 import type { UseDocumentSearchResult } from '../hooks/use-document-search.js';
 import type { KeyboardActions } from '../hooks/use-keyboard-shortcuts.js';
 import type { UseViewerSetupResult } from '../hooks/use-viewer-setup.js';

@@ -1,5 +1,3 @@
-'use client';
-
 import { createContext, useContext } from 'react';
 import type { PDFiumProviderProps } from './internal/provider-config-types.js';
 import type { PDFiumDocumentContextValue, PDFiumInstanceContextValue } from './internal/provider-context-values.js';
@@ -11,13 +9,6 @@ import { usePDFiumProviderController } from './internal/use-pdfium-provider-cont
 
 const PDFiumInstanceContext = createContext<PDFiumInstanceContextValue | null>(null);
 const PDFiumDocumentContext = createContext<PDFiumDocumentContextValue | null>(null);
-
-/**
- * Internal-only context exposing the resolved WASM binary.
- * Used by `useSyncPDFium` to create a main-thread PDFium instance.
- * Not exported from the public barrel.
- */
-const PDFiumBinaryContext = createContext<ArrayBuffer | null>(null);
 
 // ── Provider ───────────────────────────────────────────────────
 
@@ -35,7 +26,6 @@ function PDFiumProvider({
   }
 
   const {
-    resolvedBinary,
     scopedStores,
     instance,
     document,
@@ -67,11 +57,9 @@ function PDFiumProvider({
 
   return (
     <PDFiumStoresContext.Provider value={scopedStores}>
-      <PDFiumBinaryContext.Provider value={resolvedBinary}>
-        <PDFiumInstanceContext.Provider value={instanceValue}>
-          <PDFiumDocumentContext.Provider value={documentValue}>{children}</PDFiumDocumentContext.Provider>
-        </PDFiumInstanceContext.Provider>
-      </PDFiumBinaryContext.Provider>
+      <PDFiumInstanceContext.Provider value={instanceValue}>
+        <PDFiumDocumentContext.Provider value={documentValue}>{children}</PDFiumDocumentContext.Provider>
+      </PDFiumInstanceContext.Provider>
     </PDFiumStoresContext.Provider>
   );
 }
@@ -95,5 +83,5 @@ function usePDFium(): PDFiumInstanceContextValue & PDFiumDocumentContextValue {
   return { ...usePDFiumInstance(), ...usePDFiumDocument() };
 }
 
-export { PDFiumBinaryContext, PDFiumProvider, usePDFium, usePDFiumInstance, usePDFiumDocument };
+export { PDFiumProvider, usePDFium, usePDFiumInstance, usePDFiumDocument };
 export type { PDFiumProviderProps, PDFiumDocumentContextValue as PDFiumContextValue };

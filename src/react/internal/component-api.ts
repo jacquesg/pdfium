@@ -1,5 +1,3 @@
-'use client';
-
 function mergeClassNames(...tokens: Array<string | null | undefined | false>): string | undefined {
   const value = tokens.filter(Boolean).join(' ');
   return value.length > 0 ? value : undefined;

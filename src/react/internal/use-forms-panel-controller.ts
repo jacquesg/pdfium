@@ -1,5 +1,3 @@
-'use client';
-
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { Colour, FlattenResult } from '../../core/types.js';
 import { type FlattenFlags, FormFieldType } from '../../core/types.js';

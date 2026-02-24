@@ -187,6 +187,15 @@ describe('PDFDocumentView', () => {
     expect((scrollContainer as HTMLElement).style.border).toBe('1px solid red');
   });
 
+  it('merges className before classNames.container', () => {
+    const { container } = render(
+      <PDFDocumentView scale={1} className="viewer" classNames={{ container: 'viewer-slot' }} />,
+    );
+
+    const scrollContainer = container.querySelector('[role="document"]');
+    expect(scrollContainer?.className).toBe('viewer viewer-slot');
+  });
+
   it('passes search results for page to PDFPageView', () => {
     const search: SearchState = {
       resultsByPage: new Map([

@@ -1,5 +1,3 @@
-'use client';
-
 const ATTACHMENTS_PANEL_COPY = {
   emptyStateMessage: 'No attachments found.',
   nameColumnHeader: 'Name',

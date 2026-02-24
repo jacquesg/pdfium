@@ -1,5 +1,3 @@
-'use client';
-
 import type { Dispatch, SetStateAction } from 'react';
 
 type ErrorStateSetter = Dispatch<SetStateAction<Error | null>>;

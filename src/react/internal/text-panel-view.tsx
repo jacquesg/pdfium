@@ -1,5 +1,3 @@
-'use client';
-
 import type { KeyboardEvent } from 'react';
 import type { CharacterInfo, CharBox } from '../../core/types.js';
 import type { PageDimension } from '../hooks/use-page-dimensions.js';

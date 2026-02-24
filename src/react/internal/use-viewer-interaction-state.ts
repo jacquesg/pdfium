@@ -1,5 +1,3 @@
-'use client';
-
 import type { RefObject } from 'react';
 import { useEffect, useRef } from 'react';
 import type { InteractionMode, InteractionModeState } from '../hooks/use-interaction-mode.js';

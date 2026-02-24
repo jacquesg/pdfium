@@ -1,5 +1,3 @@
-'use client';
-
 import { useCallback } from 'react';
 import type { WorkerPDFiumDocument } from '../../context/worker-client.js';
 import { usePDFiumDocument } from '../context.js';

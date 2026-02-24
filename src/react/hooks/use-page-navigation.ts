@@ -1,5 +1,3 @@
-'use client';
-
 import { useCallback, useEffect, useState } from 'react';
 
 function clampPageIndex(index: number, pageCount: number): number {

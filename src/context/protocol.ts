@@ -41,6 +41,7 @@ import type {
   RenderOptions,
   SaveOptions,
   SerialisedError,
+  ShapeStyle,
   StructureElement,
   TextSearchFlags,
   TextSearchResult,
@@ -130,6 +131,44 @@ export type WorkerRequest =
     }
   | { type: 'CREATE_N_UP'; id: string; payload: { documentId: string; options: NUpLayoutOptions } }
   | { type: 'GET_ALL_PAGE_DIMENSIONS'; id: string; payload: { documentId: string } }
+  // Worker-side document builder
+  | { type: 'CREATE_DOCUMENT_BUILDER'; id: string; payload?: DestroyPayload }
+  | { type: 'DISPOSE_DOCUMENT_BUILDER'; id: string; payload: { builderId: string } }
+  | {
+      type: 'BUILDER_ADD_PAGE';
+      id: string;
+      payload: { builderId: string; options?: { width?: number; height?: number } };
+    }
+  | { type: 'BUILDER_LOAD_STANDARD_FONT'; id: string; payload: { builderId: string; fontName: string } }
+  | {
+      type: 'BUILDER_PAGE_ADD_RECTANGLE';
+      id: string;
+      payload: { pageBuilderId: string; x: number; y: number; w: number; h: number; style?: ShapeStyle };
+    }
+  | {
+      type: 'BUILDER_PAGE_ADD_TEXT';
+      id: string;
+      payload: {
+        pageBuilderId: string;
+        text: string;
+        x: number;
+        y: number;
+        fontId: string;
+        fontSize: number;
+        colour?: Colour;
+      };
+    }
+  | {
+      type: 'BUILDER_PAGE_ADD_LINE';
+      id: string;
+      payload: { pageBuilderId: string; x1: number; y1: number; x2: number; y2: number; style?: ShapeStyle };
+    }
+  | {
+      type: 'BUILDER_PAGE_ADD_ELLIPSE';
+      id: string;
+      payload: { pageBuilderId: string; cx: number; cy: number; rx: number; ry: number; style?: ShapeStyle };
+    }
+  | { type: 'BUILDER_SAVE'; id: string; payload: { builderId: string; options?: SaveOptions } }
   // Extended document-level queries
   | { type: 'GET_METADATA'; id: string; payload: { documentId: string } }
   | { type: 'GET_PERMISSIONS'; id: string; payload: { documentId: string } }
@@ -187,6 +226,30 @@ export type WorkerRequestPayloadMap = {
   IMPORT_PAGES: { targetDocId: string; sourceDocId: string; options?: ImportPagesOptions };
   CREATE_N_UP: { documentId: string; options: NUpLayoutOptions };
   GET_ALL_PAGE_DIMENSIONS: { documentId: string };
+  CREATE_DOCUMENT_BUILDER: Record<string, never>;
+  DISPOSE_DOCUMENT_BUILDER: { builderId: string };
+  BUILDER_ADD_PAGE: { builderId: string; options?: { width?: number; height?: number } };
+  BUILDER_LOAD_STANDARD_FONT: { builderId: string; fontName: string };
+  BUILDER_PAGE_ADD_RECTANGLE: { pageBuilderId: string; x: number; y: number; w: number; h: number; style?: ShapeStyle };
+  BUILDER_PAGE_ADD_TEXT: {
+    pageBuilderId: string;
+    text: string;
+    x: number;
+    y: number;
+    fontId: string;
+    fontSize: number;
+    colour?: Colour;
+  };
+  BUILDER_PAGE_ADD_LINE: { pageBuilderId: string; x1: number; y1: number; x2: number; y2: number; style?: ShapeStyle };
+  BUILDER_PAGE_ADD_ELLIPSE: {
+    pageBuilderId: string;
+    cx: number;
+    cy: number;
+    rx: number;
+    ry: number;
+    style?: ShapeStyle;
+  };
+  BUILDER_SAVE: { builderId: string; options?: SaveOptions };
   GET_METADATA: { documentId: string };
   GET_PERMISSIONS: { documentId: string };
   GET_VIEWER_PREFERENCES: { documentId: string };
@@ -288,6 +351,21 @@ export interface CharAtPosResponse {
 export interface CreateNUpResponse {
   documentId: string;
   pageCount: number;
+}
+
+/** Response payload for CREATE_DOCUMENT_BUILDER. */
+export interface CreateDocumentBuilderResponse {
+  builderId: string;
+}
+
+/** Response payload for BUILDER_ADD_PAGE. */
+export interface BuilderAddPageResponse {
+  pageBuilderId: string;
+}
+
+/** Response payload for BUILDER_LOAD_STANDARD_FONT. */
+export interface BuilderLoadStandardFontResponse {
+  fontId: string;
 }
 
 /**

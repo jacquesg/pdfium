@@ -1,5 +1,3 @@
-'use client';
-
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
 import { AnnotationOverlay } from '../components/annotation-overlay.js';
 import type { PageOverlayInfo } from '../components/pdf-page-view.js';

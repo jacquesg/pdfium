@@ -1,5 +1,3 @@
-'use client';
-
 const SEARCH_PANEL_COPY = {
   searchRegionAriaLabel: 'Search in document',
   queryPlaceholder: 'Search...',

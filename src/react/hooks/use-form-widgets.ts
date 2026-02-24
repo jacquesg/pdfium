@@ -1,5 +1,3 @@
-'use client';
-
 import type { SerialisedFormWidget } from '../../context/protocol.js';
 import { createPageDataHook } from '../internal/create-data-hook.js';
 

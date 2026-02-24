@@ -1,5 +1,3 @@
-'use client';
-
 /** Toggle a bookmark path in the expanded set. */
 function toggleExpandedPath(expandedPaths: ReadonlySet<string>, path: string): Set<string> {
   const next = new Set(expandedPaths);

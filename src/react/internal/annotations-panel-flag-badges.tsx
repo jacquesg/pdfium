@@ -1,5 +1,3 @@
-'use client';
-
 import { ANNOTATIONS_PANEL_COPY } from './annotations-panel-copy.js';
 import {
   FLAG_BADGE_STYLE,

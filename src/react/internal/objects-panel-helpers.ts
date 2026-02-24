@@ -1,5 +1,3 @@
-'use client';
-
 import type { SerialisedPageObject } from '../../context/protocol.js';
 import type { Rect } from '../../core/types.js';
 import { PageObjectType } from '../../core/types.js';

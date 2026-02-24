@@ -1,5 +1,3 @@
-'use client';
-
 import type { SpreadMode } from '../hooks/use-visible-pages.js';
 
 const TOOLBAR_SCROLL_MODE_OPTIONS: ReadonlyArray<{ value: 'continuous' | 'single' | 'horizontal'; label: string }> = [

@@ -25,6 +25,9 @@ const WRAPPER_MODULE_PATH_SUFFIXES = [
   '/components/search-panel.js',
   '/components/thumbnail-strip.js',
 ];
+const ASYNC_EFFECT_PATTERN = /use(?:Layout)?Effect\s*\(\s*async\s*\(/u;
+const MANUAL_CLASS_JOIN_PATTERN = /filter\s*\(\s*Boolean\s*\)\s*\.join\s*\(\s*['"]\s+['"]\s*\)/u;
+const MERGE_ORDER_PATTERN = /mergeClassNames\(\s*classNames\?\.\w+\s*,\s*className\s*\)/u;
 
 function collectSourceFiles(root: string): string[] {
   const entries = readdirSync(root, { withFileTypes: true });
@@ -74,5 +77,34 @@ describe('react layer boundaries', () => {
     expect(source).not.toContain('/internal/pdf-document-view-root');
     expect(source).not.toContain('/internal/search-panel-view');
     expect(source).not.toContain('/internal/thumbnail-strip-root-view');
+  });
+
+  it('react source does not use async effect callbacks directly', () => {
+    const files = [
+      ...collectSourceFiles('src/react/components'),
+      ...collectSourceFiles('src/react/hooks'),
+      ...collectSourceFiles('src/react/internal'),
+    ];
+    for (const file of files) {
+      const source = readFileSync(file, 'utf8');
+      expect(source).not.toMatch(ASYNC_EFFECT_PATTERN);
+    }
+  });
+
+  it('react source centralizes class token merging through mergeClassNames', () => {
+    const files = [...collectSourceFiles('src/react/components'), ...collectSourceFiles('src/react/internal')];
+    for (const file of files) {
+      if (file.endsWith('src/react/internal/component-api.ts')) continue;
+      const source = readFileSync(file, 'utf8');
+      expect(source).not.toMatch(MANUAL_CLASS_JOIN_PATTERN);
+    }
+  });
+
+  it('mergeClassNames keeps className before classNames slot overrides', () => {
+    const files = [...collectSourceFiles('src/react/components'), ...collectSourceFiles('src/react/internal')];
+    for (const file of files) {
+      const source = readFileSync(file, 'utf8');
+      expect(source).not.toMatch(MERGE_ORDER_PATTERN);
+    }
   });
 });

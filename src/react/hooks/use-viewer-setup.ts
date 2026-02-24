@@ -1,5 +1,3 @@
-'use client';
-
 import { type RefObject, useMemo, useRef, useState } from 'react';
 import type { WorkerPDFiumDocument } from '../../context/worker-client.js';
 import { usePDFiumDocument } from '../context.js';

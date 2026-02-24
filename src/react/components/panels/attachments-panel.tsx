@@ -1,5 +1,3 @@
-'use client';
-
 import { useAttachments } from '../../hooks/use-attachments.js';
 import { ATTACHMENTS_PANEL_COPY, formatAttachmentSize } from '../../internal/attachments-panel-copy.js';
 import { EmptyPanelState } from '../../internal/empty-panel-state.js';

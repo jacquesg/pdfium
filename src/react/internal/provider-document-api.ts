@@ -1,5 +1,3 @@
-'use client';
-
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import type { WorkerPDFium } from '../../context/worker-client.js';
 import type { DocumentLifecycleAction, DocumentLifecycleState } from './document-lifecycle.js';

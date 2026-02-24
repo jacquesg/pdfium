@@ -1,5 +1,3 @@
-'use client';
-
 import type { BookmarkNodeClassNames, BookmarkNodeProps } from './bookmark-node.js';
 import type { FilteredBookmarkEntry } from './bookmark-tree.js';
 

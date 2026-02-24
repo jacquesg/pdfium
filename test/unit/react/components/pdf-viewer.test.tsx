@@ -195,6 +195,14 @@ describe('PDFViewer', () => {
     expect(pagesWrapper.className).toBe('custom-pages');
   });
 
+  it('merges className with classNames.root on the viewer root', () => {
+    const { container } = render(<PDFViewer className="root-a" classNames={{ root: 'root-b' }} />);
+
+    const root = container.firstElementChild as HTMLElement;
+    expect(root.className).toContain('root-a');
+    expect(root.className).toContain('root-b');
+  });
+
   it('passes state to render function', () => {
     const renderFn = vi.fn().mockReturnValue(<div data-testid="custom-content" />);
     render(<PDFViewer>{renderFn}</PDFViewer>);

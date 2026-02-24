@@ -1,5 +1,3 @@
-'use client';
-
 import type { Bookmark } from '../../core/types.js';
 
 interface FilteredBookmarkEntry {

@@ -11,6 +11,13 @@ const MANUAL_DOCS_EXCLUDED_PREFIXES = ['api/'];
 
 const FRONTMATTER_PATTERN = /^---\n([\s\S]*?)\n---\n/u;
 const CODE_FENCE_PATTERN = /```(ts|tsx|typescript|javascript|jsx)\n([\s\S]*?)```/gu;
+const FORBIDDEN_DOC_PATTERNS: ReadonlyArray<RegExp> = [
+  /\bPDFiumProvider\s+src=/u,
+  /\bpdfium-worker\.ts\b/u,
+  /\bpdfium-worker\.js\b/u,
+  /\bpdf-worker\.js\b/u,
+  /node_modules\/@scaryterry\/pdfium\/pdfium\.wasm/u,
+];
 
 function listManualDocFiles(currentDir = DOCS_DIR, prefix = ''): string[] {
   const files: string[] = [];
@@ -99,6 +106,21 @@ describe('docs quality (manual pages)', () => {
 
         for (const error of parseErrors) {
           errors.push(`${relFile}#${String(snippetIndex)} (${language}): ${error}`);
+        }
+      }
+    }
+
+    expect(errors).toEqual([]);
+  });
+
+  test('manual docs avoid stale worker/WASM setup patterns', () => {
+    const errors: string[] = [];
+
+    for (const relFile of listManualDocFiles()) {
+      const content = readFileSync(join(DOCS_DIR, relFile), 'utf8');
+      for (const pattern of FORBIDDEN_DOC_PATTERNS) {
+        if (pattern.test(content)) {
+          errors.push(`${relFile}: contains stale token matching ${pattern.source}`);
         }
       }
     }

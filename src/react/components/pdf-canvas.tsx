@@ -1,5 +1,3 @@
-'use client';
-
 import { type ComponentProps, type Ref, useCallback, useLayoutEffect, useRef, useSyncExternalStore } from 'react';
 import { usePDFiumStores } from '../internal/stores-context.js';
 

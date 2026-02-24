@@ -1,5 +1,3 @@
-'use client';
-
 import { ChevronRight } from 'lucide-react';
 import { memo, useCallback, useMemo } from 'react';
 import type { Bookmark } from '../../core/types.js';

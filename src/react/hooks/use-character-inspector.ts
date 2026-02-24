@@ -1,5 +1,3 @@
-'use client';
-
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CharAtPosResponse } from '../../context/protocol.js';
 import type { WorkerPDFiumDocument } from '../../context/worker-client.js';

@@ -1,5 +1,3 @@
-'use client';
-
 import { createContext, useContext } from 'react';
 import { requireContextValue } from './component-api.js';
 import type { ToolbarContextValue } from './pdf-toolbar-types.js';

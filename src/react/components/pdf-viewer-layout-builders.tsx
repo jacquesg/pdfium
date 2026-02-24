@@ -1,7 +1,6 @@
-'use client';
-
 import type { CSSProperties, ReactNode, RefObject } from 'react';
 import type { UseResizeHandleProps } from '../hooks/use-resize.js';
+import { mergeClassNames } from '../internal/component-api.js';
 import { resolvePanelOverlay, resolvePanelViewportSettings } from '../internal/viewer-layout.js';
 import { DefaultToolbar } from './default-toolbar.js';
 import type { PanelEntry } from './panels/types.js';
@@ -86,11 +85,12 @@ function buildPanelLayout({
   });
   const effectiveOverlay = resolvePanelOverlay(panelOverlay, renderPageOverlay);
   const toolbar = children ?? <DefaultToolbar className={classNames?.toolbar} />;
+  const rootClassName = mergeClassNames(className, classNames?.root);
 
   return (
     <ViewerPanelLayout
       fullscreenRef={fullscreenRef}
-      className={classNames?.root ?? className}
+      className={rootClassName}
       style={style}
       isResizing={isResizing}
       toolbar={toolbar}
@@ -138,10 +138,12 @@ function buildDefaultLayout({
   renderFormFields,
   renderPageOverlay,
 }: BuildDefaultLayoutOptions): ReactNode {
+  const rootClassName = mergeClassNames(className, classNames?.root);
+
   return (
     <ViewerDefaultLayout
       fullscreenRef={fullscreenRef}
-      className={classNames?.root ?? className}
+      className={rootClassName}
       style={style}
       toolbar={<DefaultToolbar className={classNames?.toolbar} />}
       search={isSearchOpen ? <PagesSearch className={classNames?.search} /> : null}

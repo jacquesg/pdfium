@@ -1,5 +1,3 @@
-'use client';
-
 import type { RefObject } from 'react';
 import type { WorkerPDFiumDocument } from '../../context/worker-client.js';
 import { useFullscreen } from '../hooks/use-fullscreen.js';

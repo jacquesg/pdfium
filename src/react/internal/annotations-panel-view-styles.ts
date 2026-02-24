@@ -1,5 +1,3 @@
-'use client';
-
 import type { CSSProperties } from 'react';
 import {
   PANEL_BADGE_PILL_STYLE,

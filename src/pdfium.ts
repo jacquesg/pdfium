@@ -25,6 +25,10 @@ import { asHandle, NULL_PTR, WASMMemoryManager } from './wasm/memory.js';
 /** WASM binary magic number: \0asm */
 const WASM_MAGIC = new Uint8Array([0x00, 0x61, 0x73, 0x6d]);
 
+function importRuntimeModule<T>(specifier: string): Promise<T> {
+  return import(specifier) as Promise<T>;
+}
+
 function validateWasmBinary(binary: ArrayBuffer): void {
   if (binary.byteLength < 4) {
     throw new InitialisationError(
@@ -68,8 +72,8 @@ async function resolveWorkerWasmBinary(options: PDFiumInitOptions): Promise<Arra
 
   if (isNodeEnvironment()) {
     try {
-      const { readFile } = await import('node:fs/promises');
-      const { fileURLToPath } = await import('node:url');
+      const { readFile } = await importRuntimeModule<typeof import('node:fs/promises')>('node:fs/promises');
+      const { fileURLToPath } = await importRuntimeModule<typeof import('node:url')>('node:url');
       const wasmPath = fileURLToPath(new URL('./vendor/pdfium.wasm', import.meta.url));
       const bytes = await readFile(wasmPath);
       const binary = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
@@ -96,7 +100,10 @@ async function fileUrlExists(url: URL): Promise<boolean> {
   }
 
   try {
-    const [{ access }, { fileURLToPath }] = await Promise.all([import('node:fs/promises'), import('node:url')]);
+    const [{ access }, { fileURLToPath }] = await Promise.all([
+      importRuntimeModule<typeof import('node:fs/promises')>('node:fs/promises'),
+      importRuntimeModule<typeof import('node:url')>('node:url'),
+    ]);
     await access(fileURLToPath(url));
     return true;
   } catch {
@@ -301,7 +308,8 @@ export class PDFium extends Disposable {
    */
   static async initNative(options: { limits?: PDFiumLimits } = {}): Promise<NativePDFiumInstance | null> {
     try {
-      const { loadNativeBinding } = await import('./native/loader.js');
+      const { loadNativeBinding } =
+        await importRuntimeModule<typeof import('./native/loader.js')>('./native/loader.js');
       const binding = loadNativeBinding();
       if (!binding) {
         return null;

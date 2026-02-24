@@ -1,5 +1,3 @@
-'use client';
-
 import { useCallback, useState } from 'react';
 import { useDocumentInfo } from '../../hooks/use-document-info.js';
 import { useExtendedDocumentInfo } from '../../hooks/use-extended-document-info.js';

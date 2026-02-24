@@ -1,5 +1,3 @@
-'use client';
-
 import type { KeyboardEvent, MutableRefObject } from 'react';
 import { type Dispatch, type SetStateAction, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { Bookmark } from '../../core/types.js';

@@ -1,5 +1,3 @@
-'use client';
-
 import type { UseViewerSetupResult } from '../hooks/use-viewer-setup.js';
 import type { ButtonOverrides, ButtonProps, FitRenderProps, ZoomRenderProps } from './pdf-toolbar-types.js';
 import { TOOLBAR_LABELS } from './toolbar-config.js';

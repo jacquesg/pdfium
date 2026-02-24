@@ -1,5 +1,3 @@
-'use client';
-
 import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
 import { Fragment } from 'react';
 import type { ActivityBarItemModel } from './activity-bar-model.js';

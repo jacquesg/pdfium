@@ -13,7 +13,10 @@ export const VERSION = __PACKAGE_VERSION__;
 export const WASM_HASH = __WASM_HASH__;
 
 export type {
+  BuilderAddPageResponse,
+  BuilderLoadStandardFontResponse,
   CharAtPosResponse,
+  CreateDocumentBuilderResponse,
   CreateNUpResponse,
   DestroyPayload,
   DocumentInfoResponse,
@@ -45,9 +48,12 @@ export type {
 // Worker APIs (high-level + low-level)
 export {
   WorkerPDFium,
+  WorkerPDFiumBuilderFont,
   WorkerPDFiumDocument,
+  WorkerPDFiumDocumentBuilder,
   type WorkerPDFiumOptions,
   WorkerPDFiumPage,
+  WorkerPDFiumPageBuilder,
 } from './context/worker-client.js';
 export {
   type WorkerErrorEvent,

@@ -1,5 +1,3 @@
-'use client';
-
 import type { DocumentInfoResponse } from '../../context/protocol.js';
 import { createDocumentDataHook } from '../internal/create-data-hook.js';
 

@@ -1,5 +1,3 @@
-'use client';
-
 import type { ReactNode } from 'react';
 import { PDFViewerProviders } from '../components/pdf-viewer-providers.js';
 import type { PDFViewerProps } from '../components/pdf-viewer-types.js';

@@ -1,5 +1,3 @@
-'use client';
-
 import type { ToolbarSearchState } from '../components/pdf-toolbar.js';
 import type { PDFViewerState } from '../components/pdf-viewer.js';
 

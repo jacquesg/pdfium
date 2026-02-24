@@ -1,5 +1,3 @@
-'use client';
-
 import type { CSSProperties, KeyboardEvent } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { collectVisibleIds, findNode, findParent, type TreeNode, toggleExpandedState } from './tree-view-model.js';

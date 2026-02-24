@@ -1,5 +1,3 @@
-'use client';
-
 type ToolbarRovingKey = 'ArrowLeft' | 'ArrowRight' | 'Home' | 'End';
 
 function isToolbarRovingKey(key: string): key is ToolbarRovingKey {

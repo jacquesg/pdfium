@@ -1,5 +1,3 @@
-'use client';
-
 const BOOKMARK_PANEL_COPY = {
   emptyStateMessage: 'This document has no bookmarks.',
   treeAriaLabel: 'Document bookmarks',

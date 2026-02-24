@@ -1,5 +1,3 @@
-'use client';
-
 import type { SerialisedAnnotation, SerialisedWidgetData } from '../../context/protocol.js';
 import { formatAnnotationBounds } from './annotations-panel-helpers.js';
 import type { PropertyRow } from './property-table.js';

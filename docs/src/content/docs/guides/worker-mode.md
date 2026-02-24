@@ -5,6 +5,30 @@ description: Off-main-thread PDF processing with Web Workers
 
 For browser applications, processing PDFs on the main thread can cause UI freezes. Worker mode moves PDF operations to a Web Worker, keeping the UI responsive.
 
+## Recommended Path (Built-in Worker Runtime)
+
+For most applications, do not implement a custom worker protocol. Use the built-in worker runtime and only provide `workerUrl` + `wasmUrl`/`wasmBinary`:
+
+```typescript
+import { PDFium } from '@scaryterry/pdfium';
+
+const workerUrl = new URL('./pdfium.worker.ts', import.meta.url).toString();
+
+await using pdfium = await PDFium.init({
+  useWorker: true,
+  workerUrl,
+  wasmUrl: '/pdfium.wasm',
+  workerTimeout: 30_000,
+});
+```
+
+Worker entry module:
+
+```ts
+// src/pdfium.worker.ts
+import '@scaryterry/pdfium/worker';
+```
+
 ## When to Use Workers
 
 **Use workers when:**
@@ -20,14 +44,13 @@ For browser applications, processing PDFs on the main thread can cause UI freeze
 
 ## Setup Overview
 
-1. Create a worker script
-2. Load WASM binary
-3. Create `WorkerProxy` instance
-4. Use proxy methods for operations
+1. Create a worker entry module (`import '@scaryterry/pdfium/worker'`)
+2. Provide `workerUrl` and `wasmUrl`/`wasmBinary`
+3. Use high-level worker mode (`PDFium.init({ useWorker: true, ... })`) or `WorkerProxy`
 
-## Worker Script
+## Custom Worker Script (Advanced)
 
-Create `pdfium-worker.ts`:
+Create a dedicated custom worker module (for example `custom-pdf.worker.ts`):
 
 ```typescript
 import { PDFium, PDFiumDocument } from '@scaryterry/pdfium';
@@ -231,7 +254,7 @@ async function renderPDFInWorker() {
   const wasmBinary = await wasmResponse.arrayBuffer();
 
   // Create worker client
-  const client = new PDFWorkerClient('/pdfium-worker.js');
+  const client = new PDFWorkerClient('/custom-pdf.worker.js');
   await client.init(wasmBinary);
 
   try {
@@ -274,9 +297,11 @@ The library provides a built-in `WorkerProxy` class:
 import { PDFium } from '@scaryterry/pdfium';
 
 async function useWorkerMode() {
+  const workerUrl = new URL('./pdfium.worker.ts', import.meta.url).toString();
+
   await using pdfium = await PDFium.init({
     useWorker: true,
-    workerUrl: '/pdfium-worker.js',
+    workerUrl,
     wasmUrl: '/pdfium.wasm',
     workerTimeout: 30_000,
   });
@@ -294,8 +319,9 @@ For low-level control, use `WorkerProxy` directly:
 ```typescript
 import { WorkerProxy } from '@scaryterry/pdfium';
 
+const workerUrl = new URL('./pdfium.worker.ts', import.meta.url).toString();
 const wasmBinary = await fetch('/pdfium.wasm').then((r) => r.arrayBuffer());
-await using proxy = await WorkerProxy.create('/pdfium-worker.js', wasmBinary, { timeout: 30_000 });
+await using proxy = await WorkerProxy.create(workerUrl, wasmBinary, { timeout: 30_000 });
 
 const pdfData = await fetch('/document.pdf').then((r) => r.arrayBuffer());
 const { documentId } = await proxy.openDocument(pdfData);
@@ -480,7 +506,7 @@ class WorkerPool {
 
 // Usage
 const pool = new WorkerPool();
-await pool.init('/worker.js', wasmBinary, navigator.hardwareConcurrency);
+await pool.init('/custom-pdf.worker.js', wasmBinary, navigator.hardwareConcurrency);
 
 // Process PDFs in parallel
 const results = await Promise.all(

@@ -1,5 +1,3 @@
-'use client';
-
 import type { CSSProperties } from 'react';
 
 /** A single key-value row in a property table. */

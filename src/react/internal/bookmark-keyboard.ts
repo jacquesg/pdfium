@@ -1,5 +1,3 @@
-'use client';
-
 import type { Bookmark } from '../../core/types.js';
 import { collectExpandableSiblingPaths, parentPath, resolveBookmark } from './bookmark-tree.js';
 

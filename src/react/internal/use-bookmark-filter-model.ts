@@ -1,5 +1,3 @@
-'use client';
-
 import { type Dispatch, type SetStateAction, useMemo, useState } from 'react';
 import type { Bookmark } from '../../core/types.js';
 import type { FilteredBookmarkEntry } from './bookmark-tree.js';

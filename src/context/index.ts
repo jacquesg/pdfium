@@ -5,7 +5,10 @@
  */
 
 export type {
+  BuilderAddPageResponse,
+  BuilderLoadStandardFontResponse,
   CharAtPosResponse,
+  CreateDocumentBuilderResponse,
   CreateNUpResponse,
   DocumentInfoResponse,
   LoadPageResponse,
@@ -31,7 +34,15 @@ export type {
   WorkerRequest,
   WorkerResponse,
 } from './protocol.js';
-export { WorkerPDFium, WorkerPDFiumDocument, type WorkerPDFiumOptions, WorkerPDFiumPage } from './worker-client.js';
+export {
+  WorkerPDFium,
+  WorkerPDFiumBuilderFont,
+  WorkerPDFiumDocument,
+  WorkerPDFiumDocumentBuilder,
+  type WorkerPDFiumOptions,
+  WorkerPDFiumPage,
+  WorkerPDFiumPageBuilder,
+} from './worker-client.js';
 export {
   type WorkerErrorEvent,
   type WorkerMessageEvent,

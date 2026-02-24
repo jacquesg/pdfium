@@ -29,6 +29,7 @@ import type {
   RenderResult,
   SaveOptions,
   SerialisedError,
+  ShapeStyle,
   StructureElement,
   TextSearchFlags,
   TextSearchResult,
@@ -36,7 +37,10 @@ import type {
   WebLink,
 } from '../core/types.js';
 import type {
+  BuilderAddPageResponse,
+  BuilderLoadStandardFontResponse,
   CharAtPosResponse,
+  CreateDocumentBuilderResponse,
   CreateNUpResponse,
   DocumentInfoResponse,
   ExtendedDocumentInfoResponse,
@@ -107,8 +111,12 @@ export interface WorkerTransport {
   terminate(): void;
 }
 
+function importRuntimeModule<T>(specifier: string): Promise<T> {
+  return import(specifier) as Promise<T>;
+}
+
 async function createNodeWorkerTransport(workerUrl: string | URL): Promise<WorkerTransport> {
-  const workerThreads = await import('node:worker_threads');
+  const workerThreads = await importRuntimeModule<typeof import('node:worker_threads')>('node:worker_threads');
   // Do not inherit parent CLI flags (e.g. --input-type) that can break worker startup.
   const nodeWorker = new workerThreads.Worker(workerUrl, { execArgv: [] });
   let terminated = false;
@@ -536,6 +544,86 @@ export class WorkerProxy extends AsyncDisposable {
 
   async getAllPageDimensions(documentId: string): Promise<Array<{ width: number; height: number }>> {
     return this.#sendRequest<Array<{ width: number; height: number }>>('GET_ALL_PAGE_DIMENSIONS', { documentId });
+  }
+
+  // ────────────────────────────────────────────────────────────
+  // Builder operations
+  // ────────────────────────────────────────────────────────────
+
+  async createDocumentBuilder(): Promise<CreateDocumentBuilderResponse> {
+    return this.#sendRequest<CreateDocumentBuilderResponse>('CREATE_DOCUMENT_BUILDER', {});
+  }
+
+  async disposeDocumentBuilder(builderId: string): Promise<void> {
+    return this.#sendRequest<void>('DISPOSE_DOCUMENT_BUILDER', { builderId });
+  }
+
+  async builderAddPage(
+    builderId: string,
+    options?: { width?: number; height?: number },
+  ): Promise<BuilderAddPageResponse> {
+    return this.#sendRequest<BuilderAddPageResponse>('BUILDER_ADD_PAGE', { builderId, options });
+  }
+
+  async builderLoadStandardFont(builderId: string, fontName: string): Promise<BuilderLoadStandardFontResponse> {
+    return this.#sendRequest<BuilderLoadStandardFontResponse>('BUILDER_LOAD_STANDARD_FONT', { builderId, fontName });
+  }
+
+  async builderPageAddRectangle(
+    pageBuilderId: string,
+    x: number,
+    y: number,
+    w: number,
+    h: number,
+    style?: ShapeStyle,
+  ): Promise<void> {
+    return this.#sendRequest<void>('BUILDER_PAGE_ADD_RECTANGLE', { pageBuilderId, x, y, w, h, style });
+  }
+
+  async builderPageAddText(
+    pageBuilderId: string,
+    text: string,
+    x: number,
+    y: number,
+    fontId: string,
+    fontSize: number,
+    colour?: Colour,
+  ): Promise<void> {
+    return this.#sendRequest<void>('BUILDER_PAGE_ADD_TEXT', {
+      pageBuilderId,
+      text,
+      x,
+      y,
+      fontId,
+      fontSize,
+      colour,
+    });
+  }
+
+  async builderPageAddLine(
+    pageBuilderId: string,
+    x1: number,
+    y1: number,
+    x2: number,
+    y2: number,
+    style?: ShapeStyle,
+  ): Promise<void> {
+    return this.#sendRequest<void>('BUILDER_PAGE_ADD_LINE', { pageBuilderId, x1, y1, x2, y2, style });
+  }
+
+  async builderPageAddEllipse(
+    pageBuilderId: string,
+    cx: number,
+    cy: number,
+    rx: number,
+    ry: number,
+    style?: ShapeStyle,
+  ): Promise<void> {
+    return this.#sendRequest<void>('BUILDER_PAGE_ADD_ELLIPSE', { pageBuilderId, cx, cy, rx, ry, style });
+  }
+
+  async builderSave(builderId: string, options?: SaveOptions): Promise<ArrayBuffer> {
+    return this.#sendRequest<ArrayBuffer>('BUILDER_SAVE', { builderId, options });
   }
 
   async getMetadata(documentId: string): Promise<DocumentMetadata> {

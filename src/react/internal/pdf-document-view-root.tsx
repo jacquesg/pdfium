@@ -1,5 +1,3 @@
-'use client';
-
 import { type CSSProperties, forwardRef, type ReactNode, type RefObject, useImperativeHandle } from 'react';
 import type { PageRotation, TextSearchResult } from '../../core/types.js';
 import type { PageOverlayInfo } from '../components/pdf-page-view.js';
@@ -116,7 +114,7 @@ const PDFDocumentViewRoot = forwardRef<PDFDocumentViewHandle, PDFDocumentViewPro
 
   if (!document) return null;
 
-  const containerClassName = mergeClassNames(classNames?.container, className);
+  const containerClassName = mergeClassNames(className, classNames?.container);
   const pageClassName = classNames?.page;
 
   const sharedRenderProps = {

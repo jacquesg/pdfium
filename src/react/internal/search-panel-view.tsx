@@ -1,5 +1,3 @@
-'use client';
-
 import { ChevronDown, ChevronUp, Search, X } from 'lucide-react';
 import type { CSSProperties } from 'react';
 import { getSearchBadgeText, SEARCH_PANEL_COPY } from './search-panel-copy.js';

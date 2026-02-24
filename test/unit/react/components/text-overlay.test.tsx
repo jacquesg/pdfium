@@ -251,4 +251,13 @@ describe('TextOverlay', () => {
     expect(outerDiv.className).toBe('pdfium-text-layer custom-overlay');
     expect(outerDiv.style.opacity).toBe('0.5');
   });
+
+  it('keeps base class stable when className is omitted', () => {
+    const { container } = render(
+      <TextOverlay text={null} rects={null} scale={1} width={100} height={100} originalHeight={792} />,
+    );
+
+    const outerDiv = container.firstElementChild as HTMLElement;
+    expect(outerDiv.className).toBe('pdfium-text-layer');
+  });
 });

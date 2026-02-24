@@ -1,5 +1,3 @@
-'use client';
-
 import { useCallback, useRef } from 'react';
 import type { WorkerPDFiumDocument } from '../../context/worker-client.js';
 import type { FlattenFlags, FlattenResult } from '../../core/types.js';

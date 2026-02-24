@@ -1,5 +1,3 @@
-'use client';
-
 interface TreeNode {
   id: string;
   label: string;

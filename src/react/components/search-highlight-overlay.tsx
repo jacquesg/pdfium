@@ -1,5 +1,3 @@
-'use client';
-
 import { type ComponentProps, type Ref, useCallback, useLayoutEffect, useRef } from 'react';
 import type { TextSearchResult } from '../../core/types.js';
 import { VISUALLY_HIDDEN_STYLE } from '../internal/a11y.js';

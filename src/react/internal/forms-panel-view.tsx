@@ -1,5 +1,3 @@
-'use client';
-
 import type { CSSProperties } from 'react';
 import type { SerialisedFormWidget } from '../../context/protocol.js';
 import type { FlattenResult } from '../../core/types.js';

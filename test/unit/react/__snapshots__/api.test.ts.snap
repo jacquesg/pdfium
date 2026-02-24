@@ -90,7 +90,6 @@ exports[`React Public API > should export expected runtime symbols 1`] = `
   "useRotation",
   "useSignatures",
   "useStructureTree",
-  "useSyncPDFium",
   "useTextContent",
   "useTextSearch",
   "useToolbarContext",

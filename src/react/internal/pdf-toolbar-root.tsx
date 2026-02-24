@@ -1,5 +1,3 @@
-'use client';
-
 import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
 import { useCallback, useEffect, useRef } from 'react';
 import { ToolbarContext } from './pdf-toolbar-context.js';

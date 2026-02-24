@@ -1,5 +1,3 @@
-'use client';
-
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { PDFiumError } from '../../core/errors.js';
 import { useLatestRef, useMountedRef, useRequestCounter } from '../internal/async-guards.js';

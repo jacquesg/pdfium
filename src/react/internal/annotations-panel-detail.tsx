@@ -1,5 +1,3 @@
-'use client';
-
 import type { SerialisedAnnotation } from '../../context/protocol.js';
 import { AnnotationType } from '../../core/types.js';
 import {

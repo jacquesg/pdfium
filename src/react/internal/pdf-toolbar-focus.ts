@@ -1,5 +1,3 @@
-'use client';
-
 import { applyToolbarTabStops, getToolbarInitialTabStop } from './toolbar-roving.js';
 
 /** Collect all focusable toolbar controls that are not disabled. */

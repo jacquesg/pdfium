@@ -42,3 +42,9 @@ This index maps major React modules to the intended layers.
 - Controller/view wrapper contract: `test/unit/react/components/panels/forms-panel-wrapper.test.tsx`
 - Component wrapper contracts: `test/unit/react/components/component-wrapper-contract.test.ts`
 - Layer boundary guardrails: `test/unit/react/layer-boundary.test.ts`
+
+## See also
+
+- [React Architecture](./architecture.md) - Layering rules and review checklist for new code.
+- [React Contributor Playbook](./contributor-playbook.md) - Required file shapes and verification gates.
+- [React Testing](./testing.md) - Deterministic race coverage and teardown standards.

@@ -1,5 +1,3 @@
-'use client';
-
 import type { WorkerPDFium, WorkerPDFiumDocument } from '../../context/worker-client.js';
 import { disposeSafely } from './dispose-safely.js';
 import { disposeDocumentSafely, purgeDocumentCaches } from './document-cleanup.js';

@@ -1,5 +1,3 @@
-'use client';
-
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Printer, ZoomIn, ZoomOut } from 'lucide-react';
 import type { CSSProperties, ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';

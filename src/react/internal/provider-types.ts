@@ -1,5 +1,3 @@
-'use client';
-
 interface ProviderPasswordValue {
   required: boolean;
   attempted: boolean;

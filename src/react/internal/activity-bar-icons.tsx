@@ -1,5 +1,3 @@
-'use client';
-
 import type { ReactNode } from 'react';
 import type { PanelEntry, PanelId } from '../components/panels/types.js';
 import { isBuiltinPanelId } from '../components/panels/types.js';

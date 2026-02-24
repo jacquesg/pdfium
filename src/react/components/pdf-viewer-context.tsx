@@ -1,5 +1,3 @@
-'use client';
-
 import { createContext, type ReactNode, type RefObject, useContext, useMemo } from 'react';
 import type { UseDocumentSearchResult } from '../hooks/use-document-search.js';
 import type { UseViewerSetupResult } from '../hooks/use-viewer-setup.js';

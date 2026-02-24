@@ -1,5 +1,3 @@
-'use client';
-
 import type { DocumentMetadata } from '../../core/types.js';
 import { createDocumentDataHook } from '../internal/create-data-hook.js';
 

@@ -29,8 +29,8 @@ async function loadTestPdf(filename: string): Promise<Uint8Array> {
 }
 
 describe.skipIf(!HAS_DIST)('React Viewer Integration', { timeout: 30_000 }, () => {
-  let workerPdfium: WorkerPDFium;
-  let doc: WorkerPDFiumDocument;
+  let workerPdfium!: WorkerPDFium;
+  let doc!: WorkerPDFiumDocument;
 
   beforeAll(async () => {
     workerPdfium = await createWorkerPDFium();
@@ -39,8 +39,8 @@ describe.skipIf(!HAS_DIST)('React Viewer Integration', { timeout: 30_000 }, () =
   });
 
   afterAll(async () => {
-    await doc.dispose();
-    await workerPdfium.dispose();
+    await doc?.dispose();
+    await workerPdfium?.dispose();
   });
 
   describe('getAllPageDimensions (usePageDimensions dependency)', () => {

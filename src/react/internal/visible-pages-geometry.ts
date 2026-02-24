@@ -1,5 +1,3 @@
-'use client';
-
 import { PageRotation } from '../../core/types.js';
 import type { PageDimension } from '../hooks/use-page-dimensions.js';
 

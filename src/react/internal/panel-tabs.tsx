@@ -1,5 +1,3 @@
-'use client';
-
 import type { CSSProperties, KeyboardEvent, ReactNode } from 'react';
 import { useCallback, useId, useRef } from 'react';
 

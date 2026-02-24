@@ -17,10 +17,13 @@ import type {
   NUpLayoutOptions,
   SaveOptions,
   SerialisedError,
+  ShapeStyle,
   TextSearchFlags,
 } from '../core/types.js';
 import { AnnotationAppearanceMode, PageBoxType, PathFillMode } from '../core/types.js';
 import type { PDFiumAnnotation } from '../document/annotation.js';
+import type { PDFiumDocumentBuilder, PDFiumPageBuilder } from '../document/builder.js';
+import type { PDFiumBuilderFont } from '../document/builder-font.js';
 import type { PDFiumDocument } from '../document/document.js';
 import type { PDFiumPage } from '../document/page.js';
 import {
@@ -82,6 +85,16 @@ class WorkerState {
   readonly documents = new Map<string, PDFiumDocument>();
   /** Loaded pages keyed by unique page ID. */
   readonly pages = new Map<string, PDFiumPage>();
+  /** Active document builders keyed by unique builder ID. */
+  readonly builders = new Map<string, PDFiumDocumentBuilder>();
+  /** Active builder page handles keyed by unique builder page ID. */
+  readonly builderPages = new Map<string, PDFiumPageBuilder>();
+  /** Active builder font handles keyed by unique font ID. */
+  readonly builderFonts = new Map<string, PDFiumBuilderFont>();
+  /** Track which builder owns each builder page. */
+  readonly builderPageOwners = new Map<string, string>();
+  /** Track which builder owns each builder font. */
+  readonly builderFontOwners = new Map<string, string>();
   /** Maps each loaded page back to its parent document ID. */
   readonly pageDocumentMap = new WeakMap<PDFiumPage, string>();
   /** Maximum number of concurrently open documents. */
@@ -96,11 +109,27 @@ class WorkerState {
   nextPageId(): string {
     return crypto.randomUUID();
   }
+
+  nextBuilderId(): string {
+    return crypto.randomUUID();
+  }
+
+  nextBuilderPageId(): string {
+    return crypto.randomUUID();
+  }
+
+  nextBuilderFontId(): string {
+    return crypto.randomUUID();
+  }
 }
 
 const state = new WorkerState();
 let postToMainThread: MessageToMainThread | null = null;
 let expectedMessageOrigin: string | undefined;
+
+function importRuntimeModule<T>(specifier: string): Promise<T> {
+  return import(specifier) as Promise<T>;
+}
 
 function getBrowserWorkerScope(): BrowserWorkerScope | null {
   const scopeCandidate = (globalThis as { self?: unknown }).self ?? globalThis;
@@ -195,6 +224,42 @@ function lookupPage(id: string, pageId: string): PDFiumPage | undefined {
     });
   }
   return page;
+}
+
+function lookupBuilder(id: string, builderId: string): PDFiumDocumentBuilder | undefined {
+  const builder = state.builders.get(builderId);
+  if (builder === undefined) {
+    postError(id, {
+      name: 'DocumentError',
+      message: `Document builder ${builderId} not found`,
+      code: PDFiumErrorCode.DOC_ALREADY_CLOSED,
+    });
+  }
+  return builder;
+}
+
+function lookupBuilderPage(id: string, pageBuilderId: string): PDFiumPageBuilder | undefined {
+  const pageBuilder = state.builderPages.get(pageBuilderId);
+  if (pageBuilder === undefined) {
+    postError(id, {
+      name: 'PageError',
+      message: `Builder page ${pageBuilderId} not found`,
+      code: PDFiumErrorCode.PAGE_ALREADY_CLOSED,
+    });
+  }
+  return pageBuilder;
+}
+
+function lookupBuilderFont(id: string, fontId: string): PDFiumBuilderFont | undefined {
+  const font = state.builderFonts.get(fontId);
+  if (font === undefined) {
+    postError(id, {
+      name: 'DocumentError',
+      message: `Builder font ${fontId} not found`,
+      code: PDFiumErrorCode.DOC_ALREADY_CLOSED,
+    });
+  }
+  return font;
 }
 
 // ────────────────────────────────────────────────────────────
@@ -1126,6 +1191,159 @@ function handleCreateNUp(id: string, documentId: string, options: NUpLayoutOptio
   postSuccess(id, response);
 }
 
+function disposeBuilderResources(builderId: string): void {
+  for (const [pageId, ownerId] of state.builderPageOwners) {
+    if (ownerId === builderId) {
+      const pageBuilder = state.builderPages.get(pageId);
+      if (pageBuilder !== undefined && !pageBuilder.disposed) {
+        pageBuilder.dispose();
+      }
+      state.builderPages.delete(pageId);
+      state.builderPageOwners.delete(pageId);
+    }
+  }
+
+  for (const [fontId, ownerId] of state.builderFontOwners) {
+    if (ownerId === builderId) {
+      state.builderFonts.delete(fontId);
+      state.builderFontOwners.delete(fontId);
+    }
+  }
+}
+
+function handleCreateDocumentBuilder(id: string): void {
+  if (state.pdfium === null) {
+    postError(id, {
+      name: 'InitialisationError',
+      message: 'Worker not initialised',
+      code: PDFiumErrorCode.INIT_LIBRARY_FAILED,
+    });
+    return;
+  }
+
+  const builder = state.pdfium.createDocument();
+  const builderId = state.nextBuilderId();
+  state.builders.set(builderId, builder);
+  postSuccess(id, { builderId });
+}
+
+function handleDisposeDocumentBuilder(id: string, builderId: string): void {
+  const builder = lookupBuilder(id, builderId);
+  if (!builder) return;
+
+  disposeBuilderResources(builderId);
+  builder.dispose();
+  state.builders.delete(builderId);
+  postSuccess(id, undefined);
+}
+
+function handleBuilderAddPage(id: string, builderId: string, options?: { width?: number; height?: number }): void {
+  const builder = lookupBuilder(id, builderId);
+  if (!builder) return;
+
+  const pageBuilder = builder.addPage(options);
+  const pageBuilderId = state.nextBuilderPageId();
+  state.builderPages.set(pageBuilderId, pageBuilder);
+  state.builderPageOwners.set(pageBuilderId, builderId);
+  postSuccess(id, { pageBuilderId });
+}
+
+function handleBuilderLoadStandardFont(id: string, builderId: string, fontName: string): void {
+  const builder = lookupBuilder(id, builderId);
+  if (!builder) return;
+
+  const font = builder.loadStandardFont(fontName);
+  const fontId = state.nextBuilderFontId();
+  state.builderFonts.set(fontId, font);
+  state.builderFontOwners.set(fontId, builderId);
+  postSuccess(id, { fontId });
+}
+
+function handleBuilderPageAddRectangle(
+  id: string,
+  pageBuilderId: string,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  style?: ShapeStyle,
+): void {
+  const pageBuilder = lookupBuilderPage(id, pageBuilderId);
+  if (!pageBuilder) return;
+  pageBuilder.addRectangle(x, y, w, h, style);
+  postSuccess(id, undefined);
+}
+
+function handleBuilderPageAddText(
+  id: string,
+  pageBuilderId: string,
+  text: string,
+  x: number,
+  y: number,
+  fontId: string,
+  fontSize: number,
+  colour?: Colour,
+): void {
+  const pageBuilder = lookupBuilderPage(id, pageBuilderId);
+  if (!pageBuilder) return;
+  const font = lookupBuilderFont(id, fontId);
+  if (!font) return;
+
+  const pageOwner = state.builderPageOwners.get(pageBuilderId);
+  const fontOwner = state.builderFontOwners.get(fontId);
+  if (pageOwner !== fontOwner) {
+    postError(id, {
+      name: 'DocumentError',
+      message: 'Font and page builder must belong to the same document builder',
+      code: PDFiumErrorCode.DOC_FORMAT_INVALID,
+    });
+    return;
+  }
+
+  pageBuilder.addText(text, x, y, font, fontSize, colour);
+  postSuccess(id, undefined);
+}
+
+function handleBuilderPageAddLine(
+  id: string,
+  pageBuilderId: string,
+  x1: number,
+  y1: number,
+  x2: number,
+  y2: number,
+  style?: ShapeStyle,
+): void {
+  const pageBuilder = lookupBuilderPage(id, pageBuilderId);
+  if (!pageBuilder) return;
+  pageBuilder.addLine(x1, y1, x2, y2, style);
+  postSuccess(id, undefined);
+}
+
+function handleBuilderPageAddEllipse(
+  id: string,
+  pageBuilderId: string,
+  cx: number,
+  cy: number,
+  rx: number,
+  ry: number,
+  style?: ShapeStyle,
+): void {
+  const pageBuilder = lookupBuilderPage(id, pageBuilderId);
+  if (!pageBuilder) return;
+  pageBuilder.addEllipse(cx, cy, rx, ry, style);
+  postSuccess(id, undefined);
+}
+
+function handleBuilderSave(id: string, builderId: string, options?: SaveOptions): void {
+  const builder = lookupBuilder(id, builderId);
+  if (!builder) return;
+
+  const bytes = builder.save(options ?? {});
+  const buffer = new ArrayBuffer(bytes.byteLength);
+  new Uint8Array(buffer).set(bytes);
+  postSuccess(id, buffer, [buffer]);
+}
+
 // ────────────────────────────────────────────────────────────
 // Extended document-level handlers
 // ────────────────────────────────────────────────────────────
@@ -1240,6 +1458,19 @@ function handleGetExtendedDocumentInfo(id: string, documentId: string): void {
  * Handle destroy request.
  */
 function handleDestroy(id: string): void {
+  // Dispose all active document builders
+  for (const [builderId, builder] of state.builders) {
+    disposeBuilderResources(builderId);
+    if (!builder.disposed) {
+      builder.dispose();
+    }
+  }
+  state.builders.clear();
+  state.builderPages.clear();
+  state.builderFonts.clear();
+  state.builderPageOwners.clear();
+  state.builderFontOwners.clear();
+
   // Close all pages
   for (const page of state.pages.values()) {
     page.dispose();
@@ -1285,7 +1516,7 @@ export async function setupWorker(): Promise<void> {
   }
 
   if (isNodeEnvironment()) {
-    const { parentPort } = await import('node:worker_threads');
+    const { parentPort } = await importRuntimeModule<typeof import('node:worker_threads')>('node:worker_threads');
     if (parentPort === null) {
       throw new Error('Node worker_threads parentPort is not available');
     }
@@ -1506,6 +1737,75 @@ async function handleMessage(request: WorkerRequest, origin?: string): Promise<v
 
       case 'CREATE_N_UP':
         handleCreateNUp(id, request.payload.documentId, request.payload.options);
+        break;
+
+      case 'CREATE_DOCUMENT_BUILDER':
+        handleCreateDocumentBuilder(id);
+        break;
+
+      case 'DISPOSE_DOCUMENT_BUILDER':
+        handleDisposeDocumentBuilder(id, request.payload.builderId);
+        break;
+
+      case 'BUILDER_ADD_PAGE':
+        handleBuilderAddPage(id, request.payload.builderId, request.payload.options);
+        break;
+
+      case 'BUILDER_LOAD_STANDARD_FONT':
+        handleBuilderLoadStandardFont(id, request.payload.builderId, request.payload.fontName);
+        break;
+
+      case 'BUILDER_PAGE_ADD_RECTANGLE':
+        handleBuilderPageAddRectangle(
+          id,
+          request.payload.pageBuilderId,
+          request.payload.x,
+          request.payload.y,
+          request.payload.w,
+          request.payload.h,
+          request.payload.style,
+        );
+        break;
+
+      case 'BUILDER_PAGE_ADD_TEXT':
+        handleBuilderPageAddText(
+          id,
+          request.payload.pageBuilderId,
+          request.payload.text,
+          request.payload.x,
+          request.payload.y,
+          request.payload.fontId,
+          request.payload.fontSize,
+          request.payload.colour,
+        );
+        break;
+
+      case 'BUILDER_PAGE_ADD_LINE':
+        handleBuilderPageAddLine(
+          id,
+          request.payload.pageBuilderId,
+          request.payload.x1,
+          request.payload.y1,
+          request.payload.x2,
+          request.payload.y2,
+          request.payload.style,
+        );
+        break;
+
+      case 'BUILDER_PAGE_ADD_ELLIPSE':
+        handleBuilderPageAddEllipse(
+          id,
+          request.payload.pageBuilderId,
+          request.payload.cx,
+          request.payload.cy,
+          request.payload.rx,
+          request.payload.ry,
+          request.payload.style,
+        );
+        break;
+
+      case 'BUILDER_SAVE':
+        handleBuilderSave(id, request.payload.builderId, request.payload.options);
         break;
 
       // Extended document-level queries

@@ -94,7 +94,7 @@
   },
   "scripts": {
     "postinstall": "node scripts/postinstall.js",
-    "build": "tsup",
+    "build": "tsup && node --import tsx scripts/finalize-react-build.ts",
     "build:watch": "tsup --watch",
     "build:native": "napi build --features napi --platform --release",
     "download:pdfium": "node --import tsx scripts/download-pdfium.ts",

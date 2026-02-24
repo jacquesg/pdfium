@@ -1,5 +1,3 @@
-'use client';
-
 const ANNOTATIONS_PANEL_COPY = {
   emptyStateMessage: 'No annotations on this page.',
   totalSuffix: 'total',

@@ -1,5 +1,3 @@
-'use client';
-
 import type { CharBox } from '../../core/types.js';
 
 function isTextPanelTabId(value: string): value is 'characters' | 'extraction' {

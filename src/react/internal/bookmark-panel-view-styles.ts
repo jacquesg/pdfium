@@ -1,5 +1,3 @@
-'use client';
-
 import type { CSSProperties } from 'react';
 import {
   BOOKMARK_TREE_FILTER_COUNT_FONT_SIZE,

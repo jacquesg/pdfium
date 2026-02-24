@@ -1,5 +1,3 @@
-'use client';
-
 import { type CSSProperties, type ReactNode, type RefObject, useCallback, useMemo } from 'react';
 import type { Bookmark } from '../../core/types.js';
 import type { UseDocumentSearchResult } from '../hooks/use-document-search.js';

@@ -1,5 +1,3 @@
-'use client';
-
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 import { VISUALLY_HIDDEN_STYLE } from '../internal/a11y.js';
 import { useLatestRef, useMountedRef, useRequestCounter } from '../internal/async-guards.js';

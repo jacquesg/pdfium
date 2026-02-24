@@ -177,6 +177,100 @@ describe('WorkerPDFium high-level API', () => {
     await disposePdfiumPromise;
   });
 
+  test('createDocumentBuilder delegates builder operations to worker proxy', async () => {
+    const { PDFium } = await import('../../../src/pdfium.js');
+
+    const initPromise = PDFium.init({
+      useWorker: true,
+      workerUrl: 'worker.js',
+      wasmBinary: createWasmMagicBuffer(),
+    });
+    await vi.waitFor(() => {
+      expect(mockWorker.posted.length).toBeGreaterThan(0);
+    });
+    const initMessage = mockWorker.posted[0]!.data as { type: string; id: string };
+    mockWorker.respondSuccess(initMessage.id, undefined);
+    const workerPdfium = await initPromise;
+
+    const createBuilderPromise = workerPdfium.createDocumentBuilder();
+    const createBuilderMessage = mockWorker.posted[1]!.data as { type: string; id: string };
+    expect(createBuilderMessage.type).toBe('CREATE_DOCUMENT_BUILDER');
+    mockWorker.respondSuccess(createBuilderMessage.id, { builderId: 'builder-1' });
+    const builder = await createBuilderPromise;
+
+    const addPagePromise = builder.addPage({ width: 595, height: 842 });
+    const addPageMessage = mockWorker.posted[2]!.data as {
+      type: string;
+      id: string;
+      payload: { builderId: string; options: { width: number; height: number } };
+    };
+    expect(addPageMessage.type).toBe('BUILDER_ADD_PAGE');
+    expect(addPageMessage.payload.builderId).toBe('builder-1');
+    expect(addPageMessage.payload.options).toEqual({ width: 595, height: 842 });
+    mockWorker.respondSuccess(addPageMessage.id, { pageBuilderId: 'builder-page-1' });
+    const page = await addPagePromise;
+
+    const loadFontPromise = builder.loadStandardFont('Helvetica');
+    const loadFontMessage = mockWorker.posted[3]!.data as {
+      type: string;
+      id: string;
+      payload: { builderId: string; fontName: string };
+    };
+    expect(loadFontMessage.type).toBe('BUILDER_LOAD_STANDARD_FONT');
+    expect(loadFontMessage.payload.fontName).toBe('Helvetica');
+    mockWorker.respondSuccess(loadFontMessage.id, { fontId: 'font-1' });
+    const font = await loadFontPromise;
+
+    const addTextPromise = page.addText('Hello from worker', 72, 770, font, 24);
+    const addTextMessage = mockWorker.posted[4]!.data as {
+      type: string;
+      id: string;
+      payload: {
+        pageBuilderId: string;
+        text: string;
+        x: number;
+        y: number;
+        fontId: string;
+        fontSize: number;
+      };
+    };
+    expect(addTextMessage.type).toBe('BUILDER_PAGE_ADD_TEXT');
+    expect(addTextMessage.payload.pageBuilderId).toBe('builder-page-1');
+    expect(addTextMessage.payload.fontId).toBe('font-1');
+    mockWorker.respondSuccess(addTextMessage.id, undefined);
+    await addTextPromise;
+
+    const savePromise = builder.save();
+    const saveMessage = mockWorker.posted[5]!.data as {
+      type: string;
+      id: string;
+      payload: { builderId: string };
+    };
+    expect(saveMessage.type).toBe('BUILDER_SAVE');
+    expect(saveMessage.payload.builderId).toBe('builder-1');
+    mockWorker.respondSuccess(saveMessage.id, new ArrayBuffer(16));
+    const bytes = await savePromise;
+    expect(bytes).toBeInstanceOf(Uint8Array);
+    expect(bytes.byteLength).toBe(16);
+
+    const disposeBuilderPromise = builder.dispose();
+    const disposeBuilderMessage = mockWorker.posted[6]!.data as {
+      type: string;
+      id: string;
+      payload: { builderId: string };
+    };
+    expect(disposeBuilderMessage.type).toBe('DISPOSE_DOCUMENT_BUILDER');
+    expect(disposeBuilderMessage.payload.builderId).toBe('builder-1');
+    mockWorker.respondSuccess(disposeBuilderMessage.id, undefined);
+    await disposeBuilderPromise;
+
+    const disposePdfiumPromise = workerPdfium.dispose();
+    const destroyMessage = mockWorker.posted[mockWorker.posted.length - 1]!.data as { type: string; id: string };
+    expect(destroyMessage.type).toBe('DESTROY');
+    mockWorker.respondSuccess(destroyMessage.id, undefined);
+    await disposePdfiumPromise;
+  });
+
   test('useWorker and useNative together should throw invalid options', async () => {
     const { PDFium } = await import('../../../src/pdfium.js');
     await expect(

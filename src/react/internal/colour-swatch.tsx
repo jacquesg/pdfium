@@ -1,5 +1,3 @@
-'use client';
-
 interface ColourSwatchProps {
   /** RGBA colour to display. Renders a dash if undefined or null. */
   colour: { r: number; g: number; b: number; a: number } | undefined | null;

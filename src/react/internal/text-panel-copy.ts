@@ -1,5 +1,3 @@
-'use client';
-
 const TEXT_PANEL_COPY = {
   charactersTabLabel: 'Characters',
   extractionTabLabel: 'Extraction',

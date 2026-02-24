@@ -59,3 +59,9 @@ Examples in this repository:
 - Are subscriptions/listeners/timers always cleaned?
 - Is pure logic separated from render wiring?
 - Are tests covering success, failure, and stale-race paths?
+
+## See also
+
+- [Architecture Map](./architecture-index.md) - Concrete module-to-layer mapping.
+- [React Contributor Playbook](./contributor-playbook.md) - Required shapes for wrappers, views, hooks, and tests.
+- [React Testing](./testing.md) - Validation standards for race safety and teardown discipline.

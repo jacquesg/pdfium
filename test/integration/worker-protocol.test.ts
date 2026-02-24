@@ -43,14 +43,14 @@ async function createWorkerPDFium(): Promise<WorkerPDFium> {
 
 describe.skipIf(!HAS_DIST)('Worker Protocol Integration', { timeout: 30_000 }, () => {
   describe('basic operations', () => {
-    let workerPdfium: WorkerPDFium;
+    let workerPdfium!: WorkerPDFium;
 
     beforeAll(async () => {
       workerPdfium = await createWorkerPDFium();
     });
 
     afterAll(async () => {
-      await workerPdfium.dispose();
+      await workerPdfium?.dispose();
     });
 
     test('ping returns true', async () => {
@@ -97,14 +97,14 @@ describe.skipIf(!HAS_DIST)('Worker Protocol Integration', { timeout: 30_000 }, (
   });
 
   describe('page queries', () => {
-    let workerPdfium: WorkerPDFium;
+    let workerPdfium!: WorkerPDFium;
 
     beforeAll(async () => {
       workerPdfium = await createWorkerPDFium();
     });
 
     afterAll(async () => {
-      await workerPdfium.dispose();
+      await workerPdfium?.dispose();
     });
 
     test('get page info returns rotation, boxes, charCount', async () => {
@@ -208,14 +208,14 @@ describe.skipIf(!HAS_DIST)('Worker Protocol Integration', { timeout: 30_000 }, (
   });
 
   describe('document queries', () => {
-    let workerPdfium: WorkerPDFium;
+    let workerPdfium!: WorkerPDFium;
 
     beforeAll(async () => {
       workerPdfium = await createWorkerPDFium();
     });
 
     afterAll(async () => {
-      await workerPdfium.dispose();
+      await workerPdfium?.dispose();
     });
 
     test('get document info', async () => {
@@ -298,14 +298,14 @@ describe.skipIf(!HAS_DIST)('Worker Protocol Integration', { timeout: 30_000 }, (
   });
 
   describe('concurrency', () => {
-    let workerPdfium: WorkerPDFium;
+    let workerPdfium!: WorkerPDFium;
 
     beforeAll(async () => {
       workerPdfium = await createWorkerPDFium();
     });
 
     afterAll(async () => {
-      await workerPdfium.dispose();
+      await workerPdfium?.dispose();
     });
 
     test('concurrent requests do not cross-contaminate', async () => {

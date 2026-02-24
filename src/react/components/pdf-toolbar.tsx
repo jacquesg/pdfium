@@ -1,5 +1,3 @@
-'use client';
-
 import type { ReactElement } from 'react';
 import { useToolbarContext } from '../internal/pdf-toolbar-context.js';
 import { usePDFToolbarContextValue } from '../internal/pdf-toolbar-context-controller.js';

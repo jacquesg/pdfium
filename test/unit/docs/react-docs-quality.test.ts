@@ -12,6 +12,22 @@ const ASTRO_CONFIG_PATH = join(REPO_ROOT, 'docs/astro.config.ts');
 const FRONTMATTER_PATTERN = /^---\n([\s\S]*?)\n---\n/u;
 const CODE_FENCE_PATTERN = /```(ts|tsx|typescript|javascript|jsx)\n([\s\S]*?)```/gu;
 const REACT_SIDEBAR_SLUG_PATTERN = /slug:\s*'(react(?:\/[^']*)?)'/gu;
+const FORBIDDEN_REACT_DOC_PATTERNS: ReadonlyArray<RegExp> = [
+  /\bshowThumbnails\b/u,
+  /\bshowBookmarks\b/u,
+  /\bisThumbnailsOpen\b/u,
+  /\bisBookmarksOpen\b/u,
+  /\btoggleThumbnails\b/u,
+  /\btoggleBookmarks\b/u,
+  /classNames\.sidebar\b/u,
+  /classNames\.bookmarks\b/u,
+  /\bPDFiumProvider\s+src=/u,
+  /\bpdfium-worker\.ts\b/u,
+  /\bpdfium-worker\.js\b/u,
+  /\bpdf-worker\.js\b/u,
+];
+const REACT_DOCS_WITHOUT_SEE_ALSO = new Set(['index.md']);
+const SEE_ALSO_HEADING = '\n## See also\n';
 
 function listReactDocFiles(): string[] {
   return readdirSync(REACT_DOCS_DIR)
@@ -98,6 +114,56 @@ describe('React docs quality', () => {
         for (const error of parseErrors) {
           errors.push(`${file}#${String(snippetIndex)} (${language}): ${error}`);
         }
+      }
+    }
+
+    expect(errors).toEqual([]);
+  });
+
+  test('React docs do not reference removed panel APIs', () => {
+    const errors: string[] = [];
+
+    for (const file of listReactDocFiles()) {
+      const content = readFileSync(join(REACT_DOCS_DIR, file), 'utf8');
+      for (const pattern of FORBIDDEN_REACT_DOC_PATTERNS) {
+        if (pattern.test(content)) {
+          errors.push(`${file}: contains removed API token matching ${pattern.source}`);
+        }
+      }
+    }
+
+    expect(errors).toEqual([]);
+  });
+
+  test('React docs use a consistent final "See also" section', () => {
+    const errors: string[] = [];
+
+    for (const file of listReactDocFiles()) {
+      if (REACT_DOCS_WITHOUT_SEE_ALSO.has(file)) {
+        continue;
+      }
+
+      const content = readFileSync(join(REACT_DOCS_DIR, file), 'utf8');
+      const firstHeadingIndex = content.indexOf(SEE_ALSO_HEADING);
+      const lastHeadingIndex = content.lastIndexOf(SEE_ALSO_HEADING);
+
+      if (lastHeadingIndex < 0) {
+        errors.push(`${file}: missing "## See also" section`);
+        continue;
+      }
+
+      if (firstHeadingIndex !== lastHeadingIndex) {
+        errors.push(`${file}: multiple "## See also" sections found`);
+      }
+
+      const tail = content.slice(lastHeadingIndex + SEE_ALSO_HEADING.length);
+      if (/\n##\s+/u.test(tail)) {
+        errors.push(`${file}: "## See also" must be the final H2 section`);
+      }
+
+      const linkCount = tail.split('\n').filter((line) => line.trimStart().startsWith('- [')).length;
+      if (linkCount < 2) {
+        errors.push(`${file}: "## See also" must contain at least 2 links`);
       }
     }
 

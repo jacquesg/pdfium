@@ -1,5 +1,3 @@
-'use client';
-
 import type { CSSProperties, ReactNode } from 'react';
 import { useMemo } from 'react';
 import type { SerialisedPageObject } from '../../context/protocol.js';

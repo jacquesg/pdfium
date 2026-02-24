@@ -158,10 +158,10 @@ interface PDFViewerClassNames {
   root?: string;      // Outermost viewer wrapper (flex column)
   toolbar?: string;   // DefaultToolbar container
   search?: string;    // SearchPanel container
-  content?: string;   // Content area (flex row containing sidebar + pages)
-  sidebar?: string;   // ThumbnailStrip (PagesThumbnails slot)
-  bookmarks?: string; // BookmarkPanel (PagesBookmarks slot)
-  pages?: string;     // PDFDocumentView (Pages slot)
+  content?: string;   // Content area (flex row containing panel chrome + pages)
+  activityBar?: string; // Activity bar wrapper (panel mode)
+  panel?: string;     // Active panel container (panel mode)
+  pages?: string;     // PDFViewer.Pages wrapper
 }
 ```
 
@@ -174,8 +174,8 @@ Usage with the default layout:
     toolbar: 'viewer-toolbar',
     search: 'viewer-search',
     content: 'viewer-content',
-    sidebar: 'viewer-sidebar',
-    bookmarks: 'viewer-bookmarks',
+    activityBar: 'viewer-activity-bar',
+    panel: 'viewer-panel',
     pages: 'viewer-pages',
   }}
 />
@@ -258,11 +258,13 @@ For the `PDFViewer` compound component:
 
 ```tsx
 <PDFViewer
+  panels={['thumbnails', 'bookmarks']}
   classNames={{
     root: 'h-full flex flex-col bg-white dark:bg-gray-900',
     toolbar: 'flex items-center gap-2 px-4 py-2 border-b border-gray-200 dark:border-gray-700',
     content: 'flex flex-1 min-h-0',
-    sidebar: 'w-48 border-r border-gray-200 dark:border-gray-700 overflow-y-auto',
+    activityBar: 'border-r border-gray-200 dark:border-gray-700',
+    panel: 'w-56 border-r border-gray-200 dark:border-gray-700 overflow-y-auto',
     pages: 'flex-1 min-h-0',
   }}
 />
@@ -337,3 +339,9 @@ The `DefaultToolbar` and `SearchPanel` are reference implementations. For produc
   )}
 </PDFViewer>
 ```
+
+## See also
+
+- [PDFViewer](./pdf-viewer.md) - `classNames` slot map and layout composition points.
+- [Toolbar](./toolbar.md) - Headless toolbar surface for fully custom visual systems.
+- [Examples](./examples.md) - Practical patterns combining theming with custom layout.

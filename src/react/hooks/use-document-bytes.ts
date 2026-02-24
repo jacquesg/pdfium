@@ -1,5 +1,3 @@
-'use client';
-
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { WorkerPDFiumDocument } from '../../context/worker-client.js';
 import { useLatestRef, useMountedRef, useRequestCounter } from '../internal/async-guards.js';

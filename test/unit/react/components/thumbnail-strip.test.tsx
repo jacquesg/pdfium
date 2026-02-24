@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ── Mocks ───────────────────────────────────────────────────────
 
@@ -36,27 +36,37 @@ vi.mock('../../../../src/react/hooks/use-visible-pages.js', () => ({
 }));
 
 // Stub useRenderPage and PDFCanvas to avoid the full render pipeline
+const mockUseRenderPage = vi.fn();
 vi.mock('../../../../src/react/use-render.js', () => ({
-  useRenderPage: () => ({
-    renderKey: null,
-    width: 122,
-    height: 158,
-    originalWidth: 612,
-    originalHeight: 792,
-    isLoading: false,
-    isPlaceholderData: false,
-    error: null,
-  }),
+  useRenderPage: (...args: unknown[]) => mockUseRenderPage(...args),
 }));
 
 vi.mock('../../../../src/react/components/pdf-canvas.js', () => ({
-  PDFCanvas: (props: Record<string, unknown>) => <canvas data-testid="thumb-canvas" {...props} />,
+  PDFCanvas: ({ renderKey: _renderKey, ...props }: Record<string, unknown>) => (
+    <canvas data-testid="thumb-canvas" {...props} />
+  ),
 }));
 
 const { ThumbnailStrip } = await import('../../../../src/react/components/thumbnail-strip.js');
 
+const defaultRenderPageResult = {
+  renderKey: null,
+  width: 122,
+  height: 158,
+  originalWidth: 612,
+  originalHeight: 792,
+  isLoading: false,
+  isPlaceholderData: false,
+  error: null,
+};
+
 describe('ThumbnailStrip', () => {
   const mockDoc = { id: 'doc-1' } as never;
+
+  beforeEach(() => {
+    mockUseRenderPage.mockReset();
+    mockUseRenderPage.mockReturnValue(defaultRenderPageResult);
+  });
 
   it('returns null when document is null', () => {
     const { container } = render(
@@ -132,6 +142,23 @@ describe('ThumbnailStrip', () => {
     expect((listbox as HTMLElement).style.width).toBe('200px');
   });
 
+  it('merges className with classNames.container', () => {
+    render(
+      <ThumbnailStrip
+        document={mockDoc}
+        pageCount={5}
+        currentPageIndex={0}
+        onPageSelect={vi.fn()}
+        className="thumb-strip"
+        classNames={{ container: 'thumb-container' }}
+      />,
+    );
+
+    const listbox = screen.getByRole('listbox');
+    expect(listbox.className).toContain('thumb-strip');
+    expect(listbox.className).toContain('thumb-container');
+  });
+
   it('renders loading placeholders when renderKey is null', () => {
     const { container } = render(
       <ThumbnailStrip document={mockDoc} pageCount={5} currentPageIndex={0} onPageSelect={vi.fn()} />,
@@ -144,6 +171,39 @@ describe('ThumbnailStrip', () => {
     // Three visible thumbnails should still render as list items
     const items = screen.getAllByRole('option');
     expect(items).toHaveLength(3);
+  });
+
+  it('renders canvases when renderKey is present', () => {
+    mockUseRenderPage.mockReturnValue({
+      ...defaultRenderPageResult,
+      renderKey: 'page-render-key',
+    });
+
+    const { container } = render(
+      <ThumbnailStrip document={mockDoc} pageCount={5} currentPageIndex={0} onPageSelect={vi.fn()} />,
+    );
+
+    const canvases = container.querySelectorAll('[data-testid="thumb-canvas"]');
+    expect(canvases).toHaveLength(3);
+  });
+
+  it('falls back canvas dimensions to zero and display size to zero when render dimensions are unavailable', () => {
+    mockUseRenderPage.mockReturnValue({
+      ...defaultRenderPageResult,
+      renderKey: 'page-render-key',
+      width: null,
+      height: undefined,
+      originalWidth: null,
+      originalHeight: null,
+    });
+
+    render(<ThumbnailStrip document={mockDoc} pageCount={5} currentPageIndex={0} onPageSelect={vi.fn()} />);
+
+    const firstCanvas = screen.getAllByTestId('thumb-canvas')[0] as HTMLCanvasElement;
+    expect(firstCanvas.getAttribute('width')).toBe('0');
+    expect(firstCanvas.getAttribute('height')).toBe('0');
+    expect(firstCanvas.style.width).toBe('0px');
+    expect(firstCanvas.style.height).toBe('0px');
   });
 
   it('displays page number text below each thumbnail', () => {
@@ -215,5 +275,28 @@ describe('ThumbnailStrip', () => {
       expect(listbox.scrollTop).toBe(0);
       expect(listbox.scrollLeft).toBe(0);
     });
+  });
+
+  it('navigates with keyboard and ignores non-navigation keys', () => {
+    const onPageSelect = vi.fn();
+    render(<ThumbnailStrip document={mockDoc} pageCount={5} currentPageIndex={1} onPageSelect={onPageSelect} />);
+
+    const listbox = screen.getByRole('listbox');
+
+    fireEvent.keyDown(listbox, { key: 'ArrowDown' });
+    expect(onPageSelect).toHaveBeenCalledWith(2);
+
+    fireEvent.keyDown(listbox, { key: 'Escape' });
+    expect(onPageSelect).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not navigate past bounds when keyboard target resolves to null', () => {
+    const onPageSelect = vi.fn();
+    render(<ThumbnailStrip document={mockDoc} pageCount={5} currentPageIndex={0} onPageSelect={onPageSelect} />);
+
+    const listbox = screen.getByRole('listbox');
+    fireEvent.keyDown(listbox, { key: 'ArrowUp' });
+
+    expect(onPageSelect).not.toHaveBeenCalled();
   });
 });

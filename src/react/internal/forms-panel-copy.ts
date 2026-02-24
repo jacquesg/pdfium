@@ -1,5 +1,3 @@
-'use client';
-
 const FORMS_PANEL_COPY = {
   formDetectedBadge: 'Form Detected',
   noFormBadge: 'No Form',

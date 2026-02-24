@@ -1,5 +1,3 @@
-'use client';
-
 import { useMemo } from 'react';
 import type { WorkerPDFium, WorkerPDFiumDocument } from '../../context/worker-client.js';
 import type { ProviderPasswordValue, ProviderStableDocCallbacks } from './provider-types.js';

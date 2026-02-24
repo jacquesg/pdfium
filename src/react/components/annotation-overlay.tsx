@@ -1,5 +1,3 @@
-'use client';
-
 import { type ComponentProps, type Ref, useCallback, useLayoutEffect, useRef } from 'react';
 import type { SerialisedAnnotation } from '../../context/protocol.js';
 

@@ -1,5 +1,3 @@
-'use client';
-
 import type { CSSProperties } from 'react';
 import type { WorkerPDFiumDocument } from '../../context/worker-client.js';
 import { useTextContent } from '../hooks/use-text-content.js';

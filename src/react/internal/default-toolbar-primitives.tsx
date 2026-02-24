@@ -1,5 +1,3 @@
-'use client';
-
 import type { ButtonHTMLAttributes, CSSProperties, ReactNode } from 'react';
 
 interface ToolbarButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {

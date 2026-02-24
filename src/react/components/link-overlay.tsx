@@ -1,5 +1,3 @@
-'use client';
-
 import type { CSSProperties } from 'react';
 import type { SerialisedLink } from '../../context/protocol.js';
 import type { Rect, WebLink } from '../../core/types.js';

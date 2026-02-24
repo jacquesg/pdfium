@@ -1,5 +1,3 @@
-'use client';
-
 import type { ChangeEventHandler, CSSProperties } from 'react';
 
 interface ToolbarStyleOverrides {

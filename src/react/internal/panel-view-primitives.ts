@@ -1,5 +1,3 @@
-'use client';
-
 import type { CSSProperties } from 'react';
 
 const PANEL_STACK_4_STYLE: CSSProperties = { display: 'flex', flexDirection: 'column', gap: '4px' };

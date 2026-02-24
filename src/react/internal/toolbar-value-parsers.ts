@@ -1,5 +1,3 @@
-'use client';
-
 import type { SpreadMode } from '../hooks/use-visible-pages.js';
 
 type ToolbarScrollMode = 'continuous' | 'single' | 'horizontal';

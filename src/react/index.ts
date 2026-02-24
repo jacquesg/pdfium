@@ -1,5 +1,3 @@
-'use client';
-
 export type {
   DocumentInfoResponse,
   ExtendedDocumentInfoResponse,
@@ -171,8 +169,6 @@ export type { RotationState } from './hooks/use-rotation.js';
 export { useRotation } from './hooks/use-rotation.js';
 export { useSignatures } from './hooks/use-signatures.js';
 export { useStructureTree } from './hooks/use-structure-tree.js';
-export type { UseSyncPDFiumResult } from './hooks/use-sync-pdfium.js';
-export { useSyncPDFium } from './hooks/use-sync-pdfium.js';
 export { useTextContent } from './hooks/use-text-content.js';
 export { useTextSearch } from './hooks/use-text-search.js';
 export { useViewerPreferences } from './hooks/use-viewer-preferences.js';

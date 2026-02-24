@@ -187,10 +187,39 @@ function createMockDocument(pageCount: number) {
   };
 }
 
+function createMockBuilderPage() {
+  return {
+    addRectangle: vi.fn(),
+    addText: vi.fn(),
+    addLine: vi.fn(),
+    addEllipse: vi.fn(),
+    dispose: vi.fn(),
+    disposed: false,
+  };
+}
+
+function createMockBuilderFont() {
+  return {
+    dispose: vi.fn(),
+  };
+}
+
+function createMockBuilder() {
+  return {
+    addPage: vi.fn().mockReturnValue(createMockBuilderPage()),
+    loadStandardFont: vi.fn().mockReturnValue(createMockBuilderFont()),
+    save: vi.fn().mockReturnValue(new Uint8Array([37, 80, 68, 70])),
+    dispose: vi.fn(),
+    disposed: false,
+  };
+}
+
 // Track mock instances for assertions
 let mockPdfiumDispose: ReturnType<typeof vi.fn>;
 let mockOpenDocument: ReturnType<typeof vi.fn>;
+let mockCreateDocument: ReturnType<typeof vi.fn>;
 let currentMockDocument: ReturnType<typeof createMockDocument>;
+let currentMockBuilder: ReturnType<typeof createMockBuilder>;
 
 describe('worker-script', () => {
   beforeEach(async () => {
@@ -199,7 +228,9 @@ describe('worker-script', () => {
 
     mockPdfiumDispose = vi.fn();
     currentMockDocument = createMockDocument(5);
+    currentMockBuilder = createMockBuilder();
     mockOpenDocument = vi.fn().mockResolvedValue(currentMockDocument);
+    mockCreateDocument = vi.fn().mockReturnValue(currentMockBuilder);
 
     // Mock self.postMessage
     vi.stubGlobal('self', {
@@ -217,6 +248,7 @@ describe('worker-script', () => {
       PDFium: {
         init: vi.fn().mockResolvedValue({
           openDocument: mockOpenDocument,
+          createDocument: mockCreateDocument,
           dispose: mockPdfiumDispose,
         }),
       },
@@ -734,6 +766,89 @@ describe('worker-script', () => {
     expect(mockOpenDocument).toHaveBeenCalledWith(expect.any(ArrayBuffer), { password: 'secret' });
   });
 
+  test('builder requests should create and mutate a worker-side document builder', async () => {
+    const send = await setup();
+
+    await send({ type: 'INIT', id: 'init-1', payload: { wasmBinary: new ArrayBuffer(8) } });
+
+    await send({ type: 'CREATE_DOCUMENT_BUILDER', id: 'builder-create-1' } as WorkerRequest);
+    const createResponse = lastResponse();
+    expect(createResponse.type).toBe('SUCCESS');
+    let builderId = '';
+    if (createResponse.type === 'SUCCESS') {
+      builderId = (createResponse.payload as { builderId: string }).builderId;
+      expect(builderId.length).toBeGreaterThan(0);
+    }
+    expect(mockCreateDocument).toHaveBeenCalledTimes(1);
+
+    await send({
+      type: 'BUILDER_ADD_PAGE',
+      id: 'builder-add-page-1',
+      payload: { builderId, options: { width: 595, height: 842 } },
+    });
+    const addPageResponse = lastResponse();
+    expect(addPageResponse.type).toBe('SUCCESS');
+    let pageBuilderId = '';
+    if (addPageResponse.type === 'SUCCESS') {
+      pageBuilderId = (addPageResponse.payload as { pageBuilderId: string }).pageBuilderId;
+      expect(pageBuilderId.length).toBeGreaterThan(0);
+    }
+    expect(currentMockBuilder.addPage).toHaveBeenCalledWith({ width: 595, height: 842 });
+
+    await send({
+      type: 'BUILDER_LOAD_STANDARD_FONT',
+      id: 'builder-font-1',
+      payload: { builderId, fontName: 'Helvetica' },
+    });
+    const fontResponse = lastResponse();
+    expect(fontResponse.type).toBe('SUCCESS');
+    let fontId = '';
+    if (fontResponse.type === 'SUCCESS') {
+      fontId = (fontResponse.payload as { fontId: string }).fontId;
+      expect(fontId.length).toBeGreaterThan(0);
+    }
+    expect(currentMockBuilder.loadStandardFont).toHaveBeenCalledWith('Helvetica');
+
+    await send({
+      type: 'BUILDER_PAGE_ADD_TEXT',
+      id: 'builder-text-1',
+      payload: {
+        pageBuilderId,
+        text: 'Hello worker builder',
+        x: 72,
+        y: 770,
+        fontId,
+        fontSize: 24,
+      },
+    });
+    const addTextResponse = lastResponse();
+    expect(addTextResponse.type).toBe('SUCCESS');
+    const pageBuilder = currentMockBuilder.addPage.mock.results[0]?.value as {
+      addText: ReturnType<typeof vi.fn>;
+    };
+    expect(pageBuilder.addText).toHaveBeenCalledWith(
+      'Hello worker builder',
+      72,
+      770,
+      currentMockBuilder.loadStandardFont.mock.results[0]?.value,
+      24,
+      undefined,
+    );
+
+    await send({ type: 'BUILDER_SAVE', id: 'builder-save-1', payload: { builderId } });
+    const saveResponse = lastResponse();
+    expect(saveResponse.type).toBe('SUCCESS');
+    if (saveResponse.type === 'SUCCESS') {
+      expect(saveResponse.payload).toBeInstanceOf(ArrayBuffer);
+    }
+    expect(currentMockBuilder.save).toHaveBeenCalledWith({});
+
+    await send({ type: 'DISPOSE_DOCUMENT_BUILDER', id: 'builder-dispose-1', payload: { builderId } });
+    const disposeResponse = lastResponse();
+    expect(disposeResponse.type).toBe('SUCCESS');
+    expect(currentMockBuilder.dispose).toHaveBeenCalledTimes(1);
+  });
+
   test('handleMessage ignores messages with wrong origin', async () => {
     vi.resetModules();
     postedMessages.length = 0;
@@ -755,6 +870,7 @@ describe('worker-script', () => {
       PDFium: {
         init: vi.fn().mockResolvedValue({
           openDocument: mockOpenDocument,
+          createDocument: mockCreateDocument,
           dispose: mockPdfiumDispose,
         }),
       },
@@ -812,6 +928,7 @@ describe('worker-script', () => {
       PDFium: {
         init: vi.fn().mockResolvedValue({
           openDocument: mockOpenDocument,
+          createDocument: mockCreateDocument,
           dispose: mockPdfiumDispose,
         }),
       },

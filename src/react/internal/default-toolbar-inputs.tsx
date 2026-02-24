@@ -1,5 +1,3 @@
-'use client';
-
 import type { CSSProperties, KeyboardEvent } from 'react';
 import { useCallback, useState } from 'react';
 import { clampPageNumber, clampZoomPercentage } from './toolbar-value-parsers.js';

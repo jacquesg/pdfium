@@ -1,5 +1,3 @@
-'use client';
-
 import type { SerialisedAnnotation } from '../../context/protocol.js';
 
 function decodeAnnotationFlags(flags: number): string[] {

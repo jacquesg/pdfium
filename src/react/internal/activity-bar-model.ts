@@ -1,5 +1,3 @@
-'use client';
-
 import type { PanelEntry } from '../components/panels/types.js';
 import { getPanelId, getPanelLabel } from '../components/panels/types.js';
 

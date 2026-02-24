@@ -288,7 +288,8 @@ A single `containerRef` is shared between three consumers:
 
 All three handle late-mounting gracefully: if the ref target is `null` on first render (e.g. conditionally rendered content), they attach once the element mounts.
 
-## See Also
+## See also
 
 - [PDFViewer](./pdf-viewer.md) — Compound viewer component and page rendering primitives
 - [Toolbar](./toolbar.md) — Headless toolbar with prop-getter pattern
+- [Examples](./examples.md) — End-to-end compositions built from `useViewerSetup` and viewer slots

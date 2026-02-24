@@ -1,5 +1,3 @@
-'use client';
-
 import { collapsePath, expandPath, expandPaths } from './bookmark-expansion.js';
 import type { BookmarkKeyboardAction } from './bookmark-keyboard.js';
 

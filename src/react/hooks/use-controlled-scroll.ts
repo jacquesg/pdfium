@@ -1,5 +1,3 @@
-'use client';
-
 import { type RefObject, useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import type { PageRotation } from '../../core/types.js';
 import { getTargetPageOffset, resolveControlledScrollDecision } from '../internal/controlled-scroll-model.js';

@@ -155,6 +155,23 @@ describe('BookmarkPanel', () => {
     expect(tree.parentElement?.className).toContain('custom-container');
   });
 
+  it('merges className with classNames.container on outer wrapper', () => {
+    render(
+      <BookmarkPanel
+        bookmarks={flatBookmarks}
+        currentPageIndex={0}
+        onBookmarkSelect={vi.fn()}
+        className="outer"
+        classNames={{ container: 'custom-container' }}
+      />,
+    );
+
+    const tree = screen.getByRole('tree');
+    const wrapperClass = tree.parentElement?.className ?? '';
+    expect(wrapperClass).toContain('outer');
+    expect(wrapperClass).toContain('custom-container');
+  });
+
   it('applies classNames.item to items', () => {
     render(
       <BookmarkPanel
