@@ -5,6 +5,9 @@ description: Theme and style PDFium React components using CSS variables, classN
 
 # Styling Guide
 
+This page targets the React viewer toolkit (`@scaryterry/pdfium/react`).
+
+
 `@scaryterry/pdfium/react` is designed to be visually unopinionated. Every component ships with the minimum inline styles needed for correct layout and stacking, and exposes a layered system for consumers to apply their own visual design.
 
 ## Styling philosophy

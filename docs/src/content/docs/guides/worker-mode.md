@@ -3,6 +3,10 @@ title: Worker Mode
 description: Off-main-thread PDF processing with Web Workers
 ---
 
+This page covers worker execution for the core API (`@scaryterry/pdfium`) with emphasis on browser Web Workers.
+
+For React viewer integration, start with [React Overview](/pdfium/react/) and [Installation](/pdfium/installation/) for canonical `PDFiumProvider` worker + WASM setup.
+
 For browser applications, processing PDFs on the main thread can cause UI freezes. Worker mode moves PDF operations to a Web Worker, keeping the UI responsive.
 
 ## Recommended Path (Built-in Worker Runtime)
@@ -39,7 +43,7 @@ import '@scaryterry/pdfium/worker';
 
 **Use main thread when:**
 - Processing is fast (small documents)
-- Running in Node.js (no workers needed)
+- Running in Node.js with light workloads (workers are optional, not required)
 - Simplicity is preferred
 
 ## Setup Overview

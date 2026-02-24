@@ -3,6 +3,8 @@ title: Coordinate Systems
 description: Understanding PDF coordinate systems and unit conversions
 ---
 
+This concept page targets the core API (`@scaryterry/pdfium`).
+
 PDF uses a specific coordinate system that differs from typical screen coordinates. Understanding this is essential for positioning content and interpreting bounds.
 
 ## PDF Coordinate System

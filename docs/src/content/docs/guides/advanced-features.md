@@ -3,6 +3,8 @@ title: Advanced Features
 description: Explore advanced PDF capabilities including Digital Signatures and JavaScript automation.
 ---
 
+This guide targets the core API (`@scaryterry/pdfium`).
+
 ## Digital Signatures
 
 @scaryterry/pdfium allows you to inspect digital signatures within a PDF document. While full signature verification (cryptographic validation) is outside the scope of PDFium itself, you can access signature metadata to display status information or pass data to a verification library.

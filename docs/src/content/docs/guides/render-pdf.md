@@ -3,6 +3,8 @@ title: Render PDF to Image
 description: Render PDF pages to images with scale, dimensions, and render options
 ---
 
+This guide targets the core API (`@scaryterry/pdfium`).
+
 ## Load PDF document
 
 ```typescript

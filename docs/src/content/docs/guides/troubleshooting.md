@@ -3,6 +3,10 @@ title: Troubleshooting
 description: Common issues and solutions for @scaryterry/pdfium
 ---
 
+This page focuses on runtime troubleshooting for the core API (`@scaryterry/pdfium`).
+
+If your issue is in `PDFiumProvider`/`PDFViewer` integration, check [React Overview](/pdfium/react/) and [React Testing](/pdfium/react/testing/) first.
+
 ## Common Errors
 
 ### `INIT_WASM_LOAD_FAILED`

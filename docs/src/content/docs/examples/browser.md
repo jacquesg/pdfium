@@ -1,9 +1,14 @@
 ---
 title: Browser Examples
-description: Browser and React examples for @scaryterry/pdfium
+description: Browser runtime examples for @scaryterry/pdfium core APIs, plus minimal React integration patterns.
 ---
 
-This page provides complete browser examples including vanilla JavaScript and React.
+This page focuses on browser runtime usage of the core API (`@scaryterry/pdfium`).
+
+For the full React viewer toolkit (`@scaryterry/pdfium/react`), start with:
+
+- [React Overview](/pdfium/react/)
+- [React Examples](/pdfium/react/examples/)
 
 ## Vanilla JavaScript
 
@@ -122,7 +127,7 @@ This page provides complete browser examples including vanilla JavaScript and Re
 </html>
 ```
 
-## React Examples
+## React Integration (Core API)
 
 ### PDF Viewer Component
 
@@ -481,5 +486,6 @@ downloadPDF(bytes, 'output.pdf');
 ## See Also
 
 - [Node.js Examples](/pdfium/examples/nodejs/) — Server-side examples
+- [React Examples](/pdfium/react/examples/) — Viewer toolkit recipes
 - [Patterns](/pdfium/examples/patterns/) — Common patterns
 - [Worker Mode](/pdfium/guides/worker-mode/) — Off-main-thread processing

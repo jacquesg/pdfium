@@ -5,6 +5,9 @@ description: Module-to-layer map for React components, hooks, controllers, and m
 
 # React Architecture Index
 
+This page targets the React viewer toolkit (`@scaryterry/pdfium/react`).
+
+
 This index maps major React modules to the intended layers.
 
 ## Layer map

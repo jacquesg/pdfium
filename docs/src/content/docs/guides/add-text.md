@@ -3,6 +3,8 @@ title: Add Text
 description: Adding text to PDF pages with fonts and positioning
 ---
 
+This guide targets the core API (`@scaryterry/pdfium`).
+
 This guide covers adding text to PDF pages when creating documents from scratch using `PDFiumDocumentBuilder`.
 
 ## Prerequisites

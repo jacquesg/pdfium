@@ -3,6 +3,8 @@ title: Performance
 description: Optimising performance when working with PDFs
 ---
 
+This concept page targets the core API (`@scaryterry/pdfium`).
+
 This guide covers performance considerations and optimisation strategies for PDF processing.
 
 ## Backend Performance

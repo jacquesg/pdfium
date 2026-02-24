@@ -5,6 +5,9 @@ description: Compose navigation, zoom, fit, and container behavior with a single
 
 # useViewerSetup()
 
+This page targets the React viewer toolkit (`@scaryterry/pdfium/react`).
+
+
 `useViewerSetup()` is the single orchestration hook for building PDF viewer UIs. It composes five lower-level hooks (`usePageNavigation`, `useZoom`, `useFitZoom`, `useWheelZoom`, `usePageDimensions`) into one unified result object with logically grouped state slices. The result plugs directly into `<PDFToolbar>` and `<PDFDocumentView>`.
 
 ```typescript

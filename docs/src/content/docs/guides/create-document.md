@@ -3,6 +3,8 @@ title: Create Documents
 description: Creating new PDF documents from scratch
 ---
 
+This guide targets the core API (`@scaryterry/pdfium`).
+
 The library supports creating new PDF documents programmatically. This guide explains how to build PDFs from scratch.
 
 ## Overview

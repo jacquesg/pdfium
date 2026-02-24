@@ -3,6 +3,8 @@ title: Security Guide
 description: Security best practices for @scaryterry/pdfium
 ---
 
+This guide targets the core API (`@scaryterry/pdfium`).
+
 PDF processing involves parsing complex, potentially untrusted binary data. This guide covers the security considerations and recommended practices for using `@scaryterry/pdfium` safely.
 
 ## Content Security Policy (CSP)
@@ -58,7 +60,12 @@ When loading the WASM binary from a CDN, consider using SRI hashes to verify int
 </script>
 ```
 
-The library exposes `__WASM_HASH__` at build time for this purpose.
+The package exports `WASM_HASH` for this purpose:
+
+```typescript
+import { WASM_HASH } from '@scaryterry/pdfium';
+console.log(WASM_HASH);
+```
 
 ## WASM Isolation
 

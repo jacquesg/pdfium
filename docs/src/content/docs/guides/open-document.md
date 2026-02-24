@@ -3,6 +3,8 @@ title: Open Document
 description: Loading PDF documents with various options
 ---
 
+This guide targets the core API (`@scaryterry/pdfium`).
+
 This guide covers all the ways to open and load PDF documents.
 
 ## Basic Loading

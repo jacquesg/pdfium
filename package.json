@@ -1,7 +1,7 @@
 {
   "name": "@scaryterry/pdfium",
   "version": "0.0.3",
-  "description": "Universal PDFium WASM wrapper for Browser and Node.js with modern TypeScript patterns",
+  "description": "TypeScript PDFium platform for Node.js/browser with core APIs and a React viewer toolkit",
   "type": "module",
   "engines": {
     "node": ">=22"

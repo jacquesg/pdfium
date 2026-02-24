@@ -3,6 +3,8 @@ title: Page Properties
 description: Accessing page dimensions, rotation, and counts
 ---
 
+This guide targets the core API (`@scaryterry/pdfium`).
+
 This guide covers how to access and work with page properties.
 
 ## Page Dimensions

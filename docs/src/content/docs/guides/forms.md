@@ -3,6 +3,8 @@ title: Working with Forms
 description: Learn how to handle interactive PDF forms, including detecting forms, reading/writing form data, and managing form focus.
 ---
 
+This guide targets the core API (`@scaryterry/pdfium`).
+
 @scaryterry/pdfium provides robust support for interactive PDF forms, including AcroForms and XFA forms (limited support). This guide covers how to detect forms, interact with form fields, and manage form state.
 
 ## Detecting Forms

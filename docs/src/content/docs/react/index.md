@@ -5,6 +5,9 @@ description: React viewer documentation for usage, customization, architecture, 
 
 # React
 
+This page targets the React viewer toolkit (`@scaryterry/pdfium/react`).
+
+
 `@scaryterry/pdfium/react` provides a composable viewer stack with three layers:
 
 - `PDFViewer` for high-level integration.

@@ -3,6 +3,8 @@ title: Attachments
 description: Working with embedded file attachments in PDFs
 ---
 
+This guide targets the core API (`@scaryterry/pdfium`).
+
 PDFs can contain embedded files (attachments). This guide explains how to read, create, and delete attachments.
 
 ## Overview

@@ -5,6 +5,9 @@ description: Required layering, testing, and verification rules for React change
 
 # React Contributor Playbook
 
+This page targets the React viewer toolkit (`@scaryterry/pdfium/react`).
+
+
 This project uses strict React layering to prevent race regressions and architecture drift.
 
 ## Required shapes

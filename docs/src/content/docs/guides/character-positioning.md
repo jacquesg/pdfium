@@ -3,6 +3,8 @@ title: Character Positioning
 description: Getting character bounding boxes and positions in PDF text
 ---
 
+This guide targets the core API (`@scaryterry/pdfium`).
+
 This guide covers character-level text positioning using `getCharBox()` and `getCharIndexAtPos()` for precise text coordinate mapping.
 
 ## Use Cases

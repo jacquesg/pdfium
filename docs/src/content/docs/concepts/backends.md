@@ -3,17 +3,21 @@ title: "Backends: Native vs WASM"
 description: Choosing between the high-performance Native backend and the universal WASM backend
 ---
 
-@scaryterry/pdfium supports two distinct backends for executing PDF operations. Understanding the difference is key to optimising your application.
+This page covers backend selection for the core API (`@scaryterry/pdfium`).
+
+If you are integrating the React viewer (`@scaryterry/pdfium/react`), use [React Overview](/pdfium/react/) and [Installation](/pdfium/installation/) first, then return here to choose backend strategy.
+
+`@scaryterry/pdfium` supports two distinct backends for executing PDF operations. Understanding the difference is key to optimising your application.
 
 ## Quick Comparison
 
 | Feature | WASM Backend | Native Backend |
 |---------|--------------|----------------|
 | **Environment** | Universal (Browser + Node) | Node.js Only |
-| **Setup** | Zero configuration | Requires platform package |
+| **Setup** | Node: auto-load. Browser: provide `wasmUrl`/`wasmBinary` | Requires platform package |
 | **Performance** | High (Near-Native) | Maximum (Direct C++) |
 | **Memory** | Manual / Garbage Collected | System Allocator |
-| **Dependencies** | None (Bundled) | Platform-specific (`.node` file) |
+| **Dependencies** | Bundled WASM asset | Platform-specific (`.node` file) |
 | **Portability** | Runs anywhere | OS/Arch specific |
 | **Interactive Forms** | ✅ Full Support | ❌ Not yet supported |
 | **Document Creation** | ✅ Supported | ❌ Not supported |
@@ -25,7 +29,7 @@ This is the default backend. It uses a WebAssembly-compiled version of the PDFiu
 
 ### Pros
 *   **Universal:** Runs in Chrome, Firefox, Safari, Edge, and Node.js.
-*   **Zero Config:** The `.wasm` file is bundled with the package. No need to install separate binaries.
+*   **One package:** The `.wasm` binary ships with the package.
 *   **Secure:** Runs inside the WASM sandbox, isolating memory access.
 
 ### Cons
@@ -34,8 +38,13 @@ This is the default backend. It uses a WebAssembly-compiled version of the PDFiu
 
 ### Usage (Default)
 ```typescript
-// Uses WASM automatically
+// Node.js: uses WASM automatically unless useNative succeeds
 using pdfium = await PDFium.init();
+```
+
+```typescript
+// Browser: provide wasmUrl or wasmBinary
+using pdfium = await PDFium.init({ wasmUrl: '/pdfium.wasm' });
 ```
 
 ## Native Backend (Node.js Only)
@@ -79,3 +88,9 @@ The `init({ useNative: true })` call is designed to fail gracefully. If the nati
 | **Character operations** | 0.3ms | 0.15ms | **~2x** |
 
 The native backend's advantage grows with data-heavy operations (large bitmap renders, bulk character access) because it avoids WASM memory marshalling. For heavy rendering workloads or high-throughput server applications, the native backend is recommended. For CLI tools or lighter workloads, WASM is often sufficient and easier to distribute.
+
+## See Also
+
+- [Installation](/pdfium/installation/) — Runtime setup requirements by environment
+- [Browser vs Node.js](/pdfium/concepts/environments/) — Platform differences
+- [Performance](/pdfium/concepts/performance/) — Workload-specific tuning

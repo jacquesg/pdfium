@@ -1,258 +1,178 @@
 ---
 title: Installation
-description: Installing and configuring @scaryterry/pdfium
+description: Install @scaryterry/pdfium and configure WASM and worker assets correctly for Node.js, browser, and React.
 ---
 
-This guide covers installation and bundler configuration for the library.
+This guide is intentionally explicit about what must be configured in each runtime.
 
-## Package Installation
-
-Install using pnpm:
+## 1. Install the Package
 
 ```sh
 pnpm add @scaryterry/pdfium
 ```
 
-Or npm/yarn:
+React users also need peers:
 
 ```sh
-npm install @scaryterry/pdfium
-# or
-yarn add @scaryterry/pdfium
+pnpm add react react-dom lucide-react
 ```
 
-## Node.js Setup
+## 2. Environment Setup Matrix
 
-Node.js 22+ is supported with no additional configuration:
+| Environment | Required setup |
+|---|---|
+| Node.js core API | No extra asset wiring needed for basic `PDFium.init()` |
+| Browser core API | Provide `wasmUrl` or `wasmBinary` to `PDFium.init(...)` |
+| React viewer (`PDFiumProvider`) | Provide `workerUrl` and (`wasmUrl` or `wasmBinary`) |
+| Worker mode with core API | Create worker entry module and pass `workerUrl` |
 
-```typescript
+## 3. Node.js Setup
+
+```ts
 import { PDFium } from '@scaryterry/pdfium';
 
-// WASM loads automatically from node_modules
 using pdfium = await PDFium.init();
 ```
 
-## Browser Setup
+## 4. Browser Setup (Core API)
 
-In the browser, you must provide the WASM binary:
-
-```typescript
+```ts
 import { PDFium } from '@scaryterry/pdfium';
 
-// Fetch WASM binary
-const wasmResponse = await fetch('/pdfium.wasm');
-const wasmBinary = await wasmResponse.arrayBuffer();
-
-// Initialise with WASM
+const wasmBinary = await fetch('/pdfium.wasm').then((r) => r.arrayBuffer());
 using pdfium = await PDFium.init({ wasmBinary });
 ```
 
-If you use worker mode (`PDFium.init({ useWorker: true, ... })`) or the React provider (`PDFiumProvider`), you must also provide a `workerUrl`.
+You can also pass `wasmUrl` directly:
 
-Create an app worker module:
+```ts
+using pdfium = await PDFium.init({ wasmUrl: '/pdfium.wasm' });
+```
+
+## 5. Canonical Worker Module (React + Worker Mode)
+
+Create a worker entry in your app:
 
 ```ts
 // src/pdfium.worker.ts
 import '@scaryterry/pdfium/worker';
 ```
 
-Then pass its emitted URL:
+Resolve its URL:
 
 ```ts
 const workerUrl = new URL('./pdfium.worker.ts', import.meta.url).toString();
 ```
 
-## Bundler Configuration
+## 6. React Provider Bootstrap
 
-### Vite
+```tsx
+import wasmUrl from '@scaryterry/pdfium/pdfium.wasm?url';
+import { PDFiumProvider, PDFViewer } from '@scaryterry/pdfium/react';
 
-```typescript
+const workerUrl = new URL('./pdfium.worker.ts', import.meta.url).toString();
+
+function App() {
+  return (
+    <PDFiumProvider wasmUrl={wasmUrl} workerUrl={workerUrl}>
+      <PDFViewer />
+    </PDFiumProvider>
+  );
+}
+```
+
+## 7. Asset Wiring Strategies
+
+### Strategy A: Bundler-managed asset URLs (recommended)
+
+Use your bundler to emit both worker and WASM URLs.
+
+Vite example:
+
+```ts
 // vite.config.ts
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  optimizeDeps: {
-    exclude: ['@scaryterry/pdfium'],
-  },
+  optimizeDeps: { exclude: ['@scaryterry/pdfium'] },
   assetsInclude: ['**/*.wasm'],
 });
 ```
 
-Import and serve the WASM file:
-
-```typescript
+```ts
 import wasmUrl from '@scaryterry/pdfium/pdfium.wasm?url';
-
-const response = await fetch(wasmUrl);
-const wasmBinary = await response.arrayBuffer();
-using pdfium = await PDFium.init({ wasmBinary });
-```
-
-When using workers, use the emitted worker module URL:
-
-```typescript
 const workerUrl = new URL('./pdfium.worker.ts', import.meta.url).toString();
-await using pdfium = await PDFium.init({ useWorker: true, workerUrl, wasmUrl });
 ```
 
-### Webpack
+### Strategy B: Serve WASM from `public/`
 
-```javascript
-// webpack.config.js
-module.exports = {
-  experiments: {
-    asyncWebAssembly: true,
-  },
-  module: {
-    rules: [
-      {
-        test: /\.wasm$/,
-        type: 'asset/resource',
-      },
-    ],
-  },
-};
+Copy the WASM file into your public assets:
+
+```sh
+cp node_modules/@scaryterry/pdfium/dist/vendor/pdfium.wasm public/pdfium.wasm
 ```
 
-### Next.js
+Then use:
 
-```javascript
+```ts
+const wasmUrl = '/pdfium.wasm';
+```
+
+Keep the worker as a bundled module (`src/pdfium.worker.ts`) and pass the emitted `workerUrl`.
+Do not copy only `dist/worker.js`; it imports sibling modules.
+
+## 8. Next.js Notes
+
+Enable async WASM in webpack:
+
+```js
 // next.config.js
 module.exports = {
   webpack: (config) => {
-    config.experiments = {
-      ...config.experiments,
-      asyncWebAssembly: true,
-    };
+    config.experiments = { ...config.experiments, asyncWebAssembly: true };
     return config;
   },
 };
 ```
 
-Copy WASM to public folder:
-
-```bash
-cp node_modules/@scaryterry/pdfium/dist/vendor/pdfium.wasm public/
-```
-
-For worker mode, keep the worker as a bundled module (`src/pdfium.worker.ts`) and pass its emitted URL as `workerUrl`.
-
-## WASM Loading Options
-
-### From URL
-
-```typescript
-using pdfium = await PDFium.init({
-  wasmUrl: '/assets/pdfium.wasm',
-});
-```
-
-### From ArrayBuffer
-
-```typescript
-const wasmBinary = await fetch('/pdfium.wasm').then(r => r.arrayBuffer());
-using pdfium = await PDFium.init({ wasmBinary });
-```
-
-### From CDN (Not Recommended for Production)
-
-```typescript
-const wasmBinary = await fetch(
-  'https://unpkg.com/@scaryterry/pdfium/pdfium.wasm'
-).then(r => r.arrayBuffer());
-
-using pdfium = await PDFium.init({ wasmBinary });
-```
-
-## Resource Limits
-
-Configure limits at initialisation:
-
-```typescript
-using pdfium = await PDFium.init({
-  limits: {
-    maxDocumentSize: 50 * 1024 * 1024,  // 50 MB
-    maxRenderDimension: 8192,            // 8192 × 8192 max
-    maxTextCharCount: 1_000_000,         // 1 million chars
-  },
-});
-```
-
-## TypeScript Configuration
-
-For ES2024 `using` keyword support:
-
-```json
-{
-  "compilerOptions": {
-    "target": "ES2022",
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "module": "ESNext",
-    "moduleResolution": "bundler",
-    "strict": true
-  }
-}
-```
-
-For older TypeScript (without `using`):
-
-```typescript
-const pdfium = await PDFium.init();
-try {
-  // Use pdfium...
-} finally {
-  pdfium.dispose();
-}
-```
-
-## Verifying Installation
-
-```typescript
-import { PDFium, VERSION } from '@scaryterry/pdfium';
-
-console.log('Version:', VERSION);
-
-using pdfium = await PDFium.init();
-console.log('PDFium initialised successfully');
-```
-
-## Native Backend (Optional)
-
-For optimal performance in Node.js, install the native backend for your platform:
+If you serve from `public`, copy:
 
 ```sh
-# macOS Apple Silicon
+cp node_modules/@scaryterry/pdfium/dist/vendor/pdfium.wasm public/pdfium.wasm
+```
+
+## 9. Optional Native Backend (Node.js)
+
+Install platform package(s):
+
+```sh
 pnpm add @scaryterry/pdfium-darwin-arm64
-
-# macOS Intel
 pnpm add @scaryterry/pdfium-darwin-x64
-
-# Linux x64 (glibc)
 pnpm add @scaryterry/pdfium-linux-x64-gnu
-
-# Linux ARM64 (glibc)
 pnpm add @scaryterry/pdfium-linux-arm64-gnu
-
-# Windows x64
 pnpm add @scaryterry/pdfium-win32-x64-msvc
 ```
 
-Then request the native backend:
+Then request native:
 
-```typescript
+```ts
 import { PDFium } from '@scaryterry/pdfium';
-
-// Prefer native, fall back to WASM if unavailable
 const pdfium = await PDFium.init({ useNative: true });
 ```
 
-The native backend is optional. Without it, the library uses the WASM backend which works everywhere.
+## 10. Verify Installation
 
-See [Native vs WASM Backends](/pdfium/concepts/backends/) for details.
+```ts
+import { PDFium, VERSION } from '@scaryterry/pdfium';
+
+console.log('version', VERSION);
+using pdfium = await PDFium.init();
+console.log('ok');
+```
 
 ## See Also
 
-- [Quick Start](/pdfium/quick-start/) — 5-minute tutorial
-- [TypeScript Setup](/pdfium/typescript-setup/) — Detailed TS configuration
-- [Browser vs Node.js](/pdfium/concepts/environments/) — Platform differences
-- [Native vs WASM Backends](/pdfium/concepts/backends/) — Backend comparison
+- [Quick Start](/pdfium/quick-start/)
+- [React Overview](/pdfium/react/)
+- [Worker Mode Guide](/pdfium/guides/worker-mode/)
+- [Backends](/pdfium/concepts/backends/)

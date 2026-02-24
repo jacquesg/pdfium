@@ -3,7 +3,11 @@ title: Architecture
 description: How @scaryterry/pdfium works under the hood
 ---
 
-Understanding the library architecture helps you choose the right backend (Native vs WASM) and debug issues. This guide explains how PDFium is wrapped for JavaScript/TypeScript.
+This page covers runtime architecture for the core API (`@scaryterry/pdfium`).
+
+The React viewer (`@scaryterry/pdfium/react`) sits on top of these runtime layers and is documented separately in [React Architecture](/pdfium/react/architecture/).
+
+Understanding the runtime architecture helps you choose the right backend (Native vs WASM) and debug issues.
 
 ## High-Level Overview
 
@@ -97,6 +101,11 @@ This allows you to write code that is largely portable between Node.js (Native) 
 - **Performance:** Near-native, but incurs overhead when copying image data between WASM heap and JS memory.
 - **Capabilities:** Runs everywhere (Node.js, Browsers, Workers).
 
+### 4. React Viewer Layer (Built on Top)
+
+`@scaryterry/pdfium/react` composes UI state, rendering, and interaction flows over worker-backed core APIs.
+It does not replace the runtime backend model; it orchestrates it for UI use cases.
+
 ## Memory Architecture (WASM)
 
 The WASM backend requires manual memory management because WebAssembly memory is linear and manual. The wrapper handles this automatically using the `Disposable` pattern.
@@ -124,7 +133,7 @@ Both backends use a "Handle" system to track pointers to underlying C++ objects.
 | Feature | Native Backend | WASM Backend |
 |---------|---------------|--------------|
 | **Environment** | Node.js Only | Browsers & Node.js |
-| **Setup** | Install platform pkg | Zero config |
+| **Setup** | Install platform pkg | Node: auto-load, Browser: provide `wasmUrl`/`wasmBinary` |
 | **Performance** | Maximum | High |
 | **Worker Support** | Node.js Worker Threads | Web Workers & Worker Threads |
 | **Memory Limit** | System RAM | Browser/WASM Limit (often 2GB/4GB) |
@@ -133,3 +142,4 @@ Both backends use a "Handle" system to track pointers to underlying C++ objects.
 
 - [Installation](/pdfium/installation/) — Installing native packages
 - [Performance](/pdfium/concepts/performance/) — Benchmarking backends
+- [React Architecture](/pdfium/react/architecture/) — Viewer-layer design and boundaries

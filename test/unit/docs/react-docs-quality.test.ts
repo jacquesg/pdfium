@@ -61,6 +61,32 @@ function parseSnippetErrors(file: string, code: string, extension: 'ts' | 'tsx')
 }
 
 describe('React docs quality', () => {
+  test('all React docs declare React viewer toolkit scope', () => {
+    const errors: string[] = [];
+
+    for (const file of listReactDocFiles()) {
+      const content = readFileSync(join(REACT_DOCS_DIR, file), 'utf8');
+      if (!content.includes('React viewer toolkit') || !content.includes('@scaryterry/pdfium/react')) {
+        errors.push(`${file}: missing explicit React viewer toolkit scope line`);
+      }
+    }
+
+    expect(errors).toEqual([]);
+  });
+
+  test('React scope line does not use placeholder package tokens', () => {
+    const offenders: string[] = [];
+
+    for (const file of listReactDocFiles()) {
+      const content = readFileSync(join(REACT_DOCS_DIR, file), 'utf8');
+      if (content.includes('React viewer toolkit (`/pdfium/react`)')) {
+        offenders.push(file);
+      }
+    }
+
+    expect(offenders).toEqual([]);
+  });
+
   test('all React docs contain title and description frontmatter', () => {
     const errors: string[] = [];
 

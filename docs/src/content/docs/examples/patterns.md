@@ -3,6 +3,8 @@ title: Common Patterns
 description: Reusable patterns for working with PDFs
 ---
 
+This example page targets the core API (`@scaryterry/pdfium`).
+
 This page collects common patterns and recipes for working with the library.
 
 ## Error Handling Patterns

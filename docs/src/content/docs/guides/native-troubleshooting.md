@@ -3,6 +3,8 @@ title: Native Backend Troubleshooting
 description: Diagnosing and resolving native backend issues
 ---
 
+This guide targets the core API (`@scaryterry/pdfium`).
+
 This guide helps diagnose and resolve issues with the native PDFium backend in Node.js.
 
 ## Native Backend Not Loading

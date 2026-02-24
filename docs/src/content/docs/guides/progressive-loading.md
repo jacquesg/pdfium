@@ -3,6 +3,8 @@ title: Progressive Loading
 description: Working with linearised PDFs and streaming document loading
 ---
 
+This guide targets the core API (`@scaryterry/pdfium`).
+
 This guide covers progressive PDF loading using `ProgressivePDFLoader`, which enables linearisation detection and incremental document loading.
 
 ## What is Linearisation?

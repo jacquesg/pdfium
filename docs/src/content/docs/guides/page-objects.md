@@ -3,6 +3,8 @@ title: Page Objects
 description: Inspecting and working with page content objects
 ---
 
+This guide targets the core API (`@scaryterry/pdfium`).
+
 This guide covers inspecting page objects — the individual elements (text, images, paths, etc.) that make up a PDF page.
 
 ## What are Page Objects?

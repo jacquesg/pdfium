@@ -3,6 +3,8 @@ title: Annotations
 description: Working with PDF annotations
 ---
 
+This guide targets the core API (`@scaryterry/pdfium`).
+
 PDF annotations are interactive or visual elements overlaid on page content. This guide explains how to read, create, modify, and remove annotations.
 
 ## Overview

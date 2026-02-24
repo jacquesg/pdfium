@@ -3,7 +3,11 @@ title: Browser vs Node.js
 description: Platform-specific considerations for @scaryterry/pdfium
 ---
 
+This concept page targets the core API (`@scaryterry/pdfium`).
+
 The library works in both Node.js and browser environments, but there are important differences in setup and capabilities.
+
+If you are building a UI with `@scaryterry/pdfium/react`, use [React Overview](/pdfium/react/) and [Installation](/pdfium/installation/) first, then return here for runtime tradeoffs.
 
 ## Node.js
 
@@ -235,7 +239,7 @@ import type { RenderResult, PageObjectType } from '@scaryterry/pdfium/types';
 | WASM loading | Automatic | N/A | Manual (fetch) |
 | File system | Native `fs` | Native `fs` | File API / fetch |
 | Memory limit | System RAM | System RAM | Browser limit (~2-4GB) |
-| Web Workers | N/A | N/A | Recommended for large PDFs |
+| Worker support | Node worker threads supported | Node worker threads supported | Web Workers recommended for large PDFs |
 | CORS | N/A | N/A | Required for cross-origin |
 | Performance | Very good | Faster | Depends on device |
 | Feature coverage | Complete | Core features | Complete |

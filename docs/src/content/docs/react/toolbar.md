@@ -5,6 +5,9 @@ description: Reference for DefaultToolbar and headless PDFToolbar slot APIs.
 
 # Toolbar
 
+This page targets the React viewer toolkit (`@scaryterry/pdfium/react`).
+
+
 `@scaryterry/pdfium/react` ships two toolbar components:
 
 - **`DefaultToolbar`** -- a ready-made, unstyled reference toolbar that renders
