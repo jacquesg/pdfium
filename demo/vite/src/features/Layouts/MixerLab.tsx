@@ -10,11 +10,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Skeleton } from '../../components/ui/skeleton';
 import { ResponsiveSidebar } from '../../components/ResponsiveSidebar';
 import { usePDFium } from '../../hooks/usePDFium';
-import { useRenderPage, useSyncPDFium } from '@scaryterry/pdfium/react';
+import { useRenderPage } from '@scaryterry/pdfium/react';
 
 export function MixerLab() {
   const { instance: workerPdfium, document: docA, documentName: docAName } = usePDFium();
-  const { instance: syncPdfium } = useSyncPDFium();
+  const syncPdfium = workerPdfium;
   const [docB, setDocB] = useState<WorkerPDFiumDocument | null>(null);
   const docBRef = useRef<WorkerPDFiumDocument | null>(null);
   const [docBName, setDocBName] = useState<string | null>(null);
@@ -66,8 +66,8 @@ export function MixerLab() {
     if (!workerPdfium || !syncPdfium || !docA || !docB) return;
 
     try {
-      using builder = syncPdfium.createDocument();
-      const blankBytes = builder.save();
+      await using builder = await syncPdfium.createDocumentBuilder();
+      const blankBytes = await builder.save();
       const newDoc = await workerPdfium.openDocument(blankBytes);
       await newDoc.importPages(docA);
       await newDoc.importPages(docB, { pageRange: importRange });

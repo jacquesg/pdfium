@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { DefaultToolbar, PDFDocumentView, useKeyboardShortcuts, useSyncPDFium, useViewerSetup } from '@scaryterry/pdfium/react';
+import { DefaultToolbar, PDFDocumentView, useKeyboardShortcuts, useViewerSetup } from '@scaryterry/pdfium/react';
 import { Button } from '../../components/Button';
 import { DocPanel } from '../../components/DocPanel';
 import { DownloadButton } from '../../components/DownloadButton';
@@ -403,7 +403,7 @@ function reportTemplate(): PageDef[] {
         // Architecture layers box
         { id: uid(), type: 'rect', x: m, y: h - 580, w: cw, h: 120, fillColour: '#f8fafc', strokeColour: '#e2e8f0', strokeWidth: 0.5 },
         { id: uid(), type: 'text', text: 'ARCHITECTURE LAYERS', x: m + 12, y: h - 475, fontSize: 7, font: 'Helvetica-Bold', colour: '#2563eb' },
-        { id: uid(), type: 'text', text: 'PDFium               Main entry point: init(), openDocument(), createDocument()', x: m + 12, y: h - 498, fontSize: 9, font: 'Courier' },
+        { id: uid(), type: 'text', text: 'PDFium               Main entry point: init(), openDocument(), createDocumentBuilder()', x: m + 12, y: h - 498, fontSize: 9, font: 'Courier' },
         { id: uid(), type: 'text', text: 'PDFiumDocument        Document operations: pages, bookmarks, metadata, save, import pages', x: m + 12, y: h - 512, fontSize: 9, font: 'Courier' },
         { id: uid(), type: 'text', text: 'PDFiumBackend         Abstraction layer over WebAssembly or native Node.js N-API addon', x: m + 12, y: h - 526, fontSize: 9, font: 'Courier' },
         { id: uid(), type: 'text', text: 'WASMMemoryManager     Heap management with alloc/free tracking, typed reads/writes', x: m + 12, y: h - 540, fontSize: 9, font: 'Courier' },
@@ -598,8 +598,13 @@ const TEMPLATES = [
 // ── Component ───────────────────────────────────────────────────
 
 export function CreatorLab() {
-  const { document, loadDocument } = usePDFium();
-  const { instance: syncPdfium, isInitialising: isSyncInit, error: syncError } = useSyncPDFium();
+  const {
+    instance: syncPdfium,
+    document,
+    loadDocument,
+    isInitialising: isSyncInit,
+    error: syncError,
+  } = usePDFium();
   const viewer = useViewerSetup();
 
   // Keyboard shortcuts for zoom and page navigation
@@ -709,7 +714,7 @@ export function CreatorLab() {
     if (!syncPdfium) return;
     setIsGenerating(true);
     try {
-      using builder = syncPdfium.createDocument();
+      await using builder = await syncPdfium.createDocumentBuilder();
 
       const fontNames = new Set<string>();
       for (const pg of pages) {
@@ -717,35 +722,37 @@ export function CreatorLab() {
           if (obj.type === 'text') fontNames.add(obj.font);
         }
       }
-      const fonts = new Map<string, ReturnType<typeof builder.loadStandardFont>>();
+      const fonts = new Map<string, Awaited<ReturnType<typeof builder.loadStandardFont>>>();
       for (const name of fontNames) {
-        fonts.set(name, builder.loadStandardFont(name));
+        fonts.set(name, await builder.loadStandardFont(name));
       }
 
       for (const pg of pages) {
-        const page = builder.addPage({ width: pg.width, height: pg.height });
+        const page = await builder.addPage({ width: pg.width, height: pg.height });
         for (const obj of pg.objects) {
           switch (obj.type) {
             case 'text': {
               const font = fonts.get(obj.font);
-              if (font) page.addText(obj.text, obj.x, obj.y, font, obj.fontSize, obj.colour ? hexToRgba(obj.colour) : undefined);
+              if (font) {
+                await page.addText(obj.text, obj.x, obj.y, font, obj.fontSize, obj.colour ? hexToRgba(obj.colour) : undefined);
+              }
               break;
             }
             case 'rect':
-              page.addRectangle(obj.x, obj.y, obj.w, obj.h, {
+              await page.addRectangle(obj.x, obj.y, obj.w, obj.h, {
                 fill: hexToRgba(obj.fillColour),
                 stroke: hexToRgba(obj.strokeColour),
                 strokeWidth: obj.strokeWidth,
               });
               break;
             case 'line':
-              page.addLine(obj.x1, obj.y1, obj.x2, obj.y2, {
+              await page.addLine(obj.x1, obj.y1, obj.x2, obj.y2, {
                 stroke: hexToRgba(obj.strokeColour),
                 strokeWidth: obj.strokeWidth,
               });
               break;
             case 'ellipse':
-              page.addEllipse(obj.cx, obj.cy, obj.rx, obj.ry, {
+              await page.addEllipse(obj.cx, obj.cy, obj.rx, obj.ry, {
                 fill: hexToRgba(obj.fillColour),
                 stroke: hexToRgba(obj.strokeColour),
                 strokeWidth: obj.strokeWidth,
@@ -755,7 +762,7 @@ export function CreatorLab() {
         }
       }
 
-      const bytes = builder.save();
+      const bytes = await builder.save();
       await loadDocument(bytes, 'Created Document');
       setHasGenerated(true);
       setCreatorError(null);
@@ -1188,7 +1195,7 @@ export function CreatorLab() {
         <DocPanel
           title="Document Creator"
           apis={[
-            'createDocument()',
+            'createDocumentBuilder()',
             'addPage()',
             'addText()',
             'addRectangle()',
@@ -1198,24 +1205,24 @@ export function CreatorLab() {
             'save()',
           ]}
           snippet={[
-            'using builder = pdfium.createDocument();',
-            "const font = builder.loadStandardFont('Helvetica-Bold');",
-            'const page = builder.addPage({ width: 595, height: 842 });',
+            'await using builder = await pdfium.createDocumentBuilder();',
+            "const font = await builder.loadStandardFont('Helvetica-Bold');",
+            'const page = await builder.addPage({ width: 595, height: 842 });',
             '',
-            "page.addText('Hello', 40, 700, font, 24,",
-            '             { r: 30, g: 64, b: 175, a: 255 })',
-            '    .addRectangle(40, 600, 200, 80, {',
+            "await page.addText('Hello', 40, 700, font, 24,",
+            '                   { r: 30, g: 64, b: 175, a: 255 });',
+            'await page.addRectangle(40, 600, 200, 80, {',
             '      fill: { r: 59, g: 130, b: 246, a: 255 },',
-            '    })',
-            '    .addLine(40, 590, 240, 590, {',
+            '    });',
+            'await page.addLine(40, 590, 240, 590, {',
             '      stroke: { r: 0, g: 0, b: 0, a: 255 },',
             '      strokeWidth: 1,',
-            '    })',
-            '    .addEllipse(140, 500, 60, 40, {',
+            '    });',
+            'await page.addEllipse(140, 500, 60, 40, {',
             '      fill: { r: 220, g: 38, b: 38, a: 128 },',
             '    });',
             '',
-            'const bytes = builder.save();',
+            'const bytes = await builder.save();',
           ].join('\n')}
           description="Create PDF documents from scratch using the builder API. Supports multiple pages, all 14 standard PDF fonts with colour, rectangles, lines, and ellipses with fill/stroke styles. Use templates to see complete examples."
         />

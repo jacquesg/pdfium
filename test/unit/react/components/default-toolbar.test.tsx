@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { PageRotation } from '../../../../src/core/types.js';
-import type { PDFPanelState, PDFViewerState } from '../../../../src/react/components/pdf-viewer.js';
+import type { PDFPanelState, PDFViewerState } from '../../../../src/react/components/pdf-viewer-context.js';
 import type { UseViewerSetupResult } from '../../../../src/react/hooks/use-viewer-setup.js';
 
 // ── Mock context to provide state without needing a real PDFViewer ──
@@ -101,7 +101,7 @@ const mockPanelState: PDFPanelState = {
 let returnContext: PDFViewerState | null = mockState;
 let returnPanelContext: PDFPanelState | null = mockPanelState;
 
-vi.mock('../../../../src/react/components/pdf-viewer.js', () => ({
+vi.mock('../../../../src/react/components/pdf-viewer-context.js', () => ({
   usePDFViewer: () => {
     if (returnContext === null) throw new Error('usePDFViewer() must be called inside a <PDFViewer> component.');
     return returnContext;

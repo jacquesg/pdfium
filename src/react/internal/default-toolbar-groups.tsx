@@ -12,7 +12,7 @@ import {
   Search,
 } from 'lucide-react';
 import { useToolbarContext } from '../components/pdf-toolbar.js';
-import { usePDFPanelOptional, usePDFViewerOptional } from '../components/pdf-viewer.js';
+import { usePDFPanelOptional, usePDFViewerOptional } from '../components/pdf-viewer-context.js';
 import {
   ContinuousScrollIcon,
   DEFAULT_TOOLBAR_ICON_SIZE,

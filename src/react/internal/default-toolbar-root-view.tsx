@@ -3,7 +3,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ToolbarSearchState } from '../components/pdf-toolbar.js';
 import { PDFToolbar } from '../components/pdf-toolbar.js';
-import { usePDFViewerOptional } from '../components/pdf-viewer.js';
+import { usePDFViewerOptional } from '../components/pdf-viewer-context.js';
 import {
   FitGroup,
   FullscreenButton,

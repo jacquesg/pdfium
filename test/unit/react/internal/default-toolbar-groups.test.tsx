@@ -69,7 +69,7 @@ vi.mock('../../../../src/react/components/pdf-toolbar.js', () => ({
   useToolbarContext: () => toolbarContext,
 }));
 
-vi.mock('../../../../src/react/components/pdf-viewer.js', () => ({
+vi.mock('../../../../src/react/components/pdf-viewer-context.js', () => ({
   usePDFPanelOptional: () => panelContext,
   usePDFViewerOptional: () => viewerContext,
 }));

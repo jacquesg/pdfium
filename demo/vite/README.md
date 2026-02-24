@@ -7,7 +7,7 @@ A comprehensive React application demonstrating the full `@scaryterry/pdfium` AP
 | Tab | Lab | APIs Demonstrated |
 |-----|-----|-------------------|
 | Viewer | PDF rendering with page properties | `render()`, `getPageBox()`, `rotation`, `hasTransparency()`, `getPageLabel()`, `save()` |
-| Creator | Build PDFs from scratch | `createDocument()`, `addPage()`, `addText()`, `addRectangle()`, `loadStandardFont()`, `save()` |
+| Creator | Build PDFs from scratch | `createDocumentBuilder()`, `addPage()`, `addText()`, `addRectangle()`, `loadStandardFont()`, `save()` |
 | Text | Text extraction, search, character inspection | `getText()`, `findText()`, `getCharacterInfo()`, `getCharBox()`, `getCharIndexAtPos()`, `getTextInRect()` |
 | Annots | Annotation browsing and creation | `getAnnotations()`, `createAnnotation()`, `removeAnnotation()`, full `PDFiumAnnotation` API |
 | Objects | Page object inspection (text, image, path) | `getObjects()`, `PDFiumFont.getMetrics()`, font flags, `PDFiumImageObject` metadata, `PDFiumPathObject` details |
