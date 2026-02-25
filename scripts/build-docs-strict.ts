@@ -9,13 +9,18 @@ import { spawn } from 'node:child_process';
 import { promises as fs } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { clearDocsAstroCache, hasWarningOutput } from './build-docs-strict-utils.js';
+import {
+  allWarningsAreStarlightDuplicateIds,
+  clearDocsAstroCache,
+  hasWarningOutput,
+} from './build-docs-strict-utils.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '..');
 const LOCK_PATH = join(REPO_ROOT, '.tmp/locks/docs-build-strict.lock');
 const LOCK_WAIT_TIMEOUT_MS = 120_000;
 const LOCK_POLL_INTERVAL_MS = 200;
+const BUILD_MAX_ATTEMPTS = 3;
 
 function sleep(ms: number): Promise<void> {
   return new Promise((resolveSleep) => {
@@ -120,14 +125,30 @@ async function main(): Promise<void> {
   const releaseLock = await acquireDocsBuildLock();
 
   try {
-    await clearDocsAstroCache(REPO_ROOT);
+    for (let attempt = 1; attempt <= BUILD_MAX_ATTEMPTS; attempt++) {
+      await clearDocsAstroCache(REPO_ROOT);
 
-    const buildResult = await runCommand('pnpm', ['--dir', 'docs', 'build']);
-    if (buildResult.exitCode !== 0) {
-      process.exit(buildResult.exitCode);
-    }
+      const buildResult = await runCommand('pnpm', ['--dir', 'docs', 'build']);
+      if (buildResult.exitCode !== 0) {
+        process.exit(buildResult.exitCode);
+      }
 
-    if (hasWarningOutput(buildResult.output)) {
+      if (!hasWarningOutput(buildResult.output)) {
+        break;
+      }
+
+      const isTransientDuplicateWarning = allWarningsAreStarlightDuplicateIds(buildResult.output);
+      const isLastAttempt = attempt === BUILD_MAX_ATTEMPTS;
+
+      if (isTransientDuplicateWarning && !isLastAttempt) {
+        console.warn(
+          `Docs build emitted transient starlight duplicate-id warnings on attempt ${String(
+            attempt,
+          )}/${String(BUILD_MAX_ATTEMPTS)}. Retrying...`,
+        );
+        continue;
+      }
+
       console.error('Docs build produced warnings. Treating warnings as failures.');
       process.exit(1);
     }

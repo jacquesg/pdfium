@@ -3,9 +3,9 @@ title: Resource Management
 description: Understanding resource lifecycle and disposal patterns in @scaryterry/pdfium
 ---
 
-This page covers resource lifecycle rules for the core API (`@scaryterry/pdfium`).
+**Scope:** Core API (`@scaryterry/pdfium`).
 
-The library allocates engine-side resources (WASM and, in Node native mode, native bindings) that must be explicitly released. This guide explains the disposal patterns and best practices.
+PDFium allocates engine-side resources (WASM and, in Node native mode, native bindings) that must be explicitly released. Use this guide to apply safe disposal patterns and avoid leaks.
 
 ## Why Resource Management Matters
 

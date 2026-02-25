@@ -3,7 +3,7 @@ title: Memory Management
 description: Understanding WASM memory in @scaryterry/pdfium
 ---
 
-This concept page targets the core API (`@scaryterry/pdfium`).
+**Scope:** Core API (`@scaryterry/pdfium`).
 
 PDFium uses WebAssembly linear memory for PDF processing. Understanding memory management helps optimise performance and prevent issues.
 

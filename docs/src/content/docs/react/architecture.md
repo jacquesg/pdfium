@@ -5,8 +5,7 @@ description: Layering model and design rules for React viewer code.
 
 # React Architecture Notes
 
-This page targets the React viewer toolkit (`@scaryterry/pdfium/react`).
-
+**Scope:** React viewer toolkit (`@scaryterry/pdfium/react`).
 
 See [Architecture Map](./architecture-index.md) for a concrete module-to-layer map.
 See [Contributor Playbook](./contributor-playbook.md) for required file shapes and test gates.

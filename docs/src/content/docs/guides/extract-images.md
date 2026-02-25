@@ -3,7 +3,7 @@ title: Extract Images from PDF Page
 description: Extract image objects and metadata from PDF pages
 ---
 
-This guide targets the core API (`@scaryterry/pdfium`).
+**Scope:** Core API (`@scaryterry/pdfium`).
 
 You can extract images from page objects using `getObjects()` (or the `objects()` generator for large pages) and filtering for image types.
 

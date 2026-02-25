@@ -3,7 +3,7 @@ title: Extract Text from PDF Page
 description: Extract and search text content from PDF pages
 ---
 
-This guide targets the core API (`@scaryterry/pdfium`).
+**Scope:** Core API (`@scaryterry/pdfium`).
 
 You can extract text from pages using the `getText()` method.
 

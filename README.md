@@ -7,14 +7,13 @@ It has two public surfaces:
 1. **Core API** (`@scaryterry/pdfium`) for PDF read/write/render workflows in Node.js and browsers.
 2. **React viewer toolkit** (`@scaryterry/pdfium/react`) for production viewer UIs (provider, viewer, toolbar, hooks, panels).
 
-## What This Project Is
+## Who This Is For
 
-- A typed JavaScript/TypeScript wrapper around PDFium.
-- Cross-runtime: Node.js + browser.
-- Worker-capable for off-main-thread rendering/workflows.
-- React-ready, not just low-level bindings.
+- Teams building backend or frontend PDF workflows with one API.
+- Teams that need a ready viewer, but still want low-level control when needed.
+- Teams that want Node.js and browser support without switching libraries.
 
-This is not only a raw WASM wrapper and not only a viewer. It is both.
+This project is not only a raw WASM wrapper and not only a viewer. It is both.
 
 ## Install
 
@@ -34,6 +33,9 @@ pnpm add react react-dom lucide-react
 - `import { PDFiumProvider, PDFViewer } from '@scaryterry/pdfium/react'` for React UI.
 - `import '@scaryterry/pdfium/worker'` for worker entry modules.
 - `import wasmUrl from '@scaryterry/pdfium/pdfium.wasm?url'` (bundlers that support asset URLs).
+
+If you only need programmatic PDF processing, start with the core API.
+If you need a viewer UI quickly, start with the React toolkit.
 
 ## Quick Start (Core API)
 
@@ -86,6 +88,12 @@ export function App({ pdfBytes }: { pdfBytes: ArrayBuffer }) {
 }
 ```
 
+## Verify in 60 Seconds
+
+- Core path: `PDFium.init()` succeeds and you can open a document.
+- React path: `PDFiumProvider` mounts with valid `workerUrl` and `wasmUrl`/`wasmBinary`.
+- Rendering path: first page renders to RGBA or the viewer shows page 1.
+
 ## Runtime Requirements
 
 - Node.js: `>=22`
@@ -125,6 +133,7 @@ pnpm add @scaryterry/pdfium-win32-x64-msvc
 - Installation: <https://jacquesg.github.io/pdfium/installation/>
 - React docs: <https://jacquesg.github.io/pdfium/react/>
 - API reference: <https://jacquesg.github.io/pdfium/api/>
+- Docs voice guide: `docs/DOCS_VOICE_GUIDE.md`
 
 ## License
 

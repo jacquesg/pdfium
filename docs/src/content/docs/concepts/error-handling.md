@@ -3,9 +3,9 @@ title: Error Handling
 description: Understanding error patterns and recovery strategies in @scaryterry/pdfium
 ---
 
-This concept page targets the core API (`@scaryterry/pdfium`).
+**Scope:** Core API (`@scaryterry/pdfium`).
 
-The library uses a structured error system with specific error codes and specialised error classes. This guide explains how to handle errors effectively.
+The library uses structured errors with specific codes and specialised error classes. Use this guide to handle failures predictably and recover safely.
 
 ## Error Philosophy
 

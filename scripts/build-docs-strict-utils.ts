@@ -13,4 +13,19 @@ function hasWarningOutput(output: string): boolean {
   return /\[WARN\]/u.test(output);
 }
 
-export { clearDocsAstroCache, hasWarningOutput };
+function getWarningLines(output: string): string[] {
+  return output
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => /\[WARN\]/u.test(line));
+}
+
+function allWarningsAreStarlightDuplicateIds(output: string): boolean {
+  const warningLines = getWarningLines(output);
+  if (warningLines.length === 0) {
+    return false;
+  }
+  return warningLines.every((line) => /\[starlight-docs-loader\]\s+Duplicate id\s+/u.test(line));
+}
+
+export { allWarningsAreStarlightDuplicateIds, clearDocsAstroCache, getWarningLines, hasWarningOutput };

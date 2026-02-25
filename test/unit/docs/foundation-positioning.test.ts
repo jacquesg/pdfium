@@ -25,6 +25,8 @@ describe('docs foundation positioning', () => {
     expect(readme).toContain('Core API');
     expect(readme).toContain('@scaryterry/pdfium/react');
     expect(readme).toContain('Choose Your Entry Point');
+    expect(readme).toContain('Who This Is For');
+    expect(readme).toContain('Verify in 60 Seconds');
     expect(packageJson).toContain('React viewer toolkit');
   });
 
@@ -35,6 +37,7 @@ describe('docs foundation positioning', () => {
     expect(intro).toContain('Path B: React Viewer Toolkit');
     expect(intro).toContain('Browser core API');
     expect(intro).toContain('React viewer');
+    expect(intro).toContain('Who Should Start Here');
   });
 
   test('installation and quick-start retain explicit worker/wasm guidance', () => {
@@ -44,10 +47,22 @@ describe('docs foundation positioning', () => {
     expect(installation).toContain('React viewer (`PDFiumProvider`)');
     expect(installation).toContain('workerUrl');
     expect(installation).toContain('wasmUrl');
+    expect(installation).toContain('What You Will Finish With');
+    expect(installation).toContain('Pick Your Runtime Setup');
+    expect(installation).toContain('If this script prints a version and `ok`, your base setup is valid.');
 
     expect(quickStart).toContain('Browser core API');
     expect(quickStart).toContain('React viewer');
     expect(quickStart).toContain('/pdfium/react/');
+    expect(quickStart).toContain('What You Will Build');
+    expect(quickStart).toContain('## Verify');
+  });
+
+  test('React index keeps intent-first setup and verification sections', () => {
+    const reactIndex = readRepoFile('docs/src/content/docs/react/index.md');
+
+    expect(reactIndex).toContain('What You Need Before Coding');
+    expect(reactIndex).toContain('## Verify');
   });
 
   test('browser examples clearly point React users to React docs', () => {
@@ -88,7 +103,7 @@ describe('docs foundation positioning', () => {
       ...listMarkdownFilesIn('docs/src/content/docs/examples'),
     ];
 
-    const missing = targets.filter((file) => !readRepoFile(file).includes('core API'));
+    const missing = targets.filter((file) => !/core API/iu.test(readRepoFile(file)));
     expect(missing).toEqual([]);
   });
 });

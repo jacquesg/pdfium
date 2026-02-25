@@ -3,9 +3,9 @@ title: Advanced Rendering
 description: Master high-performance rendering techniques including sub-region rendering (clip rects) and progress monitoring.
 ---
 
-This guide targets the core API (`@scaryterry/pdfium`).
+**Scope:** Core API (`@scaryterry/pdfium`).
 
-Beyond basic full-page rendering, @scaryterry/pdfium offers advanced controls for high-performance applications, such as map viewers, design tools, or large-format document viewers.
+Use this guide when full-page rendering is not enough and you need region rendering, progress updates, or progressive rendering loops.
 
 ## Sub-Region Rendering (Clip Rects)
 

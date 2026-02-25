@@ -3,7 +3,9 @@ title: Advanced Features
 description: Explore advanced PDF capabilities including Digital Signatures and JavaScript automation.
 ---
 
-This guide targets the core API (`@scaryterry/pdfium`).
+**Scope:** Core API (`@scaryterry/pdfium`).
+
+Use this guide when you need signature metadata inspection or JavaScript action visibility in PDF workflows.
 
 ## Digital Signatures
 

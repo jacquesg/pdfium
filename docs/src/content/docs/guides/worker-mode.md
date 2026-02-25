@@ -3,7 +3,9 @@ title: Worker Mode
 description: Off-main-thread PDF processing with Web Workers
 ---
 
-This page covers worker execution for the core API (`@scaryterry/pdfium`) with emphasis on browser Web Workers.
+**Scope:** Core API (`@scaryterry/pdfium`).
+
+This page explains worker execution with emphasis on browser Web Workers.
 
 For React viewer integration, start with [React Overview](/pdfium/react/) and [Installation](/pdfium/installation/) for canonical `PDFiumProvider` worker + WASM setup.
 

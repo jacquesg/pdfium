@@ -3,11 +3,11 @@ title: Architecture
 description: How @scaryterry/pdfium works under the hood
 ---
 
-This page covers runtime architecture for the core API (`@scaryterry/pdfium`).
+**Scope:** Core API (`@scaryterry/pdfium`).
 
 The React viewer (`@scaryterry/pdfium/react`) sits on top of these runtime layers and is documented separately in [React Architecture](/pdfium/react/architecture/).
 
-Understanding the runtime architecture helps you choose the right backend (Native vs WASM) and debug issues.
+Use this page to understand backend selection, runtime boundaries, and how calls flow from your app into PDFium.
 
 ## High-Level Overview
 

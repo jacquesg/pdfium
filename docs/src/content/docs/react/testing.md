@@ -5,8 +5,7 @@ description: React testing standards for deterministic race coverage and lifecyc
 
 # React Testing Guide
 
-This page targets the React viewer toolkit (`@scaryterry/pdfium/react`).
-
+**Scope:** React viewer toolkit (`@scaryterry/pdfium/react`).
 
 ## Baseline commands
 

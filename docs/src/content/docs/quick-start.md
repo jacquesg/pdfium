@@ -3,7 +3,12 @@ title: Quick Start
 description: First working setup for the core API, plus a direct hand-off to the React viewer path.
 ---
 
-This page gets you to a working result quickly and clarifies what setup differs between Node, browser, and React.
+Use this page when you want a first successful run before diving into the full guides.
+
+## What You Will Build
+
+- A Node.js script that opens a PDF and renders page 1.
+- A clear understanding of what changes in browser and React environments.
 
 ## 1. Install
 
@@ -74,6 +79,14 @@ React setup always requires worker + WASM wiring. Start with:
 
 - [React overview](/pdfium/react/)
 - [Installation](/pdfium/installation/) for exact worker/asset wiring
+
+## Verify
+
+Your quick start is healthy if:
+
+- `Page count:` prints a number.
+- `Rendered image:` prints width/height and RGBA byte length.
+- No `INIT_WASM_*` or worker timeout errors appear.
 
 ## Resource Management Reminder
 

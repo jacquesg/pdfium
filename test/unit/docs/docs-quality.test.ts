@@ -18,6 +18,13 @@ const FORBIDDEN_DOC_PATTERNS: ReadonlyArray<RegExp> = [
   /\bpdf-worker\.js\b/u,
   /node_modules\/@scaryterry\/pdfium\/pdfium\.wasm/u,
 ];
+const ROBOTIC_INTRO_PATTERNS: ReadonlyArray<RegExp> = [
+  /^This guide targets the core API/mu,
+  /^This concept page targets the core API/mu,
+  /^This example page targets the core API/mu,
+  /^This page targets the React viewer toolkit/mu,
+  /^You will learn\b/mu,
+];
 
 function listManualDocFiles(currentDir = DOCS_DIR, prefix = ''): string[] {
   const files: string[] = [];
@@ -121,6 +128,21 @@ describe('docs quality (manual pages)', () => {
       for (const pattern of FORBIDDEN_DOC_PATTERNS) {
         if (pattern.test(content)) {
           errors.push(`${relFile}: contains stale token matching ${pattern.source}`);
+        }
+      }
+    }
+
+    expect(errors).toEqual([]);
+  });
+
+  test('manual docs avoid repetitive robotic intro phrases', () => {
+    const errors: string[] = [];
+
+    for (const relFile of listManualDocFiles()) {
+      const content = readFileSync(join(DOCS_DIR, relFile), 'utf8');
+      for (const pattern of ROBOTIC_INTRO_PATTERNS) {
+        if (pattern.test(content)) {
+          errors.push(`${relFile}: contains robotic intro pattern ${pattern.source}`);
         }
       }
     }

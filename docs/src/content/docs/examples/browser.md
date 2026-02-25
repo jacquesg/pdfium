@@ -3,7 +3,9 @@ title: Browser Examples
 description: Browser runtime examples for @scaryterry/pdfium core APIs, plus minimal React integration patterns.
 ---
 
-This page focuses on browser runtime usage of the core API (`@scaryterry/pdfium`).
+**Scope:** Core API (`@scaryterry/pdfium`).
+
+Use this page for browser runtime usage patterns.
 
 For the full React viewer toolkit (`@scaryterry/pdfium/react`), start with:
 

@@ -3,7 +3,13 @@ title: Installation
 description: Install @scaryterry/pdfium and configure WASM and worker assets correctly for Node.js, browser, and React.
 ---
 
-This guide is intentionally explicit about what must be configured in each runtime.
+Use this guide to get a correct setup on the first try.
+
+## What You Will Finish With
+
+- Core API running in Node.js or browser.
+- React viewer running with a valid worker and WASM source.
+- A quick verification step you can run before building features.
 
 ## 1. Install the Package
 
@@ -17,7 +23,7 @@ React users also need peers:
 pnpm add react react-dom lucide-react
 ```
 
-## 2. Environment Setup Matrix
+## 2. Pick Your Runtime Setup
 
 | Environment | Required setup |
 |---|---|
@@ -81,7 +87,7 @@ function App() {
 }
 ```
 
-## 7. Asset Wiring Strategies
+## 7. Choose an Asset Wiring Strategy
 
 ### Strategy A: Bundler-managed asset URLs (recommended)
 
@@ -169,6 +175,8 @@ console.log('version', VERSION);
 using pdfium = await PDFium.init();
 console.log('ok');
 ```
+
+If this script prints a version and `ok`, your base setup is valid.
 
 ## See Also
 

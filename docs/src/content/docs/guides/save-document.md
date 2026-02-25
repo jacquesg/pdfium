@@ -3,9 +3,9 @@ title: Save Documents
 description: Saving PDF documents with various options
 ---
 
-This guide targets the core API (`@scaryterry/pdfium`).
+**Scope:** Core API (`@scaryterry/pdfium`).
 
-This guide explains how to save PDF documents and the available save options.
+Use this guide to save PDF documents with the right mode and flags for your workflow.
 
 ## Basic Save
 

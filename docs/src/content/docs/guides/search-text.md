@@ -3,7 +3,7 @@ title: Search Text
 description: Finding text with position information in PDFs
 ---
 
-This guide targets the core API (`@scaryterry/pdfium`).
+**Scope:** Core API (`@scaryterry/pdfium`).
 
 The library provides text search capabilities that return both the location and bounding rectangles of found text.
 

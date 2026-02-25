@@ -3,9 +3,9 @@ title: Bookmarks
 description: Working with PDF bookmarks (outlines)
 ---
 
-This guide targets the core API (`@scaryterry/pdfium`).
+**Scope:** Core API (`@scaryterry/pdfium`).
 
-Bookmarks (also called outlines) provide a table of contents for navigating PDF documents. This guide explains how to read and traverse bookmarks.
+Bookmarks (also called outlines) provide a table of contents for navigating PDF documents. Use this guide to read and traverse bookmark trees.
 
 ## Overview
 

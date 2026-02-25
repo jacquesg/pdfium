@@ -3,9 +3,9 @@ title: Node.js Examples
 description: Complete Node.js examples for @scaryterry/pdfium
 ---
 
-This example page targets the core API (`@scaryterry/pdfium`).
+**Scope:** Core API (`@scaryterry/pdfium`).
 
-This page provides complete, runnable Node.js examples.
+This page contains complete, runnable Node.js examples.
 
 ## Using the Native Backend
 

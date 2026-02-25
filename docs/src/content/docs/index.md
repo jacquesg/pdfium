@@ -18,6 +18,12 @@ It serves two primary use cases:
 - Optional native Node backend for higher throughput.
 - React components/hooks for viewer composition (`PDFiumProvider`, `PDFViewer`, panels, toolbar).
 
+## Who Should Start Here
+
+- You want to pick the correct API surface before writing code.
+- You need to understand WASM and worker setup rules up front.
+- You are deciding between direct core API usage and viewer composition.
+
 ## Runtime Model (Important)
 
 - **Node.js core API**: `PDFium.init()` works directly.

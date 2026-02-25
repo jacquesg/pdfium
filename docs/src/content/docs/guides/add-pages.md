@@ -3,9 +3,9 @@ title: Add Pages
 description: Creating and managing pages in PDF documents
 ---
 
-This guide targets the core API (`@scaryterry/pdfium`).
+**Scope:** Core API (`@scaryterry/pdfium`).
 
-This guide covers adding and managing pages when creating PDF documents from scratch using `PDFiumDocumentBuilder`.
+Use this guide to add and manage pages when creating PDF documents from scratch with `PDFiumDocumentBuilder`.
 
 ## Prerequisites
 

@@ -3,9 +3,9 @@ title: Document Lifecycle
 description: Understanding the lifecycle of PDF documents
 ---
 
-This concept page targets the core API (`@scaryterry/pdfium`).
+**Scope:** Core API (`@scaryterry/pdfium`).
 
-This guide explains the lifecycle of documents, pages, and related resources in the library.
+Use this guide to understand the lifecycle of documents, pages, and related resources.
 
 ## Lifecycle Overview
 

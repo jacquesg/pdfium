@@ -3,11 +3,11 @@ title: "Backends: Native vs WASM"
 description: Choosing between the high-performance Native backend and the universal WASM backend
 ---
 
-This page covers backend selection for the core API (`@scaryterry/pdfium`).
+**Scope:** Core API (`@scaryterry/pdfium`).
 
 If you are integrating the React viewer (`@scaryterry/pdfium/react`), use [React Overview](/pdfium/react/) and [Installation](/pdfium/installation/) first, then return here to choose backend strategy.
 
-`@scaryterry/pdfium` supports two distinct backends for executing PDF operations. Understanding the difference is key to optimising your application.
+Use this page to choose the right backend for your runtime, workload, and deployment constraints.
 
 ## Quick Comparison
 

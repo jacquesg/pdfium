@@ -3,7 +3,7 @@ title: Merging & Layouts
 description: How to merge documents, import pages, and create N-up layouts
 ---
 
-This guide targets the core API (`@scaryterry/pdfium`).
+**Scope:** Core API (`@scaryterry/pdfium`).
 
 PDFium allows you to combine multiple documents into one or create "N-up" layouts (multiple pages per sheet) for printing.
 

@@ -5,14 +5,21 @@ description: React viewer documentation for usage, customization, architecture, 
 
 # React
 
-This page targets the React viewer toolkit (`@scaryterry/pdfium/react`).
+**Scope:** React viewer toolkit (`@scaryterry/pdfium/react`).
 
+Use this page to get from zero to a working viewer, then choose your customization depth.
 
 `@scaryterry/pdfium/react` provides a composable viewer stack with three layers:
 
 - `PDFViewer` for high-level integration.
 - `useViewerSetup` + slot components for custom layout control.
 - Low-level hooks/components for full headless composition.
+
+## What You Need Before Coding
+
+- A valid PDF source (`ArrayBuffer` or URL/fetch flow in your app).
+- A worker entry module in your app bundle.
+- A WASM source (`wasmUrl` or `wasmBinary`).
 
 ## Setup: WASM + Worker Assets
 
@@ -62,6 +69,14 @@ function App() {
 - Keep the worker as a bundled module (`src/pdfium.worker.ts`) and pass its emitted URL as `workerUrl`
 
 Do not copy only `dist/worker.js` by itself; it imports sibling modules.
+
+## Verify
+
+Your baseline React setup is correct when:
+
+- `PDFiumProvider` mounts without init errors.
+- `PDFViewer` shows at least page 1 of your document.
+- No worker timeout or WASM load errors appear in the console.
 
 ## Usage
 

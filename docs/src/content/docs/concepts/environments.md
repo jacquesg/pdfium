@@ -3,7 +3,7 @@ title: Browser vs Node.js
 description: Platform-specific considerations for @scaryterry/pdfium
 ---
 
-This concept page targets the core API (`@scaryterry/pdfium`).
+**Scope:** Core API (`@scaryterry/pdfium`).
 
 The library works in both Node.js and browser environments, but there are important differences in setup and capabilities.
 

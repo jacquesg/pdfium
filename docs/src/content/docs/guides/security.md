@@ -3,9 +3,9 @@ title: Security Guide
 description: Security best practices for @scaryterry/pdfium
 ---
 
-This guide targets the core API (`@scaryterry/pdfium`).
+**Scope:** Core API (`@scaryterry/pdfium`).
 
-PDF processing involves parsing complex, potentially untrusted binary data. This guide covers the security considerations and recommended practices for using `@scaryterry/pdfium` safely.
+PDF processing involves parsing complex, potentially untrusted binary data. Use this guide to apply practical security controls when running `@scaryterry/pdfium`.
 
 ## Content Security Policy (CSP)
 

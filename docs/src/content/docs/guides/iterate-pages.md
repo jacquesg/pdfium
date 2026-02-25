@@ -3,9 +3,9 @@ title: Iterate Pages
 description: Patterns for processing multiple pages
 ---
 
-This guide targets the core API (`@scaryterry/pdfium`).
+**Scope:** Core API (`@scaryterry/pdfium`).
 
-This guide covers different patterns for iterating through document pages.
+Use this guide to iterate through document pages safely and efficiently.
 
 ## Generator Pattern
 

@@ -5,8 +5,7 @@ description: Build viewer UIs with the PDFViewer compound component, slots, and 
 
 # PDFViewer
 
-This page targets the React viewer toolkit (`@scaryterry/pdfium/react`).
-
+**Scope:** React viewer toolkit (`@scaryterry/pdfium/react`).
 
 `<PDFViewer>` is a compound component that assembles a fully-featured PDF viewer from smaller building blocks. It provides three tiers of abstraction so you can choose the right level of control for your use case.
 

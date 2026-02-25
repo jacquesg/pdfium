@@ -3,9 +3,9 @@ title: Add Shapes
 description: Drawing rectangles and shapes on PDF pages
 ---
 
-This guide targets the core API (`@scaryterry/pdfium`).
+**Scope:** Core API (`@scaryterry/pdfium`).
 
-This guide covers adding shapes to PDF pages when creating documents from scratch using `PDFiumDocumentBuilder`.
+Use this guide to add shapes to PDF pages when creating documents from scratch with `PDFiumDocumentBuilder`.
 
 ## Prerequisites
 

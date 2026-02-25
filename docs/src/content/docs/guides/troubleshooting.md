@@ -3,7 +3,7 @@ title: Troubleshooting
 description: Common issues and solutions for @scaryterry/pdfium
 ---
 
-This page focuses on runtime troubleshooting for the core API (`@scaryterry/pdfium`).
+**Scope:** Core API (`@scaryterry/pdfium`).
 
 If your issue is in `PDFiumProvider`/`PDFViewer` integration, check [React Overview](/pdfium/react/) and [React Testing](/pdfium/react/testing/) first.
 
