@@ -83,6 +83,20 @@ abstract class DisposableBase {
   }
 
   /**
+   * Abandon this resource during constructor failure.
+   *
+   * Use this only when a subclass has called `super()` but fails before it has
+   * acquired a valid native resource or installed finalizer cleanup. It
+   * suppresses false-positive FinalizationRegistry warnings for objects that
+   * were never successfully constructed.
+   */
+  protected abandonDuringConstruction(): void {
+    this.#disposed = true;
+    this.#heldValue.cleanup = undefined;
+    disposalRegistry.unregister(this.#registrationToken);
+  }
+
+  /**
    * Throws if this resource has been disposed.
    *
    * Call this at the beginning of any method that requires the resource

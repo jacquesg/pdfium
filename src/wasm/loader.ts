@@ -10,7 +10,7 @@ import type { PDFiumWASM, WASMLoadOptions } from './bindings/index.js';
 import { REQUIRED_SYMBOLS } from './manifest.js';
 
 function importRuntimeModule<T>(specifier: string): Promise<T> {
-  return import(specifier) as Promise<T>;
+  return import(/* @vite-ignore */ specifier) as Promise<T>;
 }
 
 /**

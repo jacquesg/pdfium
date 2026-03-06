@@ -7,6 +7,7 @@ import {
   type LucideIcon,
   Menu,
   Monitor,
+  PenTool,
   Shield,
   X,
 } from 'lucide-react';
@@ -16,7 +17,7 @@ import { Button } from './ui/button';
 import { Separator } from './ui/separator';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './ui/tooltip';
 
-export type NavItem = 'viewer' | 'creator' | 'mixer' | 'render' | 'security';
+export type NavItem = 'viewer' | 'editor' | 'creator' | 'mixer' | 'render' | 'security';
 
 interface NavEntry {
   id: NavItem;
@@ -34,6 +35,7 @@ const NAV_GROUPS: NavGroup[] = [
     title: 'Document',
     items: [
       { id: 'viewer', label: 'Viewer', icon: Eye },
+      { id: 'editor', label: 'Editor', icon: PenTool },
       { id: 'security', label: 'Security', icon: Shield },
     ],
   },

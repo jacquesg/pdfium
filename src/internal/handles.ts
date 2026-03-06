@@ -82,3 +82,6 @@ export type PageLinkHandle = number & { readonly __brand: 'PageLinkHandle' };
 
 /** Branded handle for a page object content mark. */
 export type PageObjectMarkHandle = number & { readonly __brand: 'PageObjectMarkHandle' };
+
+/** Branded handle for a structure element attribute. */
+export type StructElementAttrHandle = number & { readonly __brand: 'StructElementAttrHandle' };

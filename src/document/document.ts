@@ -1361,9 +1361,8 @@ export class PDFiumDocument extends Disposable implements IDocumentReader {
 
     // Allocate array for page indices
     using indicesBuffer = this.#memory.alloc(pageIndices.length * 4);
-    const intView = new Int32Array(this.#memory.heapU8.buffer, indicesBuffer.ptr, pageIndices.length);
     for (let i = 0; i < pageIndices.length; i++) {
-      intView[i] = pageIndices[i] ?? 0;
+      this.#memory.writeInt32(ptrOffset(indicesBuffer.ptr, i * 4), pageIndices[i] ?? 0);
     }
 
     const result = this.#module._FPDF_ImportPagesByIndex(
@@ -1380,6 +1379,122 @@ export class PDFiumDocument extends Disposable implements IDocumentReader {
       );
     }
 
+    this.#cachedPageCount = undefined;
+  }
+
+  /**
+   * Move pages within this document to a new position.
+   *
+   * Rearranges one or more pages by specifying their current indices and a
+   * destination index. All specified pages are gathered and placed at the
+   * destination position in the order they appear in `pageIndices`.
+   *
+   * **Warning**: If this call fails, the document may be left in an indeterminate state.
+   *
+   * @param pageIndices - Zero-based page indices to move (no duplicates allowed)
+   * @param destPageIndex - Zero-based destination index where pages are moved to
+   * @throws {DocumentError} If the indices are invalid or the move fails
+   *
+   * @example
+   * ```typescript
+   * // Move page 3 to the beginning
+   * document.movePages([3], 0);
+   *
+   * // Move pages 0 and 2 to position 4
+   * document.movePages([0, 2], 4);
+   * ```
+   */
+  movePages(pageIndices: readonly number[], destPageIndex: number): void {
+    this.ensureNotDisposed();
+
+    if (pageIndices.length === 0) {
+      return;
+    }
+
+    if (!Number.isSafeInteger(destPageIndex) || destPageIndex < 0) {
+      throw new DocumentError(
+        PDFiumErrorCode.DOC_FORMAT_INVALID,
+        `Destination page index must be a non-negative safe integer, got ${destPageIndex}`,
+      );
+    }
+
+    const count = this.pageCount;
+    const seen = new Set<number>();
+    for (const idx of pageIndices) {
+      if (!Number.isSafeInteger(idx) || idx < 0 || idx >= count) {
+        throw new DocumentError(PDFiumErrorCode.DOC_FORMAT_INVALID, `Page index ${idx} out of range [0, ${count})`);
+      }
+      if (seen.has(idx)) {
+        throw new DocumentError(PDFiumErrorCode.DOC_FORMAT_INVALID, `Duplicate page index: ${idx}`);
+      }
+      seen.add(idx);
+    }
+
+    if (destPageIndex > count) {
+      throw new DocumentError(
+        PDFiumErrorCode.DOC_FORMAT_INVALID,
+        `Destination index ${destPageIndex} exceeds page count ${count}`,
+      );
+    }
+
+    // Allocate int array on WASM heap and write page indices
+    const byteLength = pageIndices.length * 4;
+    using indicesAlloc = this.#memory.alloc(byteLength);
+    for (let i = 0; i < pageIndices.length; i++) {
+      this.#memory.writeInt32(ptrOffset(indicesAlloc.ptr, i * 4), pageIndices[i] ?? 0);
+    }
+
+    const result = this.#module._FPDF_MovePages(
+      this.#documentHandle,
+      indicesAlloc.ptr,
+      pageIndices.length,
+      destPageIndex,
+    );
+
+    if (result === 0) {
+      throw new DocumentError(
+        PDFiumErrorCode.DOC_FORMAT_INVALID,
+        `Failed to move pages [${pageIndices.join(', ')}] to index ${destPageIndex}`,
+      );
+    }
+
+    this.#cachedPageCount = undefined;
+  }
+
+  /**
+   * Delete a page from the document.
+   *
+   * @param pageIndex - Zero-based page index to delete
+   * @throws {DocumentError} If the page index is out of bounds
+   */
+  deletePage(pageIndex: number): void {
+    this.ensureNotDisposed();
+    if (pageIndex < 0 || pageIndex >= this.pageCount) {
+      throw new DocumentError(
+        PDFiumErrorCode.PAGE_NOT_FOUND,
+        `Page index ${pageIndex} is out of bounds (document has ${this.pageCount} pages)`,
+      );
+    }
+    this.#module._FPDFPage_Delete(this.#documentHandle, pageIndex);
+    this.#cachedPageCount = undefined;
+  }
+
+  /**
+   * Insert a blank page into the document.
+   *
+   * @param pageIndex - Zero-based index where the page will be inserted
+   * @param width - Page width in points (default: 612 = US Letter)
+   * @param height - Page height in points (default: 792 = US Letter)
+   * @throws {DocumentError} If page creation fails
+   */
+  insertBlankPage(pageIndex: number, width = 612, height = 792): void {
+    this.ensureNotDisposed();
+    const handle = this.#module._FPDFPage_New(this.#documentHandle, pageIndex, width, height);
+    if (handle === 0) {
+      throw new DocumentError(PDFiumErrorCode.DOC_CREATE_FAILED, `Failed to insert blank page at index ${pageIndex}`);
+    }
+    this.#module._FPDFPage_GenerateContent(handle);
+    this.#module._FPDF_ClosePage(handle);
     this.#cachedPageCount = undefined;
   }
 

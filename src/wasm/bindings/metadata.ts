@@ -9,6 +9,7 @@ import type {
   DocumentHandle,
   JavaScriptActionHandle,
   PageHandle,
+  StructElementAttrHandle,
   StructElementHandle,
   StructTreeHandle,
   WASMPointer,
@@ -102,9 +103,72 @@ export interface MetadataBindings {
   _FPDF_StructTree_Close: (structTree: StructTreeHandle) => void;
   _FPDF_StructTree_CountChildren: (structTree: StructTreeHandle) => number;
   _FPDF_StructTree_GetChildAtIndex: (structTree: StructTreeHandle, index: number) => StructElementHandle;
+
+  // Structure element — identity and text
   _FPDF_StructElement_GetType: (element: StructElementHandle, buffer: WASMPointer, bufferLen: number) => number;
+  _FPDF_StructElement_GetObjType: (element: StructElementHandle, buffer: WASMPointer, bufferLen: number) => number;
+  _FPDF_StructElement_GetID: (element: StructElementHandle, buffer: WASMPointer, bufferLen: number) => number;
+  _FPDF_StructElement_GetTitle: (element: StructElementHandle, buffer: WASMPointer, bufferLen: number) => number;
+  _FPDF_StructElement_GetActualText: (element: StructElementHandle, buffer: WASMPointer, bufferLen: number) => number;
   _FPDF_StructElement_GetAltText: (element: StructElementHandle, buffer: WASMPointer, bufferLen: number) => number;
   _FPDF_StructElement_GetLang: (element: StructElementHandle, buffer: WASMPointer, bufferLen: number) => number;
+
+  // Structure element — hierarchy
   _FPDF_StructElement_CountChildren: (element: StructElementHandle) => number;
   _FPDF_StructElement_GetChildAtIndex: (element: StructElementHandle, index: number) => StructElementHandle;
+  _FPDF_StructElement_GetParent: (element: StructElementHandle) => StructElementHandle;
+
+  // Structure element — marked content
+  _FPDF_StructElement_GetMarkedContentID: (element: StructElementHandle) => number;
+  _FPDF_StructElement_GetMarkedContentIdCount: (element: StructElementHandle) => number;
+  _FPDF_StructElement_GetMarkedContentIdAtIndex: (element: StructElementHandle, index: number) => number;
+  _FPDF_StructElement_GetChildMarkedContentID: (element: StructElementHandle, index: number) => number;
+
+  // Structure element — attributes
+  _FPDF_StructElement_GetStringAttribute: (
+    element: StructElementHandle,
+    attrName: WASMPointer,
+    buffer: WASMPointer,
+    bufferLen: number,
+  ) => number;
+  _FPDF_StructElement_GetAttributeCount: (element: StructElementHandle) => number;
+  _FPDF_StructElement_GetAttributeAtIndex: (element: StructElementHandle, index: number) => StructElementAttrHandle;
+
+  // Structure element attribute object operations
+  _FPDF_StructElement_Attr_GetCount: (attr: StructElementAttrHandle) => number;
+  _FPDF_StructElement_Attr_GetName: (
+    attr: StructElementAttrHandle,
+    index: number,
+    buffer: WASMPointer,
+    bufferLen: number,
+    outLen: WASMPointer,
+  ) => number;
+  _FPDF_StructElement_Attr_GetType: (attr: StructElementAttrHandle, name: WASMPointer) => number;
+  _FPDF_StructElement_Attr_GetBooleanValue: (
+    attr: StructElementAttrHandle,
+    name: WASMPointer,
+    outValue: WASMPointer,
+  ) => number;
+  _FPDF_StructElement_Attr_GetNumberValue: (
+    attr: StructElementAttrHandle,
+    name: WASMPointer,
+    outValue: WASMPointer,
+  ) => number;
+  _FPDF_StructElement_Attr_GetStringValue: (
+    attr: StructElementAttrHandle,
+    name: WASMPointer,
+    buffer: WASMPointer,
+    bufferLen: number,
+    outLen: WASMPointer,
+  ) => number;
+  _FPDF_StructElement_Attr_GetBlobValue: (
+    attr: StructElementAttrHandle,
+    name: WASMPointer,
+    buffer: WASMPointer,
+    bufferLen: number,
+    outLen: WASMPointer,
+  ) => number;
+  _FPDF_StructElement_Attr_CountChildren: (attr: StructElementAttrHandle) => number;
+  _FPDF_StructElement_Attr_GetChildAtIndex: (attr: StructElementAttrHandle, index: number) => StructElementAttrHandle;
+  _FPDF_StructElement_Attr_GetValue: (attr: StructElementAttrHandle, name: WASMPointer) => number;
 }

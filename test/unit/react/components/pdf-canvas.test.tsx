@@ -147,6 +147,15 @@ describe('PDFCanvas', () => {
     expect(ref.current).toBeInstanceOf(HTMLCanvasElement);
   });
 
+  it('invokes function refs with the canvas element', () => {
+    const ref = vi.fn();
+
+    render(<PDFCanvas width={100} height={100} ref={ref} />, { wrapper: StoresWrapper });
+
+    expect(ref).toHaveBeenCalledTimes(1);
+    expect(ref.mock.calls[0]?.[0]).toBeInstanceOf(HTMLCanvasElement);
+  });
+
   it('spreads additional props onto the canvas element', () => {
     const { container } = render(
       <PDFCanvas
@@ -171,6 +180,38 @@ describe('PDFCanvas', () => {
 
       // Without data or renderKey, putImageData should not be called
       expect(mockCtx.putImageData).not.toHaveBeenCalled();
+    } finally {
+      restore();
+    }
+  });
+
+  it('skips painting when a 2D context is unavailable', () => {
+    const original = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = vi.fn().mockReturnValue(null) as HTMLCanvasElement['getContext'];
+
+    try {
+      const pixelData = new Uint8Array(50 * 50 * 4);
+      const { container } = render(<PDFCanvas width={50} height={50} data={pixelData} />, { wrapper: StoresWrapper });
+
+      const canvas = container.querySelector('canvas') as HTMLCanvasElement;
+      expect(canvas.width).toBe(50);
+      expect(canvas.height).toBe(50);
+    } finally {
+      HTMLCanvasElement.prototype.getContext = original;
+    }
+  });
+
+  it('copies SharedArrayBuffer-backed pixel data before painting', () => {
+    if (typeof SharedArrayBuffer === 'undefined') {
+      return;
+    }
+
+    const { mockCtx, restore } = spyOnCanvasContext();
+    try {
+      const data = new Uint8Array(new SharedArrayBuffer(25 * 25 * 4));
+      render(<PDFCanvas width={25} height={25} data={data} />, { wrapper: StoresWrapper });
+
+      expect(mockCtx.putImageData).toHaveBeenCalledTimes(1);
     } finally {
       restore();
     }

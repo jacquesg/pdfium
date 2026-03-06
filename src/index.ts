@@ -13,6 +13,7 @@ export const VERSION = __PACKAGE_VERSION__;
 export const WASM_HASH = __WASM_HASH__;
 
 export type {
+  ApplyRedactionsResponse,
   BuilderAddPageResponse,
   BuilderLoadStandardFontResponse,
   CharAtPosResponse,
@@ -72,7 +73,7 @@ export { PDFiumFont } from './document/font.js';
 export { NativePDFiumDocument } from './document/native-document.js';
 export { NativePDFiumInstance } from './document/native-instance.js';
 export { NativePDFiumPage } from './document/native-page.js';
-export { PDFiumPage } from './document/page.js';
+export { type ApplyRedactionsOptions, type ApplyRedactionsResult, PDFiumPage } from './document/page.js';
 export {
   PDFiumImageObject,
   PDFiumPageObject,

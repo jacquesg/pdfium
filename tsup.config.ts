@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, join, resolve } from 'node:path';
 import { defineConfig } from 'tsup';
 import ts from 'typescript';
@@ -13,6 +14,43 @@ const wasmHash = wasmExists
 function applyCommonEsbuildOptions(opts: { legalComments?: string; charset?: string }) {
   opts.legalComments = 'none';
   opts.charset = 'utf8';
+}
+
+async function bundleStandaloneWorker() {
+  const workerEntry = 'dist/worker.js';
+  const workerBundle = 'dist/worker.bundle.js';
+  if (!existsSync(workerEntry)) {
+    console.log('Skipping worker bundle: dist/worker.js not found');
+    return;
+  }
+
+  // Resolve esbuild from tsup's dependency chain (it's a transitive dependency).
+  const tsupPath = import.meta.resolve('tsup');
+  const tsupRequire = createRequire(tsupPath);
+  const esbuild: { build: (opts: Record<string, unknown>) => Promise<void> } = tsupRequire('esbuild');
+
+  await esbuild.build({
+    entryPoints: [workerEntry],
+    outfile: workerBundle,
+    bundle: true,
+    format: 'esm',
+    target: 'es2024',
+    platform: 'browser',
+    external: [
+      'node:fs',
+      'node:fs/promises',
+      'node:path',
+      'node:url',
+      'node:crypto',
+      'node:worker_threads',
+      'module',
+      'fs',
+      'path',
+      'crypto',
+      'worker_threads',
+    ],
+  });
+  console.log(`Bundled standalone worker → ${workerBundle}`);
 }
 
 function copyVendorArtifacts() {
@@ -185,6 +223,7 @@ export default defineConfig((options) => [
     },
     async onSuccess() {
       copyVendorArtifacts();
+      await bundleStandaloneWorker();
     },
   },
 ]);

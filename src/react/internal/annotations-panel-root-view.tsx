@@ -1,8 +1,10 @@
 import { type ReactNode, useCallback, useEffect, useMemo, useState } from 'react';
+import { AnnotationType } from '../../core/types.js';
 import { AnnotationOverlay } from '../components/annotation-overlay.js';
 import type { PageOverlayInfo } from '../components/pdf-page-view.js';
 import { usePDFPanel, usePDFViewer } from '../components/pdf-viewer.js';
 import { useAnnotations } from '../hooks/use-annotations.js';
+import { useAnnotationSelectionBridgeOptional } from './annotation-selection-bridge-context.js';
 import { ANNOTATIONS_PANEL_COPY, formatAnnotationsSummary } from './annotations-panel-copy.js';
 import { findAnnotationByIndex, groupAnnotationsByType } from './annotations-panel-helpers.js';
 import { AnnotationDetail, AnnotationGroup } from './annotations-panel-view.js';
@@ -22,6 +24,7 @@ function AnnotationsPanelRootView() {
   const { setPanelOverlay } = usePDFPanel();
   const { document: doc } = viewer;
   const { pageIndex } = viewer.navigation;
+  const selectionBridge = useAnnotationSelectionBridgeOptional();
   const [selectedIndex, setSelectedIndex] = useState<number | null>(null);
 
   const { data: rawAnnotations = [] } = useAnnotations(doc, pageIndex);
@@ -32,11 +35,45 @@ function AnnotationsPanelRootView() {
     () => findAnnotationByIndex(annotations, selectedIndex),
     [annotations, selectedIndex],
   );
+  const panelOverlaySelection = useMemo(() => {
+    if (selectedAnnotation === undefined || selectedAnnotation === null) {
+      return null;
+    }
+    if (selectionBridge !== null && selectedAnnotation.type !== AnnotationType.Link) {
+      return null;
+    }
+    return selectedAnnotation;
+  }, [selectedAnnotation, selectionBridge]);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: intentionally re-runs when page/document changes
   useEffect(() => {
     setSelectedIndex(null);
   }, [doc, pageIndex]);
+
+  useEffect(() => {
+    if (selectionBridge === null) {
+      return;
+    }
+
+    const selection = selectionBridge.selection;
+    if (selection !== null && selection.pageIndex === pageIndex) {
+      setSelectedIndex(selection.annotationIndex);
+      return;
+    }
+
+    if (selection !== null) {
+      setSelectedIndex(null);
+      return;
+    }
+
+    setSelectedIndex((previous) => {
+      if (previous === null) {
+        return null;
+      }
+      const previousAnnotation = findAnnotationByIndex(annotations, previous);
+      return previousAnnotation?.type === AnnotationType.Link ? previous : null;
+    });
+  }, [selectionBridge, annotations, pageIndex]);
 
   const createOverlayRenderer = useCallback(
     (annotation: NonNullable<typeof selectedAnnotation>, targetPageIndex: number) =>
@@ -58,15 +95,39 @@ function AnnotationsPanelRootView() {
   );
 
   usePanelSelectionOverlay({
-    selectedItem: selectedAnnotation,
+    selectedItem: panelOverlaySelection,
     pageIndex,
     setPanelOverlay,
     createOverlayRenderer,
   });
 
-  const handleSelect = useCallback((index: number) => {
-    setSelectedIndex((previous) => (previous === index ? null : index));
-  }, []);
+  const handleSelect = useCallback(
+    (index: number) => {
+      setSelectedIndex((previous) => {
+        const nextIndex = previous === index ? null : index;
+        if (selectionBridge !== null) {
+          const nextAnnotation = nextIndex === null ? null : findAnnotationByIndex(annotations, nextIndex);
+          if (nextAnnotation !== null && nextAnnotation !== undefined && nextAnnotation.type !== AnnotationType.Link) {
+            selectionBridge.setSelection({ pageIndex, annotationIndex: nextAnnotation.index });
+          } else {
+            selectionBridge.setSelection(null);
+          }
+        }
+        return nextIndex;
+      });
+    },
+    [annotations, pageIndex, selectionBridge],
+  );
+
+  const handleCloseDetail = useCallback(() => {
+    setSelectedIndex(null);
+    if (selectionBridge === null) {
+      return;
+    }
+    if (selectedAnnotation?.type !== AnnotationType.Link) {
+      selectionBridge.setSelection(null);
+    }
+  }, [selectedAnnotation, selectionBridge]);
 
   if (annotations.length === 0) {
     return <EmptyPanelState message={ANNOTATIONS_PANEL_COPY.emptyStateMessage} />;
@@ -90,7 +151,7 @@ function AnnotationsPanelRootView() {
 
       {selectedAnnotation && (
         <div style={PANEL_DETAIL_REGION_STYLE}>
-          <AnnotationDetail annotation={selectedAnnotation} onClose={() => setSelectedIndex(null)} />
+          <AnnotationDetail annotation={selectedAnnotation} onClose={handleCloseDetail} />
         </div>
       )}
     </div>

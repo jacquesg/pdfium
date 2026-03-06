@@ -10,6 +10,8 @@
 import { AsyncDisposable } from '../core/disposable.js';
 import { PDFiumError, PDFiumErrorCode } from '../core/errors.js';
 import type {
+  AnnotationColourType,
+  AnnotationType,
   Bookmark,
   CharacterInfo,
   CharBox,
@@ -24,7 +26,9 @@ import type {
   NamedDestination,
   NUpLayoutOptions,
   OpenDocumentOptions,
+  PageRotation,
   ProgressCallback,
+  Rect,
   RenderOptions,
   RenderResult,
   SaveOptions,
@@ -45,6 +49,7 @@ import type {
   SerialisedFormWidget,
   SerialisedLink,
   SerialisedPageObject,
+  SerialisedQuadPoints,
   SerialisedSignature,
   WorkerRequest,
   WorkerResponse,
@@ -438,6 +443,25 @@ export class WorkerPDFiumDocument extends AsyncDisposable {
     return this.#proxy.getExtendedDocumentInfo(this.#documentId);
   }
 
+  // ────────────────────────────────────────────────────────────
+  // Page management operations
+  // ────────────────────────────────────────────────────────────
+
+  async deletePage(pageIndex: number): Promise<void> {
+    this.ensureNotDisposed();
+    return this.#proxy.deletePage(this.#documentId, pageIndex);
+  }
+
+  async insertBlankPage(pageIndex: number, width: number, height: number): Promise<void> {
+    this.ensureNotDisposed();
+    return this.#proxy.insertBlankPage(this.#documentId, pageIndex, width, height);
+  }
+
+  async movePages(pageIndices: number[], destPageIndex: number): Promise<void> {
+    this.ensureNotDisposed();
+    return this.#proxy.movePages(this.#documentId, pageIndices, destPageIndex);
+  }
+
   protected async disposeInternalAsync(): Promise<void> {
     for (const page of this.#pages) {
       try {
@@ -591,6 +615,19 @@ export class WorkerPDFiumPage extends AsyncDisposable {
     return this.#proxy.flattenPage(this.#pageId, flags);
   }
 
+  async applyRedactions(
+    fillColour?: Colour,
+    removeIntersectingAnnotations?: boolean,
+  ): Promise<{
+    appliedRegionCount: number;
+    removedObjectCount: number;
+    removedAnnotationCount: number;
+    insertedFillObjectCount: number;
+  }> {
+    this.ensureNotDisposed();
+    return this.#proxy.applyRedactions(this.#pageId, fillColour, removeIntersectingAnnotations);
+  }
+
   async getFormWidgets(): Promise<SerialisedFormWidget[]> {
     this.ensureNotDisposed();
     return this.#proxy.getFormWidgets(this.#pageId);
@@ -613,6 +650,92 @@ export class WorkerPDFiumPage extends AsyncDisposable {
   async formUndo(): Promise<boolean> {
     this.ensureNotDisposed();
     return this.#proxy.formUndo(this.#pageId);
+  }
+
+  // ────────────────────────────────────────────────────────────
+  // Annotation mutations
+  // ────────────────────────────────────────────────────────────
+
+  async createAnnotation(subtype: AnnotationType): Promise<SerialisedAnnotation> {
+    this.ensureNotDisposed();
+    return this.#proxy.createAnnotation(this.#pageId, subtype);
+  }
+
+  async removeAnnotation(annotationIndex: number): Promise<boolean> {
+    this.ensureNotDisposed();
+    return this.#proxy.removeAnnotation(this.#pageId, annotationIndex);
+  }
+
+  async setAnnotationRect(annotationIndex: number, rect: Rect): Promise<boolean> {
+    this.ensureNotDisposed();
+    return this.#proxy.setAnnotationRect(this.#pageId, annotationIndex, rect);
+  }
+
+  async setAnnotationColour(
+    annotationIndex: number,
+    colourType: AnnotationColourType,
+    colour: Colour,
+  ): Promise<boolean> {
+    this.ensureNotDisposed();
+    return this.#proxy.setAnnotationColour(this.#pageId, annotationIndex, colourType, colour);
+  }
+
+  async setAnnotationFlags(annotationIndex: number, flags: number): Promise<boolean> {
+    this.ensureNotDisposed();
+    return this.#proxy.setAnnotationFlags(this.#pageId, annotationIndex, flags);
+  }
+
+  async setAnnotationString(annotationIndex: number, key: string, value: string): Promise<boolean> {
+    this.ensureNotDisposed();
+    return this.#proxy.setAnnotationString(this.#pageId, annotationIndex, key, value);
+  }
+
+  async setAnnotationBorder(
+    annotationIndex: number,
+    hRadius: number,
+    vRadius: number,
+    borderWidth: number,
+  ): Promise<boolean> {
+    this.ensureNotDisposed();
+    return this.#proxy.setAnnotationBorder(this.#pageId, annotationIndex, hRadius, vRadius, borderWidth);
+  }
+
+  async setAnnotationAttachmentPoints(
+    annotationIndex: number,
+    quadIndex: number,
+    points: SerialisedQuadPoints,
+  ): Promise<boolean> {
+    this.ensureNotDisposed();
+    return this.#proxy.setAnnotationAttachmentPoints(this.#pageId, annotationIndex, quadIndex, points);
+  }
+
+  async appendAnnotationAttachmentPoints(annotationIndex: number, points: SerialisedQuadPoints): Promise<boolean> {
+    this.ensureNotDisposed();
+    return this.#proxy.appendAnnotationAttachmentPoints(this.#pageId, annotationIndex, points);
+  }
+
+  async setAnnotationURI(annotationIndex: number, uri: string): Promise<boolean> {
+    this.ensureNotDisposed();
+    return this.#proxy.setAnnotationURI(this.#pageId, annotationIndex, uri);
+  }
+
+  async addInkStroke(annotationIndex: number, points: Array<{ x: number; y: number }>): Promise<number> {
+    this.ensureNotDisposed();
+    return this.#proxy.addInkStroke(this.#pageId, annotationIndex, points);
+  }
+
+  async generateContent(): Promise<boolean> {
+    this.ensureNotDisposed();
+    return this.#proxy.generatePageContent(this.#pageId);
+  }
+
+  // ────────────────────────────────────────────────────────────
+  // Page properties
+  // ────────────────────────────────────────────────────────────
+
+  async setRotation(rotation: PageRotation): Promise<void> {
+    this.ensureNotDisposed();
+    return this.#proxy.setPageRotation(this.#pageId, rotation);
   }
 
   protected async disposeInternalAsync(): Promise<void> {

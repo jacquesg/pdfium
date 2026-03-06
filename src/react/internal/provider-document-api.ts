@@ -22,6 +22,9 @@ interface UseProviderDocumentApiOptions {
   scopedStores: PDFiumStores;
   loadDocumentInternal: LoadDocumentInternal;
   loadDocumentBufferFromUrl: (url: string, signal?: AbortSignal) => Promise<ArrayBuffer>;
+  bumpPageRevision: (pageIndex: number) => void;
+  getPageRevision: (pageIndex: number) => number;
+  resetPageRevisions: () => void;
   setDocumentRevision: SetDocumentRevision;
   setError: SetProviderError;
 }
@@ -38,6 +41,9 @@ function useProviderDocumentApi({
   scopedStores,
   loadDocumentInternal,
   loadDocumentBufferFromUrl,
+  bumpPageRevision,
+  getPageRevision,
+  resetPageRevisions,
   setDocumentRevision,
   setError,
 }: UseProviderDocumentApiOptions): UseProviderDocumentApiResult {
@@ -112,8 +118,9 @@ function useProviderDocumentApi({
   const invalidateCache = useCallback(() => {
     scopedStores.queryStore.clear();
     scopedStores.renderStore.clear();
+    resetPageRevisions();
     setDocumentRevision((prev) => prev + 1);
-  }, [scopedStores, setDocumentRevision]);
+  }, [resetPageRevisions, scopedStores, setDocumentRevision]);
 
   const passwordSubmit = useCallback(
     async (password: string) => {
@@ -160,8 +167,15 @@ function useProviderDocumentApi({
   );
 
   const stableDocCallbacks = useMemo<ProviderStableDocCallbacks>(
-    () => ({ bumpDocumentRevision, invalidateCache, loadDocument, loadDocumentFromUrl }),
-    [bumpDocumentRevision, invalidateCache, loadDocument, loadDocumentFromUrl],
+    () => ({
+      bumpDocumentRevision,
+      bumpPageRevision,
+      getPageRevision,
+      invalidateCache,
+      loadDocument,
+      loadDocumentFromUrl,
+    }),
+    [bumpDocumentRevision, bumpPageRevision, getPageRevision, invalidateCache, loadDocument, loadDocumentFromUrl],
   );
 
   return {

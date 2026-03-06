@@ -8,7 +8,7 @@
 import { beforeEach, describe, expect, test, vi } from 'vitest';
 import type { WorkerRequest, WorkerResponse } from '../../../src/context/protocol.js';
 import { PDFiumErrorCode } from '../../../src/core/errors.js';
-import { FormFieldType } from '../../../src/core/types.js';
+import { AnnotationType, FormFieldType, PageRotation } from '../../../src/core/types.js';
 
 // Captured postMessage calls
 const postedMessages: Array<{ data: WorkerResponse; transfer: Transferable[] }> = [];
@@ -35,8 +35,9 @@ function createMockAnnotation() {
       if (key === 'Subj') return 'Review';
       return undefined;
     }),
-    getBorder: vi.fn().mockReturnValue({ width: 1, style: 'solid', dashArray: [] }),
+    getBorder: vi.fn().mockReturnValue({ horizontalRadius: 0, verticalRadius: 0, borderWidth: 1 }),
     getAppearance: vi.fn().mockReturnValue(null),
+    getNumberValue: vi.fn().mockReturnValue(undefined),
     getLine: vi.fn().mockReturnValue(undefined),
     getVertices: vi.fn().mockReturnValue(undefined),
     getInkPath: vi.fn().mockReturnValue([]),
@@ -48,6 +49,42 @@ function createMockAnnotation() {
     isWidget: vi.fn().mockReturnValue(false),
     getLink: vi.fn().mockReturnValue(undefined),
     getFontSize: vi.fn().mockReturnValue(12),
+    dispose: vi.fn(),
+    [Symbol.dispose]: vi.fn(),
+  };
+}
+
+// Mock mutable annotation (used by getAnnotation for mutation handlers)
+function createMockMutableAnnotation(index = 0) {
+  return {
+    index,
+    setRect: vi.fn().mockReturnValue(true),
+    setColour: vi.fn().mockReturnValue(true),
+    setFlags: vi.fn().mockReturnValue(true),
+    setStringValue: vi.fn().mockReturnValue(true),
+    setBorder: vi.fn().mockReturnValue(true),
+    setAttachmentPoints: vi.fn().mockReturnValue(true),
+    appendAttachmentPoints: vi.fn().mockReturnValue(true),
+    setURI: vi.fn().mockReturnValue(true),
+    addInkStroke: vi.fn().mockReturnValue(0),
+    // serialiseAnnotation fields (needed if annotation is serialised after creation)
+    type: 4,
+    bounds: { left: 0, top: 10, right: 100, bottom: 0 },
+    getColour: vi.fn().mockReturnValue(undefined),
+    flags: 0,
+    getStringValue: vi.fn().mockReturnValue(undefined),
+    getBorder: vi.fn().mockReturnValue(null),
+    getAppearance: vi.fn().mockReturnValue(null),
+    getNumberValue: vi.fn().mockReturnValue(undefined),
+    getLine: vi.fn().mockReturnValue(undefined),
+    getVertices: vi.fn().mockReturnValue(undefined),
+    getInkPath: vi.fn().mockReturnValue([]),
+    inkPathCount: 0,
+    getAttachmentPoints: vi.fn().mockReturnValue(undefined),
+    attachmentPointCount: 0,
+    isWidget: vi.fn().mockReturnValue(false),
+    getLink: vi.fn().mockReturnValue(undefined),
+    getFontSize: vi.fn().mockReturnValue(0),
     dispose: vi.fn(),
     [Symbol.dispose]: vi.fn(),
   };
@@ -78,7 +115,7 @@ function createMockPage(index: number, width: number, height: number) {
     width,
     height,
     size: { width, height },
-    rotation: 0,
+    rotation: PageRotation.None,
     charCount: 9,
     render: vi.fn().mockReturnValue({
       width: Math.round(width),
@@ -150,9 +187,20 @@ function createMockPage(index: number, width: number, height: number) {
       .fn()
       .mockReturnValue([{ charIndex: 0, charCount: 5, rects: [{ left: 72, bottom: 700, right: 200, top: 720 }] }]),
     flatten: vi.fn().mockReturnValue(1),
+    applyRedactions: vi.fn().mockReturnValue({
+      appliedRegionCount: 0,
+      removedObjectCount: 0,
+      removedAnnotationCount: 0,
+      insertedFillObjectCount: 0,
+    }),
     getFormSelectedText: vi.fn().mockReturnValue('selected'),
     canFormUndo: vi.fn().mockReturnValue(true),
     formUndo: vi.fn().mockReturnValue(true),
+    // Annotation mutations
+    createAnnotation: vi.fn().mockReturnValue(createMockMutableAnnotation()),
+    removeAnnotation: vi.fn().mockReturnValue(true),
+    getAnnotation: vi.fn().mockReturnValue(createMockMutableAnnotation()),
+    generateContent: vi.fn().mockReturnValue(true),
     dispose: vi.fn(),
     [Symbol.dispose]: vi.fn(),
   };
@@ -178,6 +226,9 @@ function createMockDocument(pageCount: number) {
     getPageLabel: vi.fn().mockReturnValue('i'),
     save: vi.fn().mockReturnValue(new Uint8Array([37, 80, 68, 70])),
     killFormFocus: vi.fn().mockReturnValue(true),
+    deletePage: vi.fn(),
+    insertBlankPage: vi.fn(),
+    movePages: vi.fn(),
     setFormFieldHighlightColour: vi.fn(),
     setFormFieldHighlightAlpha: vi.fn(),
     importPages: vi.fn(),
@@ -849,6 +900,263 @@ describe('worker-script', () => {
     expect(currentMockBuilder.dispose).toHaveBeenCalledTimes(1);
   });
 
+  test('builder shape requests should delegate to the page builder', async () => {
+    const send = await setup();
+
+    await send({ type: 'INIT', id: 'init-1', payload: { wasmBinary: new ArrayBuffer(8) } });
+    await send({ type: 'CREATE_DOCUMENT_BUILDER', id: 'builder-create-1' } as WorkerRequest);
+    const createResponse = lastResponse();
+    const builderId =
+      createResponse.type === 'SUCCESS' ? (createResponse.payload as { builderId: string }).builderId : '';
+
+    await send({
+      type: 'BUILDER_ADD_PAGE',
+      id: 'builder-add-page-1',
+      payload: { builderId, options: { width: 595, height: 842 } },
+    });
+    const addPageResponse = lastResponse();
+    const pageBuilderId =
+      addPageResponse.type === 'SUCCESS' ? (addPageResponse.payload as { pageBuilderId: string }).pageBuilderId : '';
+
+    const pageBuilder = currentMockBuilder.addPage.mock.results[0]?.value as ReturnType<typeof createMockBuilderPage>;
+
+    await send({
+      type: 'BUILDER_PAGE_ADD_RECTANGLE',
+      id: 'builder-rect-1',
+      payload: {
+        pageBuilderId,
+        x: 10,
+        y: 20,
+        w: 30,
+        h: 40,
+        style: { stroke: { r: 1, g: 2, b: 3, a: 255 } },
+      },
+    });
+    expect(pageBuilder.addRectangle).toHaveBeenCalledWith(10, 20, 30, 40, {
+      stroke: { r: 1, g: 2, b: 3, a: 255 },
+    });
+
+    await send({
+      type: 'BUILDER_PAGE_ADD_LINE',
+      id: 'builder-line-1',
+      payload: {
+        pageBuilderId,
+        x1: 1,
+        y1: 2,
+        x2: 3,
+        y2: 4,
+        style: { strokeWidth: 2 },
+      },
+    });
+    expect(pageBuilder.addLine).toHaveBeenCalledWith(1, 2, 3, 4, { strokeWidth: 2 });
+
+    await send({
+      type: 'BUILDER_PAGE_ADD_ELLIPSE',
+      id: 'builder-ellipse-1',
+      payload: {
+        pageBuilderId,
+        cx: 50,
+        cy: 60,
+        rx: 70,
+        ry: 80,
+        style: { fill: { r: 9, g: 8, b: 7, a: 200 } },
+      },
+    });
+    expect(pageBuilder.addEllipse).toHaveBeenCalledWith(50, 60, 70, 80, {
+      fill: { r: 9, g: 8, b: 7, a: 200 },
+    });
+  });
+
+  test('builder text requests reject fonts from a different builder', async () => {
+    const send = await setup();
+
+    await send({ type: 'INIT', id: 'init-1', payload: { wasmBinary: new ArrayBuffer(8) } });
+
+    await send({ type: 'CREATE_DOCUMENT_BUILDER', id: 'builder-create-a' } as WorkerRequest);
+    const builderAResponse = lastResponse();
+    const builderAId =
+      builderAResponse.type === 'SUCCESS' ? (builderAResponse.payload as { builderId: string }).builderId : '';
+    await send({
+      type: 'BUILDER_ADD_PAGE',
+      id: 'builder-add-page-a',
+      payload: { builderId: builderAId, options: { width: 595, height: 842 } },
+    });
+    const pageResponse = lastResponse();
+    const pageBuilderId =
+      pageResponse.type === 'SUCCESS' ? (pageResponse.payload as { pageBuilderId: string }).pageBuilderId : '';
+
+    await send({ type: 'CREATE_DOCUMENT_BUILDER', id: 'builder-create-b' } as WorkerRequest);
+    const builderBResponse = lastResponse();
+    const builderBId =
+      builderBResponse.type === 'SUCCESS' ? (builderBResponse.payload as { builderId: string }).builderId : '';
+    await send({
+      type: 'BUILDER_LOAD_STANDARD_FONT',
+      id: 'builder-font-b',
+      payload: { builderId: builderBId, fontName: 'Helvetica' },
+    });
+    const fontResponse = lastResponse();
+    const fontId = fontResponse.type === 'SUCCESS' ? (fontResponse.payload as { fontId: string }).fontId : '';
+
+    await send({
+      type: 'BUILDER_PAGE_ADD_TEXT',
+      id: 'builder-text-mismatch',
+      payload: {
+        pageBuilderId,
+        text: 'Wrong owner',
+        x: 10,
+        y: 20,
+        fontId,
+        fontSize: 12,
+      },
+    });
+
+    const response = lastResponse();
+    expect(response.type).toBe('ERROR');
+    if (response.type === 'ERROR') {
+      expect(response.error.code).toBe(PDFiumErrorCode.DOC_FORMAT_INVALID);
+    }
+  });
+
+  test('page management and redaction requests delegate to the document and page', async () => {
+    const send = await setup();
+
+    currentMockDocument.deletePage = vi.fn();
+    currentMockDocument.insertBlankPage = vi.fn();
+    currentMockDocument.movePages = vi.fn();
+    currentMockDocument._mockPage.applyRedactions = vi.fn().mockReturnValue({
+      appliedRegionCount: 1,
+      removedObjectCount: 2,
+      removedAnnotationCount: 3,
+      insertedFillObjectCount: 1,
+    });
+
+    await send({ type: 'INIT', id: 'init-1', payload: { wasmBinary: new ArrayBuffer(8) } });
+    await send({ type: 'OPEN_DOCUMENT', id: 'open-1', payload: { data: new ArrayBuffer(100) } });
+
+    const openResponse = postedMessages[1]!.data;
+    const documentId = (openResponse as { type: 'SUCCESS'; payload: { documentId: string } }).payload.documentId;
+
+    await send({ type: 'LOAD_PAGE', id: 'load-1', payload: { documentId, pageIndex: 0 } });
+    const loadResponse = postedMessages[2]!.data;
+    const pageId = (loadResponse as { type: 'SUCCESS'; payload: { pageId: string } }).payload.pageId;
+
+    await send({ type: 'DELETE_PAGE', id: 'delete-page-1', payload: { documentId, pageIndex: 2 } });
+    expect(currentMockDocument.deletePage).toHaveBeenCalledWith(2);
+
+    await send({
+      type: 'INSERT_BLANK_PAGE',
+      id: 'insert-page-1',
+      payload: { documentId, pageIndex: 1, width: 400, height: 300 },
+    });
+    expect(currentMockDocument.insertBlankPage).toHaveBeenCalledWith(1, 400, 300);
+
+    await send({
+      type: 'MOVE_PAGES',
+      id: 'move-pages-1',
+      payload: { documentId, pageIndices: [1], destPageIndex: 4 },
+    });
+    expect(currentMockDocument.movePages).toHaveBeenCalledWith([1], 4);
+
+    await send({
+      type: 'SET_PAGE_ROTATION',
+      id: 'rotate-page-1',
+      payload: { pageId, rotation: PageRotation.Clockwise90 },
+    });
+    expect(currentMockDocument._mockPage.rotation).toBe(PageRotation.Clockwise90);
+
+    await send({
+      type: 'APPLY_REDACTIONS',
+      id: 'apply-redactions-1',
+      payload: {
+        pageId,
+        fillColour: { r: 10, g: 20, b: 30, a: 255 },
+        removeIntersectingAnnotations: false,
+      },
+    });
+    expect(currentMockDocument._mockPage.applyRedactions).toHaveBeenCalledWith({
+      fillColour: { r: 10, g: 20, b: 30, a: 255 },
+      removeIntersectingAnnotations: false,
+    });
+    const response = lastResponse();
+    expect(response.type).toBe('SUCCESS');
+    if (response.type === 'SUCCESS') {
+      expect(response.payload).toEqual({
+        appliedRegionCount: 1,
+        removedObjectCount: 2,
+        removedAnnotationCount: 3,
+        insertedFillObjectCount: 1,
+      });
+    }
+  });
+
+  test('builder lookup handlers post already-closed errors for missing builder resources', async () => {
+    const send = await setup();
+
+    await send({ type: 'INIT', id: 'init-1', payload: { wasmBinary: new ArrayBuffer(8) } });
+
+    const requests: WorkerRequest[] = [
+      {
+        type: 'BUILDER_ADD_PAGE',
+        id: 'missing-builder',
+        payload: { builderId: 'missing-builder', options: { width: 100, height: 100 } },
+      },
+      {
+        type: 'BUILDER_PAGE_ADD_RECTANGLE',
+        id: 'missing-page-builder',
+        payload: { pageBuilderId: 'missing-page', x: 0, y: 0, w: 10, h: 10 },
+      },
+      {
+        type: 'BUILDER_PAGE_ADD_TEXT',
+        id: 'missing-page-for-text',
+        payload: { pageBuilderId: 'missing-page', text: 'x', x: 0, y: 0, fontId: 'missing-font', fontSize: 12 },
+      },
+      {
+        type: 'BUILDER_SAVE',
+        id: 'missing-builder-save',
+        payload: { builderId: 'missing-builder' },
+      },
+      {
+        type: 'DISPOSE_DOCUMENT_BUILDER',
+        id: 'missing-builder-dispose',
+        payload: { builderId: 'missing-builder' },
+      },
+    ];
+
+    for (const request of requests) {
+      await send(request);
+      const response = lastResponse();
+      expect(response.type).toBe('ERROR');
+      if (response.type === 'ERROR') {
+        expect(
+          [PDFiumErrorCode.DOC_ALREADY_CLOSED, PDFiumErrorCode.PAGE_ALREADY_CLOSED].includes(response.error.code),
+        ).toBe(true);
+      }
+    }
+  });
+
+  test('DESTROY disposes active builder resources as well as PDFium', async () => {
+    const send = await setup();
+
+    await send({ type: 'INIT', id: 'init-1', payload: { wasmBinary: new ArrayBuffer(8) } });
+    await send({ type: 'CREATE_DOCUMENT_BUILDER', id: 'builder-create-1' } as WorkerRequest);
+    const createResponse = lastResponse();
+    const builderId =
+      createResponse.type === 'SUCCESS' ? (createResponse.payload as { builderId: string }).builderId : '';
+
+    await send({
+      type: 'BUILDER_ADD_PAGE',
+      id: 'builder-add-page-1',
+      payload: { builderId, options: { width: 595, height: 842 } },
+    });
+    const pageBuilder = currentMockBuilder.addPage.mock.results[0]?.value as ReturnType<typeof createMockBuilderPage>;
+
+    await send({ type: 'DESTROY', id: 'destroy-builders-1' } as WorkerRequest);
+
+    expect(pageBuilder.dispose).toHaveBeenCalledTimes(1);
+    expect(currentMockBuilder.dispose).toHaveBeenCalledTimes(1);
+    expect(mockPdfiumDispose).toHaveBeenCalledTimes(1);
+  });
+
   test('handleMessage ignores messages with wrong origin', async () => {
     vi.resetModules();
     postedMessages.length = 0;
@@ -1262,12 +1570,12 @@ describe('worker-script', () => {
     expect(response.type).toBe('SUCCESS');
     if (response.type === 'SUCCESS') {
       const payload = response.payload as {
-        rotation: number;
+        rotation: PageRotation;
         hasTransparency: boolean;
         charCount: number;
         pageBoxes: { media: unknown };
       };
-      expect(payload.rotation).toBe(0);
+      expect(payload.rotation).toBe(PageRotation.None);
       expect(payload.hasTransparency).toBe(false);
       expect(payload.charCount).toBe(9);
       expect(payload.pageBoxes.media).toEqual({ left: 0, bottom: 0, right: 612, top: 792 });
@@ -1310,6 +1618,120 @@ describe('worker-script', () => {
       expect(payload[0]!.index).toBe(0);
       expect(payload[0]!.type).toBe(4);
       expect(payload[0]!.contents).toBe('Note');
+    }
+  });
+
+  test('GET_ANNOTATIONS should fallback to appearance colours when annotation colours are unavailable', async () => {
+    const send = await setup();
+
+    await send({ type: 'INIT', id: 'init-1', payload: { wasmBinary: new ArrayBuffer(8) } });
+    await send({ type: 'OPEN_DOCUMENT', id: 'open-1', payload: { data: new ArrayBuffer(100) } });
+
+    const openResponse = postedMessages[1]!.data;
+    const documentId = (openResponse as { type: 'SUCCESS'; payload: { documentId: string } }).payload.documentId;
+
+    await send({ type: 'LOAD_PAGE', id: 'load-1', payload: { documentId, pageIndex: 0 } });
+    const loadResponse = postedMessages[2]!.data;
+    const pageId = (loadResponse as { type: 'SUCCESS'; payload: { pageId: string } }).payload.pageId;
+
+    const fallbackAnnot = createMockAnnotation();
+    fallbackAnnot.getColour = vi.fn().mockReturnValue(null);
+    fallbackAnnot.getAppearance = vi.fn().mockReturnValue('/GS gs 0 0 1 rg 0 1 0 RG 1 w 100.5 100.5 99 99 re b');
+    fallbackAnnot.getNumberValue = vi.fn().mockImplementation((key: string) => (key === 'CA' ? 0.4 : undefined));
+
+    const page = currentMockDocument.getPage(0);
+    page.annotations = vi.fn().mockReturnValue(
+      (function* fallbackAnnotGen() {
+        yield fallbackAnnot;
+      })(),
+    );
+
+    await send({ type: 'GET_ANNOTATIONS', id: 'annots-fallback-1', payload: { pageId } });
+
+    const response = lastResponse();
+    expect(response.type).toBe('SUCCESS');
+    if (response.type === 'SUCCESS') {
+      const payload = response.payload as Array<{ colour: { stroke?: unknown; interior?: unknown } }>;
+      expect(payload).toHaveLength(1);
+      expect(payload[0]?.colour.stroke).toEqual({ r: 0, g: 255, b: 0, a: 102 });
+      expect(payload[0]?.colour.interior).toEqual({ r: 0, g: 0, b: 255, a: 102 });
+    }
+  });
+
+  test('GET_ANNOTATIONS should not infer interior colour from stroke-only appearances', async () => {
+    const send = await setup();
+
+    await send({ type: 'INIT', id: 'init-1', payload: { wasmBinary: new ArrayBuffer(8) } });
+    await send({ type: 'OPEN_DOCUMENT', id: 'open-1', payload: { data: new ArrayBuffer(100) } });
+
+    const openResponse = postedMessages[1]!.data;
+    const documentId = (openResponse as { type: 'SUCCESS'; payload: { documentId: string } }).payload.documentId;
+
+    await send({ type: 'LOAD_PAGE', id: 'load-1', payload: { documentId, pageIndex: 0 } });
+    const loadResponse = postedMessages[2]!.data;
+    const pageId = (loadResponse as { type: 'SUCCESS'; payload: { pageId: string } }).payload.pageId;
+
+    const fallbackAnnot = createMockAnnotation();
+    fallbackAnnot.getColour = vi.fn().mockReturnValue(null);
+    fallbackAnnot.getAppearance = vi.fn().mockReturnValue('/GS gs 0 0 1 rg 0 1 0 RG 1 w 100 100 80 80 re S');
+    fallbackAnnot.getNumberValue = vi.fn().mockImplementation((key: string) => (key === 'CA' ? 0.4 : undefined));
+
+    const page = currentMockDocument.getPage(0);
+    page.annotations = vi.fn().mockReturnValue(
+      (function* fallbackAnnotGen() {
+        yield fallbackAnnot;
+      })(),
+    );
+
+    await send({ type: 'GET_ANNOTATIONS', id: 'annots-fallback-stroke-only-1', payload: { pageId } });
+
+    const response = lastResponse();
+    expect(response.type).toBe('SUCCESS');
+    if (response.type === 'SUCCESS') {
+      const payload = response.payload as Array<{ colour: { stroke?: unknown; interior?: unknown } }>;
+      expect(payload).toHaveLength(1);
+      expect(payload[0]?.colour.stroke).toEqual({ r: 0, g: 255, b: 0, a: 102 });
+      expect(payload[0]?.colour.interior).toBeUndefined();
+    }
+  });
+
+  test('GET_ANNOTATIONS should fallback border width from appearance when native border is unavailable', async () => {
+    const send = await setup();
+
+    await send({ type: 'INIT', id: 'init-1', payload: { wasmBinary: new ArrayBuffer(8) } });
+    await send({ type: 'OPEN_DOCUMENT', id: 'open-1', payload: { data: new ArrayBuffer(100) } });
+
+    const openResponse = postedMessages[1]!.data;
+    const documentId = (openResponse as { type: 'SUCCESS'; payload: { documentId: string } }).payload.documentId;
+
+    await send({ type: 'LOAD_PAGE', id: 'load-1', payload: { documentId, pageIndex: 0 } });
+    const loadResponse = postedMessages[2]!.data;
+    const pageId = (loadResponse as { type: 'SUCCESS'; payload: { pageId: string } }).payload.pageId;
+
+    const fallbackAnnot = createMockAnnotation();
+    fallbackAnnot.type = AnnotationType.Square as unknown as number;
+    fallbackAnnot.getBorder = vi.fn().mockReturnValue(null);
+    fallbackAnnot.getAppearance = vi.fn().mockReturnValue('0 0 0 RG 3.5 w 100 100 80 80 re S');
+
+    const page = currentMockDocument.getPage(0);
+    page.annotations = vi.fn().mockReturnValue(
+      (function* fallbackAnnotGen() {
+        yield fallbackAnnot;
+      })(),
+    );
+
+    await send({ type: 'GET_ANNOTATIONS', id: 'annots-fallback-border-1', payload: { pageId } });
+
+    const response = lastResponse();
+    expect(response.type).toBe('SUCCESS');
+    if (response.type === 'SUCCESS') {
+      const payload = response.payload as Array<{ border: unknown }>;
+      expect(payload).toHaveLength(1);
+      expect(payload[0]?.border).toEqual({
+        horizontalRadius: 0,
+        verticalRadius: 0,
+        borderWidth: 3.5,
+      });
     }
   });
 
@@ -2068,6 +2490,433 @@ describe('worker-script', () => {
     expect(response.type).toBe('ERROR');
     if (response.type === 'ERROR') {
       expect(response.error.code).toBe(PDFiumErrorCode.DOC_ALREADY_CLOSED);
+    }
+  });
+
+  // ────────────────────────────────────────────────────────────
+  // Annotation mutation handlers
+  // ────────────────────────────────────────────────────────────
+
+  async function setupWithPage() {
+    const send = await setup();
+
+    await send({ type: 'INIT', id: 'init-1', payload: { wasmBinary: new ArrayBuffer(8) } });
+    await send({ type: 'OPEN_DOCUMENT', id: 'open-1', payload: { data: new ArrayBuffer(100) } });
+
+    const openResponse = postedMessages[1]!.data;
+    const documentId = (openResponse as { type: 'SUCCESS'; payload: { documentId: string } }).payload.documentId;
+
+    await send({ type: 'LOAD_PAGE', id: 'load-1', payload: { documentId, pageIndex: 0 } });
+    const loadResponse = postedMessages[2]!.data;
+    const pageId = (loadResponse as { type: 'SUCCESS'; payload: { pageId: string } }).payload.pageId;
+
+    return { send, documentId, pageId };
+  }
+
+  test('CREATE_ANNOTATION should call createAnnotation and return serialised annotation', async () => {
+    const { AnnotationType } = await import('../../../src/core/types.js');
+    const { send, pageId } = await setupWithPage();
+
+    await send({
+      type: 'CREATE_ANNOTATION',
+      id: 'create-annot-1',
+      payload: { pageId, subtype: AnnotationType.Highlight },
+    });
+
+    const response = lastResponse();
+    expect(response.type).toBe('SUCCESS');
+    expect(currentMockDocument._mockPage.createAnnotation).toHaveBeenCalledWith(AnnotationType.Highlight);
+  });
+
+  test('CREATE_ANNOTATION should post error when createAnnotation returns null', async () => {
+    const { AnnotationType } = await import('../../../src/core/types.js');
+    const { send, pageId } = await setupWithPage();
+
+    currentMockDocument._mockPage.createAnnotation = vi.fn().mockReturnValue(null);
+
+    await send({
+      type: 'CREATE_ANNOTATION',
+      id: 'create-annot-fail',
+      payload: { pageId, subtype: AnnotationType.Highlight },
+    });
+
+    const response = lastResponse();
+    expect(response.type).toBe('ERROR');
+    if (response.type === 'ERROR') {
+      expect(response.error.code).toBe(PDFiumErrorCode.ANNOT_LOAD_FAILED);
+    }
+  });
+
+  test('CREATE_ANNOTATION should error for unknown pageId', async () => {
+    const { AnnotationType } = await import('../../../src/core/types.js');
+    const send = await setup();
+
+    await send({ type: 'INIT', id: 'init-1', payload: { wasmBinary: new ArrayBuffer(8) } });
+    await send({
+      type: 'CREATE_ANNOTATION',
+      id: 'create-annot-1',
+      payload: { pageId: 'nonexistent', subtype: AnnotationType.Highlight },
+    });
+
+    const response = lastResponse();
+    expect(response.type).toBe('ERROR');
+    if (response.type === 'ERROR') {
+      expect(response.error.code).toBe(PDFiumErrorCode.PAGE_ALREADY_CLOSED);
+    }
+  });
+
+  test('REMOVE_ANNOTATION should call removeAnnotation and return true', async () => {
+    const { send, pageId } = await setupWithPage();
+
+    await send({ type: 'REMOVE_ANNOTATION', id: 'rm-annot-1', payload: { pageId, annotationIndex: 2 } });
+
+    const response = lastResponse();
+    expect(response.type).toBe('SUCCESS');
+    if (response.type === 'SUCCESS') {
+      expect(response.payload).toBe(true);
+    }
+    expect(currentMockDocument._mockPage.removeAnnotation).toHaveBeenCalledWith(2);
+  });
+
+  test('REMOVE_ANNOTATION should error for unknown pageId', async () => {
+    const send = await setup();
+
+    await send({ type: 'INIT', id: 'init-1', payload: { wasmBinary: new ArrayBuffer(8) } });
+    await send({ type: 'REMOVE_ANNOTATION', id: 'rm-annot-1', payload: { pageId: 'nonexistent', annotationIndex: 0 } });
+
+    const response = lastResponse();
+    expect(response.type).toBe('ERROR');
+    if (response.type === 'ERROR') {
+      expect(response.error.code).toBe(PDFiumErrorCode.PAGE_ALREADY_CLOSED);
+    }
+  });
+
+  test('SET_ANNOTATION_RECT should call setRect on annotation and return true', async () => {
+    const { send, pageId } = await setupWithPage();
+    const rect = { left: 10, top: 100, right: 200, bottom: 50 };
+
+    await send({ type: 'SET_ANNOTATION_RECT', id: 'set-rect-1', payload: { pageId, annotationIndex: 0, rect } });
+
+    const response = lastResponse();
+    expect(response.type).toBe('SUCCESS');
+    expect(currentMockDocument._mockPage.getAnnotation).toHaveBeenCalledWith(0);
+    const annot = currentMockDocument._mockPage.getAnnotation.mock.results[0]!.value;
+    expect(annot.setRect).toHaveBeenCalledWith(rect);
+  });
+
+  test('SET_ANNOTATION_RECT should error for unknown pageId', async () => {
+    const send = await setup();
+
+    await send({ type: 'INIT', id: 'init-1', payload: { wasmBinary: new ArrayBuffer(8) } });
+    await send({
+      type: 'SET_ANNOTATION_RECT',
+      id: 'set-rect-1',
+      payload: { pageId: 'nonexistent', annotationIndex: 0, rect: { left: 0, top: 10, right: 100, bottom: 0 } },
+    });
+
+    const response = lastResponse();
+    expect(response.type).toBe('ERROR');
+    if (response.type === 'ERROR') {
+      expect(response.error.code).toBe(PDFiumErrorCode.PAGE_ALREADY_CLOSED);
+    }
+  });
+
+  test('SET_ANNOTATION_COLOUR should call setColour on annotation', async () => {
+    const { send, pageId } = await setupWithPage();
+    const colour = { r: 255, g: 0, b: 0, a: 255 };
+
+    await send({
+      type: 'SET_ANNOTATION_COLOUR',
+      id: 'set-colour-1',
+      payload: { pageId, annotationIndex: 1, colourType: 'stroke', colour },
+    });
+
+    const response = lastResponse();
+    expect(response.type).toBe('SUCCESS');
+    const annot = currentMockDocument._mockPage.getAnnotation.mock.results[0]!.value;
+    expect(annot.setColour).toHaveBeenCalledWith(colour, 'stroke');
+  });
+
+  test('SET_ANNOTATION_COLOUR should error for unknown pageId', async () => {
+    const send = await setup();
+
+    await send({ type: 'INIT', id: 'init-1', payload: { wasmBinary: new ArrayBuffer(8) } });
+    await send({
+      type: 'SET_ANNOTATION_COLOUR',
+      id: 'set-colour-1',
+      payload: {
+        pageId: 'nonexistent',
+        annotationIndex: 0,
+        colourType: 'stroke',
+        colour: { r: 0, g: 0, b: 0, a: 255 },
+      },
+    });
+
+    const response = lastResponse();
+    expect(response.type).toBe('ERROR');
+    if (response.type === 'ERROR') {
+      expect(response.error.code).toBe(PDFiumErrorCode.PAGE_ALREADY_CLOSED);
+    }
+  });
+
+  test('SET_ANNOTATION_FLAGS should call setFlags on annotation', async () => {
+    const { send, pageId } = await setupWithPage();
+
+    await send({
+      type: 'SET_ANNOTATION_FLAGS',
+      id: 'set-flags-1',
+      payload: { pageId, annotationIndex: 0, flags: 4 },
+    });
+
+    const response = lastResponse();
+    expect(response.type).toBe('SUCCESS');
+    const annot = currentMockDocument._mockPage.getAnnotation.mock.results[0]!.value;
+    expect(annot.setFlags).toHaveBeenCalledWith(4);
+  });
+
+  test('SET_ANNOTATION_FLAGS should error for unknown pageId', async () => {
+    const send = await setup();
+
+    await send({ type: 'INIT', id: 'init-1', payload: { wasmBinary: new ArrayBuffer(8) } });
+    await send({
+      type: 'SET_ANNOTATION_FLAGS',
+      id: 'set-flags-1',
+      payload: { pageId: 'nonexistent', annotationIndex: 0, flags: 0 },
+    });
+
+    const response = lastResponse();
+    expect(response.type).toBe('ERROR');
+    if (response.type === 'ERROR') {
+      expect(response.error.code).toBe(PDFiumErrorCode.PAGE_ALREADY_CLOSED);
+    }
+  });
+
+  test('SET_ANNOTATION_STRING should call setStringValue on annotation', async () => {
+    const { send, pageId } = await setupWithPage();
+
+    await send({
+      type: 'SET_ANNOTATION_STRING',
+      id: 'set-str-1',
+      payload: { pageId, annotationIndex: 0, key: 'Contents', value: 'Hello world' },
+    });
+
+    const response = lastResponse();
+    expect(response.type).toBe('SUCCESS');
+    const annot = currentMockDocument._mockPage.getAnnotation.mock.results[0]!.value;
+    expect(annot.setStringValue).toHaveBeenCalledWith('Contents', 'Hello world');
+  });
+
+  test('SET_ANNOTATION_STRING should error for unknown pageId', async () => {
+    const send = await setup();
+
+    await send({ type: 'INIT', id: 'init-1', payload: { wasmBinary: new ArrayBuffer(8) } });
+    await send({
+      type: 'SET_ANNOTATION_STRING',
+      id: 'set-str-1',
+      payload: { pageId: 'nonexistent', annotationIndex: 0, key: 'T', value: '' },
+    });
+
+    const response = lastResponse();
+    expect(response.type).toBe('ERROR');
+    if (response.type === 'ERROR') {
+      expect(response.error.code).toBe(PDFiumErrorCode.PAGE_ALREADY_CLOSED);
+    }
+  });
+
+  test('SET_ANNOTATION_BORDER should call setBorder with radius and width', async () => {
+    const { send, pageId } = await setupWithPage();
+
+    await send({
+      type: 'SET_ANNOTATION_BORDER',
+      id: 'set-border-1',
+      payload: { pageId, annotationIndex: 0, hRadius: 2, vRadius: 3, borderWidth: 1 },
+    });
+
+    const response = lastResponse();
+    expect(response.type).toBe('SUCCESS');
+    const annot = currentMockDocument._mockPage.getAnnotation.mock.results[0]!.value;
+    expect(annot.setBorder).toHaveBeenCalledWith({ horizontalRadius: 2, verticalRadius: 3, borderWidth: 1 });
+  });
+
+  test('SET_ANNOTATION_BORDER should error for unknown pageId', async () => {
+    const send = await setup();
+
+    await send({ type: 'INIT', id: 'init-1', payload: { wasmBinary: new ArrayBuffer(8) } });
+    await send({
+      type: 'SET_ANNOTATION_BORDER',
+      id: 'set-border-1',
+      payload: { pageId: 'nonexistent', annotationIndex: 0, hRadius: 1, vRadius: 1, borderWidth: 1 },
+    });
+
+    const response = lastResponse();
+    expect(response.type).toBe('ERROR');
+    if (response.type === 'ERROR') {
+      expect(response.error.code).toBe(PDFiumErrorCode.PAGE_ALREADY_CLOSED);
+    }
+  });
+
+  test('SET_ANNOTATION_ATTACHMENT_POINTS should call setAttachmentPoints on annotation', async () => {
+    const { send, pageId } = await setupWithPage();
+    const points = { x1: 0, y1: 10, x2: 100, y2: 10, x3: 100, y3: 0, x4: 0, y4: 0 };
+
+    await send({
+      type: 'SET_ANNOTATION_ATTACHMENT_POINTS',
+      id: 'set-quad-1',
+      payload: { pageId, annotationIndex: 0, quadIndex: 1, points },
+    });
+
+    const response = lastResponse();
+    expect(response.type).toBe('SUCCESS');
+    const annot = currentMockDocument._mockPage.getAnnotation.mock.results[0]!.value;
+    expect(annot.setAttachmentPoints).toHaveBeenCalledWith(1, points);
+  });
+
+  test('SET_ANNOTATION_ATTACHMENT_POINTS should error for unknown pageId', async () => {
+    const send = await setup();
+    const points = { x1: 0, y1: 10, x2: 100, y2: 10, x3: 100, y3: 0, x4: 0, y4: 0 };
+
+    await send({ type: 'INIT', id: 'init-1', payload: { wasmBinary: new ArrayBuffer(8) } });
+    await send({
+      type: 'SET_ANNOTATION_ATTACHMENT_POINTS',
+      id: 'set-quad-1',
+      payload: { pageId: 'nonexistent', annotationIndex: 0, quadIndex: 0, points },
+    });
+
+    const response = lastResponse();
+    expect(response.type).toBe('ERROR');
+    if (response.type === 'ERROR') {
+      expect(response.error.code).toBe(PDFiumErrorCode.PAGE_ALREADY_CLOSED);
+    }
+  });
+
+  test('APPEND_ANNOTATION_ATTACHMENT_POINTS should call appendAttachmentPoints on annotation', async () => {
+    const { send, pageId } = await setupWithPage();
+    const points = { x1: 5, y1: 15, x2: 105, y2: 15, x3: 105, y3: 5, x4: 5, y4: 5 };
+
+    await send({
+      type: 'APPEND_ANNOTATION_ATTACHMENT_POINTS',
+      id: 'append-quad-1',
+      payload: { pageId, annotationIndex: 0, points },
+    });
+
+    const response = lastResponse();
+    expect(response.type).toBe('SUCCESS');
+    const annot = currentMockDocument._mockPage.getAnnotation.mock.results[0]!.value;
+    expect(annot.appendAttachmentPoints).toHaveBeenCalledWith(points);
+  });
+
+  test('APPEND_ANNOTATION_ATTACHMENT_POINTS should error for unknown pageId', async () => {
+    const send = await setup();
+    const points = { x1: 5, y1: 15, x2: 105, y2: 15, x3: 105, y3: 5, x4: 5, y4: 5 };
+
+    await send({ type: 'INIT', id: 'init-1', payload: { wasmBinary: new ArrayBuffer(8) } });
+    await send({
+      type: 'APPEND_ANNOTATION_ATTACHMENT_POINTS',
+      id: 'append-quad-1',
+      payload: { pageId: 'nonexistent', annotationIndex: 0, points },
+    });
+
+    const response = lastResponse();
+    expect(response.type).toBe('ERROR');
+    if (response.type === 'ERROR') {
+      expect(response.error.code).toBe(PDFiumErrorCode.PAGE_ALREADY_CLOSED);
+    }
+  });
+
+  test('SET_ANNOTATION_URI should call setURI on annotation', async () => {
+    const { send, pageId } = await setupWithPage();
+
+    await send({
+      type: 'SET_ANNOTATION_URI',
+      id: 'set-uri-1',
+      payload: { pageId, annotationIndex: 0, uri: 'https://example.com' },
+    });
+
+    const response = lastResponse();
+    expect(response.type).toBe('SUCCESS');
+    const annot = currentMockDocument._mockPage.getAnnotation.mock.results[0]!.value;
+    expect(annot.setURI).toHaveBeenCalledWith('https://example.com');
+  });
+
+  test('SET_ANNOTATION_URI should error for unknown pageId', async () => {
+    const send = await setup();
+
+    await send({ type: 'INIT', id: 'init-1', payload: { wasmBinary: new ArrayBuffer(8) } });
+    await send({
+      type: 'SET_ANNOTATION_URI',
+      id: 'set-uri-1',
+      payload: { pageId: 'nonexistent', annotationIndex: 0, uri: 'https://example.com' },
+    });
+
+    const response = lastResponse();
+    expect(response.type).toBe('ERROR');
+    if (response.type === 'ERROR') {
+      expect(response.error.code).toBe(PDFiumErrorCode.PAGE_ALREADY_CLOSED);
+    }
+  });
+
+  test('ADD_INK_STROKE should call addInkStroke on annotation and return stroke count', async () => {
+    const { send, pageId } = await setupWithPage();
+    const points = [
+      { x: 10, y: 20 },
+      { x: 30, y: 40 },
+    ];
+
+    await send({
+      type: 'ADD_INK_STROKE',
+      id: 'ink-1',
+      payload: { pageId, annotationIndex: 0, points },
+    });
+
+    const response = lastResponse();
+    expect(response.type).toBe('SUCCESS');
+    if (response.type === 'SUCCESS') {
+      expect(response.payload).toBe(0);
+    }
+    const annot = currentMockDocument._mockPage.getAnnotation.mock.results[0]!.value;
+    expect(annot.addInkStroke).toHaveBeenCalledWith(points);
+  });
+
+  test('ADD_INK_STROKE should error for unknown pageId', async () => {
+    const send = await setup();
+
+    await send({ type: 'INIT', id: 'init-1', payload: { wasmBinary: new ArrayBuffer(8) } });
+    await send({
+      type: 'ADD_INK_STROKE',
+      id: 'ink-1',
+      payload: { pageId: 'nonexistent', annotationIndex: 0, points: [{ x: 0, y: 0 }] },
+    });
+
+    const response = lastResponse();
+    expect(response.type).toBe('ERROR');
+    if (response.type === 'ERROR') {
+      expect(response.error.code).toBe(PDFiumErrorCode.PAGE_ALREADY_CLOSED);
+    }
+  });
+
+  test('GENERATE_PAGE_CONTENT should call generateContent on page and return true', async () => {
+    const { send, pageId } = await setupWithPage();
+
+    await send({ type: 'GENERATE_PAGE_CONTENT', id: 'gen-content-1', payload: { pageId } });
+
+    const response = lastResponse();
+    expect(response.type).toBe('SUCCESS');
+    if (response.type === 'SUCCESS') {
+      expect(response.payload).toBe(true);
+    }
+    expect(currentMockDocument._mockPage.generateContent).toHaveBeenCalled();
+  });
+
+  test('GENERATE_PAGE_CONTENT should error for unknown pageId', async () => {
+    const send = await setup();
+
+    await send({ type: 'INIT', id: 'init-1', payload: { wasmBinary: new ArrayBuffer(8) } });
+    await send({ type: 'GENERATE_PAGE_CONTENT', id: 'gen-content-1', payload: { pageId: 'nonexistent' } });
+
+    const response = lastResponse();
+    expect(response.type).toBe('ERROR');
+    if (response.type === 'ERROR') {
+      expect(response.error.code).toBe(PDFiumErrorCode.PAGE_ALREADY_CLOSED);
     }
   });
 });

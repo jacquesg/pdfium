@@ -240,8 +240,55 @@ describe('WorkerPDFium high-level API', () => {
     mockWorker.respondSuccess(addTextMessage.id, undefined);
     await addTextPromise;
 
+    const addRectanglePromise = page.addRectangle(10, 20, 30, 40, {
+      stroke: { r: 255, g: 0, b: 0, a: 255 },
+      strokeWidth: 2,
+    });
+    const addRectangleMessage = mockWorker.posted[5]!.data as {
+      type: string;
+      id: string;
+      payload: { pageBuilderId: string; x: number; y: number; w: number; h: number };
+    };
+    expect(addRectangleMessage.type).toBe('BUILDER_PAGE_ADD_RECTANGLE');
+    expect(addRectangleMessage.payload).toMatchObject({ pageBuilderId: 'builder-page-1', x: 10, y: 20, w: 30, h: 40 });
+    mockWorker.respondSuccess(addRectangleMessage.id, undefined);
+    await expect(addRectanglePromise).resolves.toBe(page);
+
+    const addLinePromise = page.addLine(10, 20, 30, 40, {
+      stroke: { r: 0, g: 255, b: 0, a: 255 },
+      strokeWidth: 3,
+    });
+    const addLineMessage = mockWorker.posted[6]!.data as {
+      type: string;
+      id: string;
+      payload: { pageBuilderId: string; x1: number; y1: number; x2: number; y2: number };
+    };
+    expect(addLineMessage.type).toBe('BUILDER_PAGE_ADD_LINE');
+    expect(addLineMessage.payload).toMatchObject({ pageBuilderId: 'builder-page-1', x1: 10, y1: 20, x2: 30, y2: 40 });
+    mockWorker.respondSuccess(addLineMessage.id, undefined);
+    await expect(addLinePromise).resolves.toBe(page);
+
+    const addEllipsePromise = page.addEllipse(50, 60, 20, 10, {
+      fill: { r: 0, g: 0, b: 255, a: 255 },
+    });
+    const addEllipseMessage = mockWorker.posted[7]!.data as {
+      type: string;
+      id: string;
+      payload: { pageBuilderId: string; cx: number; cy: number; rx: number; ry: number };
+    };
+    expect(addEllipseMessage.type).toBe('BUILDER_PAGE_ADD_ELLIPSE');
+    expect(addEllipseMessage.payload).toMatchObject({
+      pageBuilderId: 'builder-page-1',
+      cx: 50,
+      cy: 60,
+      rx: 20,
+      ry: 10,
+    });
+    mockWorker.respondSuccess(addEllipseMessage.id, undefined);
+    await expect(addEllipsePromise).resolves.toBe(page);
+
     const savePromise = builder.save();
-    const saveMessage = mockWorker.posted[5]!.data as {
+    const saveMessage = mockWorker.posted[8]!.data as {
       type: string;
       id: string;
       payload: { builderId: string };
@@ -254,7 +301,7 @@ describe('WorkerPDFium high-level API', () => {
     expect(bytes.byteLength).toBe(16);
 
     const disposeBuilderPromise = builder.dispose();
-    const disposeBuilderMessage = mockWorker.posted[6]!.data as {
+    const disposeBuilderMessage = mockWorker.posted[9]!.data as {
       type: string;
       id: string;
       payload: { builderId: string };
@@ -267,6 +314,144 @@ describe('WorkerPDFium high-level API', () => {
     const disposePdfiumPromise = workerPdfium.dispose();
     const destroyMessage = mockWorker.posted[mockWorker.posted.length - 1]!.data as { type: string; id: string };
     expect(destroyMessage.type).toBe('DESTROY');
+    mockWorker.respondSuccess(destroyMessage.id, undefined);
+    await disposePdfiumPromise;
+  });
+
+  test('worker-backed document query methods delegate to the worker proxy', async () => {
+    const { PDFium } = await import('../../../src/pdfium.js');
+
+    const initPromise = PDFium.init({
+      useWorker: true,
+      workerUrl: 'worker.js',
+      wasmBinary: createWasmMagicBuffer(),
+    });
+    await vi.waitFor(() => {
+      expect(mockWorker.posted.length).toBeGreaterThan(0);
+    });
+    const initMessage = mockWorker.posted[0]!.data as { type: string; id: string };
+    mockWorker.respondSuccess(initMessage.id, undefined);
+    const workerPdfium = await initPromise;
+
+    const openPromise = workerPdfium.openDocument(new Uint8Array([1, 2, 3, 4]));
+    const openMessage = mockWorker.posted[1]!.data as { type: string; id: string };
+    mockWorker.respondSuccess(openMessage.id, { documentId: 'doc-1', pageCount: 1 });
+    const document = await openPromise;
+
+    const metadataPromise = document.getMetadata();
+    const metadataMessage = mockWorker.posted[2]!.data as { type: string; id: string };
+    expect(metadataMessage.type).toBe('GET_METADATA');
+    mockWorker.respondSuccess(metadataMessage.id, { title: 'Doc' });
+    await expect(metadataPromise).resolves.toEqual({ title: 'Doc' });
+
+    const permissionsPromise = document.getPermissions();
+    const permissionsMessage = mockWorker.posted[3]!.data as { type: string; id: string };
+    expect(permissionsMessage.type).toBe('GET_PERMISSIONS');
+    mockWorker.respondSuccess(permissionsMessage.id, { canPrint: true });
+    await expect(permissionsPromise).resolves.toEqual({ canPrint: true });
+
+    const viewerPreferencesPromise = document.getViewerPreferences();
+    const viewerPreferencesMessage = mockWorker.posted[4]!.data as { type: string; id: string };
+    expect(viewerPreferencesMessage.type).toBe('GET_VIEWER_PREFERENCES');
+    mockWorker.respondSuccess(viewerPreferencesMessage.id, { hideToolbar: true });
+    await expect(viewerPreferencesPromise).resolves.toEqual({ hideToolbar: true });
+
+    const jsActionsPromise = document.getJavaScriptActions();
+    const jsActionsMessage = mockWorker.posted[5]!.data as { type: string; id: string };
+    expect(jsActionsMessage.type).toBe('GET_JAVASCRIPT_ACTIONS');
+    mockWorker.respondSuccess(jsActionsMessage.id, [{ name: 'OpenAction', script: 'app.alert("hi")' }]);
+    await expect(jsActionsPromise).resolves.toEqual([{ name: 'OpenAction', script: 'app.alert("hi")' }]);
+
+    const signaturesPromise = document.getSignatures();
+    const signaturesMessage = mockWorker.posted[6]!.data as { type: string; id: string };
+    expect(signaturesMessage.type).toBe('GET_SIGNATURES');
+    mockWorker.respondSuccess(signaturesMessage.id, [{ name: 'sig-1' }]);
+    await expect(signaturesPromise).resolves.toEqual([{ name: 'sig-1' }]);
+
+    const printRangesPromise = document.getPrintPageRanges();
+    const printRangesMessage = mockWorker.posted[7]!.data as { type: string; id: string };
+    expect(printRangesMessage.type).toBe('GET_PRINT_PAGE_RANGES');
+    mockWorker.respondSuccess(printRangesMessage.id, [1, 3, 5]);
+    await expect(printRangesPromise).resolves.toEqual([1, 3, 5]);
+
+    const extendedInfoPromise = document.getExtendedDocumentInfo();
+    const extendedInfoMessage = mockWorker.posted[8]!.data as { type: string; id: string };
+    expect(extendedInfoMessage.type).toBe('GET_EXTENDED_DOCUMENT_INFO');
+    mockWorker.respondSuccess(extendedInfoMessage.id, { version: '1.7' });
+    await expect(extendedInfoPromise).resolves.toEqual({ version: '1.7' });
+
+    const closeDocumentPromise = document.dispose();
+    const closeDocumentMessage = mockWorker.posted[9]!.data as { type: string; id: string };
+    expect(closeDocumentMessage.type).toBe('CLOSE_DOCUMENT');
+    mockWorker.respondSuccess(closeDocumentMessage.id, undefined);
+    await closeDocumentPromise;
+
+    const disposePdfiumPromise = workerPdfium.dispose();
+    const destroyMessage = mockWorker.posted[mockWorker.posted.length - 1]!.data as { type: string; id: string };
+    expect(destroyMessage.type).toBe('DESTROY');
+    mockWorker.respondSuccess(destroyMessage.id, undefined);
+    await disposePdfiumPromise;
+  });
+
+  test('worker-backed page applyRedactions delegates to the worker proxy', async () => {
+    const { PDFium } = await import('../../../src/pdfium.js');
+
+    const initPromise = PDFium.init({
+      useWorker: true,
+      workerUrl: 'worker.js',
+      wasmBinary: createWasmMagicBuffer(),
+    });
+    await vi.waitFor(() => {
+      expect(mockWorker.posted.length).toBeGreaterThan(0);
+    });
+    const initMessage = mockWorker.posted[0]!.data as { type: string; id: string };
+    mockWorker.respondSuccess(initMessage.id, undefined);
+    const workerPdfium = await initPromise;
+
+    const openPromise = workerPdfium.openDocument(new Uint8Array([1, 2, 3, 4]));
+    const openMessage = mockWorker.posted[1]!.data as { type: string; id: string };
+    mockWorker.respondSuccess(openMessage.id, { documentId: 'doc-1', pageCount: 1 });
+    const document = await openPromise;
+
+    const getPagePromise = document.getPage(0);
+    const loadPageMessage = mockWorker.posted[2]!.data as { type: string; id: string };
+    mockWorker.respondSuccess(loadPageMessage.id, { pageId: 'page-1', index: 0, width: 100, height: 100 });
+    const page = await getPagePromise;
+
+    const applyRedactionsPromise = page.applyRedactions({ r: 0, g: 0, b: 0, a: 255 }, false);
+    const applyRedactionsMessage = mockWorker.posted[3]!.data as {
+      type: string;
+      id: string;
+      payload: { fillColour: { r: number; g: number; b: number; a: number }; removeIntersectingAnnotations: boolean };
+    };
+    expect(applyRedactionsMessage.type).toBe('APPLY_REDACTIONS');
+    expect(applyRedactionsMessage.payload.fillColour).toEqual({ r: 0, g: 0, b: 0, a: 255 });
+    expect(applyRedactionsMessage.payload.removeIntersectingAnnotations).toBe(false);
+    mockWorker.respondSuccess(applyRedactionsMessage.id, {
+      appliedRegionCount: 1,
+      removedObjectCount: 2,
+      removedAnnotationCount: 0,
+      insertedFillObjectCount: 1,
+    });
+    await expect(applyRedactionsPromise).resolves.toEqual({
+      appliedRegionCount: 1,
+      removedObjectCount: 2,
+      removedAnnotationCount: 0,
+      insertedFillObjectCount: 1,
+    });
+
+    const pageDisposePromise = page.dispose();
+    const closePageMessage = mockWorker.posted[4]!.data as { type: string; id: string };
+    mockWorker.respondSuccess(closePageMessage.id, undefined);
+    await pageDisposePromise;
+
+    const closeDocumentPromise = document.dispose();
+    const closeDocumentMessage = mockWorker.posted[5]!.data as { type: string; id: string };
+    mockWorker.respondSuccess(closeDocumentMessage.id, undefined);
+    await closeDocumentPromise;
+
+    const disposePdfiumPromise = workerPdfium.dispose();
+    const destroyMessage = mockWorker.posted[mockWorker.posted.length - 1]!.data as { type: string; id: string };
     mockWorker.respondSuccess(destroyMessage.id, undefined);
     await disposePdfiumPromise;
   });

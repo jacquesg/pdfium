@@ -215,6 +215,41 @@ jobs:
       - name: Run browser tests
         run: pnpm test:browser --project=chromium --project=firefox
 
+  editor-browser-test:
+    name: Editor Browser Tests
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install demo Vite dependencies
+        run: pnpm --dir demo/vite install --frozen-lockfile
+
+      - name: Download PDFium WASM
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm download:pdfium --target wasm
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium firefox --with-deps
+
+      - name: Run editor browser tests
+        run: pnpm test:browser:editor
+
+      - name: Run editor browser stress tests (Chromium repeat)
+        run: pnpm test:browser:editor:stress
+
   rust-test:
     name: Rust Tests
     runs-on: ubuntu-latest

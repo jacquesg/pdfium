@@ -8,6 +8,8 @@ interface ProviderPasswordValue {
 
 interface ProviderStableDocCallbacks {
   bumpDocumentRevision: () => void;
+  bumpPageRevision: (pageIndex: number) => void;
+  getPageRevision: (pageIndex: number) => number;
   invalidateCache: () => void;
   loadDocument: (data: ArrayBuffer | Uint8Array, name: string) => Promise<void>;
   loadDocumentFromUrl: (url: string, name: string) => Promise<void>;

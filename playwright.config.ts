@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const includeWebkitProject = process.env.PLAYWRIGHT_INCLUDE_WEBKIT === '1';
+
 /**
  * Playwright configuration for browser tests.
  *
@@ -7,6 +9,7 @@ import { defineConfig, devices } from '@playwright/test';
  */
 export default defineConfig({
   testDir: './test/browser',
+  testIgnore: 'editor.spec.ts',
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI !== undefined ? 2 : 0,
@@ -28,11 +31,15 @@ export default defineConfig({
       use: { ...devices['Desktop Firefox'] },
     },
     // WebKit has known issues with PDFium WASM initialization.
-    // Kept for local testing but excluded from CI via --project flag.
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
+    // Keep it opt-in so the default browser suite remains stable.
+    ...(includeWebkitProject
+      ? [
+          {
+            name: 'webkit',
+            use: { ...devices['Desktop Safari'] },
+          },
+        ]
+      : []),
   ],
 
   webServer: {

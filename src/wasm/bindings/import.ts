@@ -65,6 +65,24 @@ export interface ImportBindings {
   ) => DocumentHandle;
 
   /**
+   * Move pages within a document to a new position.
+   *
+   * WARNING: When this call fails, the document may be left in an indeterminate state.
+   *
+   * @param document - Document handle
+   * @param pageIndices - Pointer to array of zero-based page indices to move (no duplicates)
+   * @param pageIndicesLen - Number of page indices in the array
+   * @param destPageIndex - Zero-based destination index where pages are moved to
+   * @returns Non-zero on success
+   */
+  _FPDF_MovePages: (
+    document: DocumentHandle,
+    pageIndices: WASMPointer,
+    pageIndicesLen: number,
+    destPageIndex: number,
+  ) => number;
+
+  /**
    * Copy viewer preferences from source to destination document.
    *
    * @param destDoc - Destination document handle

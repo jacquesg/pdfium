@@ -38,8 +38,10 @@ function createPageDataHook<T>(
     document: WorkerPDFiumDocument | null,
     pageIndex: number,
   ): UseStoreQueryResult<T | undefined> {
-    const { documentRevision } = usePDFiumDocument();
-    const key = document ? buildCacheKey(document.id, hookName, documentRevision, pageIndex) : null;
+    const { documentRevision, pageRevisionVersion, getPageRevision } = usePDFiumDocument();
+    void pageRevisionVersion;
+    const pageRevision = getPageRevision(pageIndex);
+    const key = document ? buildCacheKey(document.id, hookName, documentRevision, pageIndex, pageRevision) : null;
     const fetcher = useCallback(async (): Promise<T | undefined> => {
       if (!document) return undefined;
       const page = await document.getPage(pageIndex);

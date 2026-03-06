@@ -8,7 +8,23 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = resolve(__dirname, '../../..');
 const LINK_PATTERN = /\[[^\]]*\]\(([^)]+)\)/gu;
 const EXCLUDED_PREFIXES = ['docs/src/content/docs/api/'];
-const FORBIDDEN_DOC_PATTERNS = [/^docs\/react\//u, /^docs\/react-[^/]+\.md$/u, /^docs\/(?!README\.md$)[^/]+\.md$/u];
+const FORBIDDEN_DOC_PATTERNS = [/^docs\/react\//u, /^docs\/react-[^/]+\.md$/u];
+const ALLOWED_TOP_LEVEL_DOC_FILES = new Set([
+  'docs/README.md',
+  'docs/DOCS_VOICE_GUIDE.md',
+  'docs/EDITOR_REMEDIATION_PLAN.md',
+]);
+
+function isForbiddenTopLevelDoc(file: string): boolean {
+  if (!file.startsWith('docs/') || !file.endsWith('.md')) {
+    return false;
+  }
+  const relative = file.slice('docs/'.length);
+  if (relative.length === 0 || relative.includes('/')) {
+    return false;
+  }
+  return !ALLOWED_TOP_LEVEL_DOC_FILES.has(file);
+}
 
 function listTrackedMarkdownFiles(): string[] {
   const output = execFileSync('git', ['ls-files', '*.md', '*.mdx'], {
@@ -60,7 +76,9 @@ function targetExists(sourceFile: string, target: string): boolean {
 describe('tracked markdown relative links', () => {
   test('no orphan product docs exist outside canonical docs content tree', () => {
     const files = listTrackedMarkdownFiles();
-    const orphans = files.filter((file) => FORBIDDEN_DOC_PATTERNS.some((pattern) => pattern.test(file)));
+    const orphans = files.filter(
+      (file) => FORBIDDEN_DOC_PATTERNS.some((pattern) => pattern.test(file)) || isForbiddenTopLevelDoc(file),
+    );
     expect(orphans).toEqual([]);
   });
 

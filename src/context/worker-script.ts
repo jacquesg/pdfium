@@ -10,17 +10,20 @@ import { isNodeEnvironment } from '../core/env.js';
 import { PDFiumError, PDFiumErrorCode } from '../core/errors.js';
 import { getLogger } from '../core/logger.js';
 import type {
+  AnnotationColourType,
   Colour,
   FlattenFlags,
   FormFieldType,
   ImportPagesOptions,
   NUpLayoutOptions,
+  PageRotation,
+  Rect,
   SaveOptions,
   SerialisedError,
   ShapeStyle,
   TextSearchFlags,
 } from '../core/types.js';
-import { AnnotationAppearanceMode, PageBoxType, PathFillMode } from '../core/types.js';
+import { AnnotationAppearanceMode, AnnotationType, PageBoxType, PathFillMode } from '../core/types.js';
 import type { PDFiumAnnotation } from '../document/annotation.js';
 import type { PDFiumDocumentBuilder, PDFiumPageBuilder } from '../document/builder.js';
 import type { PDFiumBuilderFont } from '../document/builder-font.js';
@@ -32,6 +35,12 @@ import {
   PDFiumPathObject,
   PDFiumTextObject,
 } from '../document/page-object.js';
+import {
+  BORDER_FALLBACK_ANNOTATION_TYPES,
+  parseLastAppearanceStrokeWidth,
+  resolveFallbackAppearanceColours,
+} from '../internal/annotation-appearance.js';
+import { LINE_FALLBACK_MARKER_KEY, LINE_FALLBACK_MARKER_VALUE } from '../internal/annotation-markers.js';
 import { PDFium } from '../pdfium.js';
 import type {
   CharAtPosResponse,
@@ -48,6 +57,7 @@ import type {
   SerialisedFormWidget,
   SerialisedLink,
   SerialisedPageObject,
+  SerialisedQuadPoints,
   SerialisedSignature,
   WorkerRequest,
   WorkerResponse,
@@ -128,7 +138,7 @@ let postToMainThread: MessageToMainThread | null = null;
 let expectedMessageOrigin: string | undefined;
 
 function importRuntimeModule<T>(specifier: string): Promise<T> {
-  return import(specifier) as Promise<T>;
+  return import(/* @vite-ignore */ specifier) as Promise<T>;
 }
 
 function getBrowserWorkerScope(): BrowserWorkerScope | null {
@@ -266,14 +276,62 @@ function lookupBuilderFont(id: string, fontId: string): PDFiumBuilderFont | unde
 // Serialisation helpers
 // ────────────────────────────────────────────────────────────
 
+function serialiseFallbackAppearanceColours(
+  annot: PDFiumAnnotation,
+  appearance: string | null | undefined,
+  strokeColour: Colour | null,
+  interiorColour: Colour | null,
+): { stroke: Colour | null; interior: Colour | null } {
+  const strokeOpacity = annot.getNumberValue('CA');
+  const interiorOpacity = annot.getNumberValue('ca') ?? strokeOpacity;
+  return resolveFallbackAppearanceColours(
+    appearance,
+    { stroke: strokeColour, interior: interiorColour },
+    { stroke: strokeOpacity, interior: interiorOpacity },
+  );
+}
+
 function serialiseAnnotation(annot: PDFiumAnnotation, index: number): SerialisedAnnotation {
-  const strokeColour = annot.getColour('stroke');
-  const interiorColour = annot.getColour('interior');
+  let strokeColour = annot.getColour('stroke');
+  let interiorColour = annot.getColour('interior');
   const border = annot.getBorder();
   const appearance = annot.getAppearance(AnnotationAppearanceMode.Normal);
   const line = annot.getLine();
   const vertices = annot.getVertices();
   const fontSize = annot.getFontSize();
+  const lineFallback =
+    annot.type === AnnotationType.Ink && annot.getStringValue(LINE_FALLBACK_MARKER_KEY) === LINE_FALLBACK_MARKER_VALUE;
+
+  if (strokeColour === null || interiorColour === null) {
+    const fallbackColours = serialiseFallbackAppearanceColours(annot, appearance, strokeColour, interiorColour);
+    strokeColour = fallbackColours.stroke;
+    interiorColour = fallbackColours.interior;
+  }
+
+  let serialisedBorder = border;
+  if (serialisedBorder === null && appearance && BORDER_FALLBACK_ANNOTATION_TYPES.has(annot.type)) {
+    const fallbackWidth = parseLastAppearanceStrokeWidth(appearance);
+    if (fallbackWidth !== undefined) {
+      serialisedBorder = {
+        horizontalRadius: 0,
+        verticalRadius: 0,
+        borderWidth: fallbackWidth,
+      };
+    }
+  }
+  if (
+    serialisedBorder === null &&
+    (annot.type === AnnotationType.Square ||
+      annot.type === AnnotationType.Circle ||
+      annot.type === AnnotationType.Line ||
+      lineFallback)
+  ) {
+    serialisedBorder = {
+      horizontalRadius: 0,
+      verticalRadius: 0,
+      borderWidth: 1,
+    };
+  }
 
   // Ink paths
   let inkPaths: Array<Array<{ x: number; y: number }>> | undefined;
@@ -356,10 +414,11 @@ function serialiseAnnotation(annot: PDFiumAnnotation, index: number): Serialised
     flags: annot.flags,
     contents: annot.getStringValue('Contents') ?? '',
     author: annot.getStringValue('T') ?? '',
-    subject: annot.getStringValue('Subj') ?? '',
-    border: border ?? null,
+    subject: annot.getStringValue('Subj') ?? annot.getStringValue('Subject') ?? '',
+    border: serialisedBorder ?? null,
     appearance: appearance ?? null,
     fontSize: fontSize ?? 0,
+    ...(lineFallback ? { lineFallback: true } : {}),
     line: line ? { start: { x: line.startX, y: line.startY }, end: { x: line.endX, y: line.endY } } : undefined,
     vertices: vertices ?? undefined,
     inkPaths,
@@ -802,6 +861,42 @@ function handleGetAllPageDimensions(id: string, documentId: string): void {
   postSuccess(id, dimensions);
 }
 
+// ────────────────────────────────────────────────────────────
+// Page management handlers
+// ────────────────────────────────────────────────────────────
+
+function handleDeletePage(id: string, documentId: string, pageIndex: number): void {
+  const document = lookupDocument(id, documentId);
+  if (!document) return;
+
+  document.deletePage(pageIndex);
+  postSuccess(id, undefined);
+}
+
+function handleInsertBlankPage(id: string, documentId: string, pageIndex: number, width: number, height: number): void {
+  const document = lookupDocument(id, documentId);
+  if (!document) return;
+
+  document.insertBlankPage(pageIndex, width, height);
+  postSuccess(id, undefined);
+}
+
+function handleMovePages(id: string, documentId: string, pageIndices: number[], destPageIndex: number): void {
+  const document = lookupDocument(id, documentId);
+  if (!document) return;
+
+  document.movePages(pageIndices, destPageIndex);
+  postSuccess(id, undefined);
+}
+
+function handleSetPageRotation(id: string, pageId: string, rotation: PageRotation): void {
+  const page = lookupPage(id, pageId);
+  if (!page) return;
+
+  page.rotation = rotation;
+  postSuccess(id, undefined);
+}
+
 /**
  * Handle get bookmarks request.
  */
@@ -1057,6 +1152,25 @@ function handleFlattenPage(id: string, pageId: string, flags?: FlattenFlags): vo
 }
 
 /**
+ * Handle apply redactions request.
+ */
+function handleApplyRedactions(
+  id: string,
+  pageId: string,
+  fillColour?: Colour,
+  removeIntersectingAnnotations?: boolean,
+): void {
+  const page = lookupPage(id, pageId);
+  if (!page) return;
+
+  const options = {
+    ...(fillColour !== undefined ? { fillColour } : {}),
+    ...(removeIntersectingAnnotations !== undefined ? { removeIntersectingAnnotations } : {}),
+  };
+  postSuccess(id, page.applyRedactions(options));
+}
+
+/**
  * Handle get form widgets request.
  */
 function handleGetFormWidgets(id: string, pageId: string): void {
@@ -1119,6 +1233,186 @@ function handleKillFormFocus(id: string, documentId: string): void {
   if (!document) return;
 
   postSuccess(id, document.killFormFocus());
+}
+
+// ────────────────────────────────────────────────────────────
+// Annotation mutation handlers
+// ────────────────────────────────────────────────────────────
+
+/**
+ * Handle create annotation request.
+ */
+function handleCreateAnnotation(id: string, pageId: string, subtype: AnnotationType): void {
+  const page = lookupPage(id, pageId);
+  if (!page) return;
+
+  const annot = page.createAnnotation(subtype);
+  if (annot === null) {
+    postError(id, {
+      name: 'PDFiumError',
+      message: `Failed to create annotation of type ${subtype}`,
+      code: PDFiumErrorCode.ANNOT_LOAD_FAILED,
+    });
+    return;
+  }
+  const serialised = serialiseAnnotation(annot, annot.index);
+  annot[Symbol.dispose]();
+  postSuccess(id, serialised);
+}
+
+/**
+ * Handle remove annotation request.
+ */
+function handleRemoveAnnotation(id: string, pageId: string, annotationIndex: number): void {
+  const page = lookupPage(id, pageId);
+  if (!page) return;
+
+  postSuccess(id, page.removeAnnotation(annotationIndex));
+}
+
+/**
+ * Handle set annotation rect request.
+ */
+function handleSetAnnotationRect(id: string, pageId: string, annotationIndex: number, rect: Rect): void {
+  const page = lookupPage(id, pageId);
+  if (!page) return;
+
+  using annot = page.getAnnotation(annotationIndex);
+  postSuccess(id, annot.setRect(rect));
+}
+
+/**
+ * Handle set annotation colour request.
+ */
+function handleSetAnnotationColour(
+  id: string,
+  pageId: string,
+  annotationIndex: number,
+  colourType: AnnotationColourType,
+  colour: Colour,
+): void {
+  const page = lookupPage(id, pageId);
+  if (!page) return;
+
+  using annot = page.getAnnotation(annotationIndex);
+  postSuccess(id, annot.setColour(colour, colourType));
+}
+
+/**
+ * Handle set annotation flags request.
+ */
+function handleSetAnnotationFlags(id: string, pageId: string, annotationIndex: number, flags: number): void {
+  const page = lookupPage(id, pageId);
+  if (!page) return;
+
+  using annot = page.getAnnotation(annotationIndex);
+  postSuccess(id, annot.setFlags(flags));
+}
+
+/**
+ * Handle set annotation string request.
+ */
+function handleSetAnnotationString(
+  id: string,
+  pageId: string,
+  annotationIndex: number,
+  key: string,
+  value: string,
+): void {
+  const page = lookupPage(id, pageId);
+  if (!page) return;
+
+  using annot = page.getAnnotation(annotationIndex);
+  postSuccess(id, annot.setStringValue(key, value));
+}
+
+/**
+ * Handle set annotation border request.
+ */
+function handleSetAnnotationBorder(
+  id: string,
+  pageId: string,
+  annotationIndex: number,
+  hRadius: number,
+  vRadius: number,
+  borderWidth: number,
+): void {
+  const page = lookupPage(id, pageId);
+  if (!page) return;
+
+  using annot = page.getAnnotation(annotationIndex);
+  const success = annot.setBorder({ horizontalRadius: hRadius, verticalRadius: vRadius, borderWidth });
+  postSuccess(id, success);
+}
+
+/**
+ * Handle set annotation attachment points request.
+ */
+function handleSetAnnotationAttachmentPoints(
+  id: string,
+  pageId: string,
+  annotationIndex: number,
+  quadIndex: number,
+  points: SerialisedQuadPoints,
+): void {
+  const page = lookupPage(id, pageId);
+  if (!page) return;
+
+  using annot = page.getAnnotation(annotationIndex);
+  postSuccess(id, annot.setAttachmentPoints(quadIndex, points));
+}
+
+/**
+ * Handle append annotation attachment points request.
+ */
+function handleAppendAnnotationAttachmentPoints(
+  id: string,
+  pageId: string,
+  annotationIndex: number,
+  points: SerialisedQuadPoints,
+): void {
+  const page = lookupPage(id, pageId);
+  if (!page) return;
+
+  using annot = page.getAnnotation(annotationIndex);
+  postSuccess(id, annot.appendAttachmentPoints(points));
+}
+
+/**
+ * Handle set annotation URI request.
+ */
+function handleSetAnnotationURI(id: string, pageId: string, annotationIndex: number, uri: string): void {
+  const page = lookupPage(id, pageId);
+  if (!page) return;
+
+  using annot = page.getAnnotation(annotationIndex);
+  postSuccess(id, annot.setURI(uri));
+}
+
+/**
+ * Handle add ink stroke request.
+ */
+function handleAddInkStroke(
+  id: string,
+  pageId: string,
+  annotationIndex: number,
+  points: Array<{ x: number; y: number }>,
+): void {
+  const page = lookupPage(id, pageId);
+  if (!page) return;
+
+  using annot = page.getAnnotation(annotationIndex);
+  postSuccess(id, annot.addInkStroke(points));
+}
+
+/**
+ * Handle generate page content request.
+ */
+function handleGeneratePageContent(id: string, pageId: string): void {
+  const page = lookupPage(id, pageId);
+  if (!page) return;
+
+  postSuccess(id, page.generateContent());
 }
 
 // ────────────────────────────────────────────────────────────
@@ -1699,6 +1993,15 @@ async function handleMessage(request: WorkerRequest, origin?: string): Promise<v
         handleFlattenPage(id, request.payload.pageId, request.payload.flags);
         break;
 
+      case 'APPLY_REDACTIONS':
+        handleApplyRedactions(
+          id,
+          request.payload.pageId,
+          request.payload.fillColour,
+          request.payload.removeIntersectingAnnotations,
+        );
+        break;
+
       case 'GET_FORM_WIDGETS':
         handleGetFormWidgets(id, request.payload.pageId);
         break;
@@ -1718,6 +2021,85 @@ async function handleMessage(request: WorkerRequest, origin?: string): Promise<v
 
       case 'KILL_FORM_FOCUS':
         handleKillFormFocus(id, request.payload.documentId);
+        break;
+
+      // Annotation mutations
+      case 'CREATE_ANNOTATION':
+        handleCreateAnnotation(id, request.payload.pageId, request.payload.subtype);
+        break;
+
+      case 'REMOVE_ANNOTATION':
+        handleRemoveAnnotation(id, request.payload.pageId, request.payload.annotationIndex);
+        break;
+
+      case 'SET_ANNOTATION_RECT':
+        handleSetAnnotationRect(id, request.payload.pageId, request.payload.annotationIndex, request.payload.rect);
+        break;
+
+      case 'SET_ANNOTATION_COLOUR':
+        handleSetAnnotationColour(
+          id,
+          request.payload.pageId,
+          request.payload.annotationIndex,
+          request.payload.colourType,
+          request.payload.colour,
+        );
+        break;
+
+      case 'SET_ANNOTATION_FLAGS':
+        handleSetAnnotationFlags(id, request.payload.pageId, request.payload.annotationIndex, request.payload.flags);
+        break;
+
+      case 'SET_ANNOTATION_STRING':
+        handleSetAnnotationString(
+          id,
+          request.payload.pageId,
+          request.payload.annotationIndex,
+          request.payload.key,
+          request.payload.value,
+        );
+        break;
+
+      case 'SET_ANNOTATION_BORDER':
+        handleSetAnnotationBorder(
+          id,
+          request.payload.pageId,
+          request.payload.annotationIndex,
+          request.payload.hRadius,
+          request.payload.vRadius,
+          request.payload.borderWidth,
+        );
+        break;
+
+      case 'SET_ANNOTATION_ATTACHMENT_POINTS':
+        handleSetAnnotationAttachmentPoints(
+          id,
+          request.payload.pageId,
+          request.payload.annotationIndex,
+          request.payload.quadIndex,
+          request.payload.points,
+        );
+        break;
+
+      case 'APPEND_ANNOTATION_ATTACHMENT_POINTS':
+        handleAppendAnnotationAttachmentPoints(
+          id,
+          request.payload.pageId,
+          request.payload.annotationIndex,
+          request.payload.points,
+        );
+        break;
+
+      case 'SET_ANNOTATION_URI':
+        handleSetAnnotationURI(id, request.payload.pageId, request.payload.annotationIndex, request.payload.uri);
+        break;
+
+      case 'ADD_INK_STROKE':
+        handleAddInkStroke(id, request.payload.pageId, request.payload.annotationIndex, request.payload.points);
+        break;
+
+      case 'GENERATE_PAGE_CONTENT':
+        handleGeneratePageContent(id, request.payload.pageId);
         break;
 
       // Document operations
@@ -1839,6 +2221,29 @@ async function handleMessage(request: WorkerRequest, origin?: string): Promise<v
 
       case 'GET_ALL_PAGE_DIMENSIONS':
         handleGetAllPageDimensions(id, request.payload.documentId);
+        break;
+
+      // Page management operations
+      case 'DELETE_PAGE':
+        handleDeletePage(id, request.payload.documentId, request.payload.pageIndex);
+        break;
+
+      case 'INSERT_BLANK_PAGE':
+        handleInsertBlankPage(
+          id,
+          request.payload.documentId,
+          request.payload.pageIndex,
+          request.payload.width,
+          request.payload.height,
+        );
+        break;
+
+      case 'MOVE_PAGES':
+        handleMovePages(id, request.payload.documentId, request.payload.pageIndices, request.payload.destPageIndex);
+        break;
+
+      case 'SET_PAGE_ROTATION':
+        handleSetPageRotation(id, request.payload.pageId, request.payload.rotation);
         break;
 
       default:

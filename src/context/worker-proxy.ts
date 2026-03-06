@@ -11,6 +11,8 @@ import { isNodeEnvironment } from '../core/env.js';
 import { InitialisationError, PDFiumError, PDFiumErrorCode, WorkerError } from '../core/errors.js';
 import { getLogger } from '../core/logger.js';
 import type {
+  AnnotationColourType,
+  AnnotationType,
   Bookmark,
   CharacterInfo,
   CharBox,
@@ -24,7 +26,9 @@ import type {
   JavaScriptAction,
   NamedDestination,
   NUpLayoutOptions,
+  PageRotation,
   ProgressCallback,
+  Rect,
   RenderOptions,
   RenderResult,
   SaveOptions,
@@ -37,6 +41,7 @@ import type {
   WebLink,
 } from '../core/types.js';
 import type {
+  ApplyRedactionsResponse,
   BuilderAddPageResponse,
   BuilderLoadStandardFontResponse,
   CharAtPosResponse,
@@ -54,6 +59,7 @@ import type {
   SerialisedFormWidget,
   SerialisedLink,
   SerialisedPageObject,
+  SerialisedQuadPoints,
   SerialisedSignature,
   WorkerRequest,
   WorkerResponse,
@@ -112,7 +118,7 @@ export interface WorkerTransport {
 }
 
 function importRuntimeModule<T>(specifier: string): Promise<T> {
-  return import(specifier) as Promise<T>;
+  return import(/* @vite-ignore */ specifier) as Promise<T>;
 }
 
 async function createNodeWorkerTransport(workerUrl: string | URL): Promise<WorkerTransport> {
@@ -502,6 +508,18 @@ export class WorkerProxy extends AsyncDisposable {
     return this.#sendRequest<FlattenResult>('FLATTEN_PAGE', { pageId, flags });
   }
 
+  async applyRedactions(
+    pageId: string,
+    fillColour?: Colour,
+    removeIntersectingAnnotations?: boolean,
+  ): Promise<ApplyRedactionsResponse> {
+    return this.#sendRequest<ApplyRedactionsResponse>('APPLY_REDACTIONS', {
+      pageId,
+      fillColour,
+      removeIntersectingAnnotations,
+    });
+  }
+
   async getFormWidgets(pageId: string): Promise<SerialisedFormWidget[]> {
     return this.#sendRequest<SerialisedFormWidget[]>('GET_FORM_WIDGETS', { pageId });
   }
@@ -652,6 +670,117 @@ export class WorkerProxy extends AsyncDisposable {
 
   async getExtendedDocumentInfo(documentId: string): Promise<ExtendedDocumentInfoResponse> {
     return this.#sendRequest<ExtendedDocumentInfoResponse>('GET_EXTENDED_DOCUMENT_INFO', { documentId });
+  }
+
+  // ────────────────────────────────────────────────────────────
+  // Annotation mutations
+  // ────────────────────────────────────────────────────────────
+
+  async createAnnotation(pageId: string, subtype: AnnotationType): Promise<SerialisedAnnotation> {
+    return this.#sendRequest<SerialisedAnnotation>('CREATE_ANNOTATION', { pageId, subtype });
+  }
+
+  async removeAnnotation(pageId: string, annotationIndex: number): Promise<boolean> {
+    return this.#sendRequest<boolean>('REMOVE_ANNOTATION', { pageId, annotationIndex });
+  }
+
+  async setAnnotationRect(pageId: string, annotationIndex: number, rect: Rect): Promise<boolean> {
+    return this.#sendRequest<boolean>('SET_ANNOTATION_RECT', { pageId, annotationIndex, rect });
+  }
+
+  async setAnnotationColour(
+    pageId: string,
+    annotationIndex: number,
+    colourType: AnnotationColourType,
+    colour: Colour,
+  ): Promise<boolean> {
+    return this.#sendRequest<boolean>('SET_ANNOTATION_COLOUR', { pageId, annotationIndex, colourType, colour });
+  }
+
+  async setAnnotationFlags(pageId: string, annotationIndex: number, flags: number): Promise<boolean> {
+    return this.#sendRequest<boolean>('SET_ANNOTATION_FLAGS', { pageId, annotationIndex, flags });
+  }
+
+  async setAnnotationString(pageId: string, annotationIndex: number, key: string, value: string): Promise<boolean> {
+    return this.#sendRequest<boolean>('SET_ANNOTATION_STRING', { pageId, annotationIndex, key, value });
+  }
+
+  async setAnnotationBorder(
+    pageId: string,
+    annotationIndex: number,
+    hRadius: number,
+    vRadius: number,
+    borderWidth: number,
+  ): Promise<boolean> {
+    return this.#sendRequest<boolean>('SET_ANNOTATION_BORDER', {
+      pageId,
+      annotationIndex,
+      hRadius,
+      vRadius,
+      borderWidth,
+    });
+  }
+
+  async setAnnotationAttachmentPoints(
+    pageId: string,
+    annotationIndex: number,
+    quadIndex: number,
+    points: SerialisedQuadPoints,
+  ): Promise<boolean> {
+    return this.#sendRequest<boolean>('SET_ANNOTATION_ATTACHMENT_POINTS', {
+      pageId,
+      annotationIndex,
+      quadIndex,
+      points,
+    });
+  }
+
+  async appendAnnotationAttachmentPoints(
+    pageId: string,
+    annotationIndex: number,
+    points: SerialisedQuadPoints,
+  ): Promise<boolean> {
+    return this.#sendRequest<boolean>('APPEND_ANNOTATION_ATTACHMENT_POINTS', {
+      pageId,
+      annotationIndex,
+      points,
+    });
+  }
+
+  async setAnnotationURI(pageId: string, annotationIndex: number, uri: string): Promise<boolean> {
+    return this.#sendRequest<boolean>('SET_ANNOTATION_URI', { pageId, annotationIndex, uri });
+  }
+
+  async addInkStroke(
+    pageId: string,
+    annotationIndex: number,
+    points: Array<{ x: number; y: number }>,
+  ): Promise<number> {
+    return this.#sendRequest<number>('ADD_INK_STROKE', { pageId, annotationIndex, points });
+  }
+
+  async generatePageContent(pageId: string): Promise<boolean> {
+    return this.#sendRequest<boolean>('GENERATE_PAGE_CONTENT', { pageId });
+  }
+
+  // ────────────────────────────────────────────────────────────
+  // Page management operations
+  // ────────────────────────────────────────────────────────────
+
+  async deletePage(documentId: string, pageIndex: number): Promise<void> {
+    return this.#sendRequest<void>('DELETE_PAGE', { documentId, pageIndex });
+  }
+
+  async insertBlankPage(documentId: string, pageIndex: number, width: number, height: number): Promise<void> {
+    return this.#sendRequest<void>('INSERT_BLANK_PAGE', { documentId, pageIndex, width, height });
+  }
+
+  async movePages(documentId: string, pageIndices: number[], destPageIndex: number): Promise<void> {
+    return this.#sendRequest<void>('MOVE_PAGES', { documentId, pageIndices, destPageIndex });
+  }
+
+  async setPageRotation(pageId: string, rotation: PageRotation): Promise<void> {
+    return this.#sendRequest<void>('SET_PAGE_ROTATION', { pageId, rotation });
   }
 
   /**

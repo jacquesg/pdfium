@@ -95,8 +95,20 @@ describe('annotationTypeMap', () => {
     expect(fromNative(annotationTypeMap.fromNative, native, AnnotationType.Unknown)).toBe(AnnotationType.Widget);
   });
 
-  it('should fall back for gap values 12 and 19', () => {
-    expect(fromNative(annotationTypeMap.fromNative, 12, AnnotationType.Unknown)).toBe(AnnotationType.Unknown);
+  it('should round-trip Highlight (native 9, native 8 is Polyline gap)', () => {
+    const native = toNative(annotationTypeMap.toNative, AnnotationType.Highlight);
+    expect(native).toBe(9);
+    expect(fromNative(annotationTypeMap.fromNative, native, AnnotationType.Unknown)).toBe(AnnotationType.Highlight);
+  });
+
+  it('should round-trip Underline (native 10)', () => {
+    const native = toNative(annotationTypeMap.toNative, AnnotationType.Underline);
+    expect(native).toBe(10);
+    expect(fromNative(annotationTypeMap.fromNative, native, AnnotationType.Unknown)).toBe(AnnotationType.Underline);
+  });
+
+  it('should fall back for gap values 8 and 19', () => {
+    expect(fromNative(annotationTypeMap.fromNative, 8, AnnotationType.Unknown)).toBe(AnnotationType.Unknown);
     expect(fromNative(annotationTypeMap.fromNative, 19, AnnotationType.Unknown)).toBe(AnnotationType.Unknown);
   });
 });

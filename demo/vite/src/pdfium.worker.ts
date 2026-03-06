@@ -1,0 +1,1 @@
+import '@scaryterry/pdfium/worker';

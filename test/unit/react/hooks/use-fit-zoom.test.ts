@@ -155,4 +155,50 @@ describe('useFitZoom', () => {
 
     expect(result.current.fitScale('page-width')).toBeCloseTo(1168 / 612, 5);
   });
+
+  it('ignores ResizeObserver callbacks with no entry or the wrong target', () => {
+    const observers: ResizeObserverCallback[] = [];
+
+    class MockResizeObserver {
+      observe = vi.fn();
+      disconnect = vi.fn();
+
+      constructor(callback: ResizeObserverCallback) {
+        observers.push(callback);
+      }
+    }
+
+    vi.stubGlobal('ResizeObserver', MockResizeObserver);
+
+    const first = document.createElement('div');
+    Object.defineProperty(first, 'clientWidth', { value: 800, writable: true, configurable: true });
+    Object.defineProperty(first, 'clientHeight', { value: 600, writable: true, configurable: true });
+    const other = document.createElement('div');
+    const ref: RefObject<HTMLDivElement | null> = { current: first };
+    const { result } = renderHook(() => useFitZoom(ref, 612, 792));
+
+    act(() => {
+      observers[0]?.([], {} as ResizeObserver);
+      observers[0]?.(
+        [
+          {
+            target: other,
+            contentRect: { width: 320, height: 240 } as DOMRectReadOnly,
+          } as unknown as ResizeObserverEntry,
+        ],
+        {} as ResizeObserver,
+      );
+    });
+
+    expect(result.current.fitScale('page-width')).toBeCloseTo(768 / 612, 5);
+  });
+
+  it('returns 1 when padding consumes the available container space', () => {
+    const ref = makeContainerRef(20, 20);
+    const { result } = renderHook(() => useFitZoom(ref, 612, 792));
+
+    expect(result.current.fitScale('page-width')).toBe(1);
+    expect(result.current.fitScale('page-height')).toBe(1);
+    expect(result.current.fitScale('page-fit')).toBe(1);
+  });
 });

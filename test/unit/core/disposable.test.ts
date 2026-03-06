@@ -20,6 +20,22 @@ class TestDisposable extends Disposable {
   }
 }
 
+class TestAbandonedDisposable extends Disposable {
+  public cleanupCalled = false;
+
+  constructor(name = 'AbandonedResource') {
+    super(name);
+  }
+
+  public abandon(): void {
+    this.abandonDuringConstruction();
+  }
+
+  protected disposeInternal(): void {
+    this.cleanupCalled = true;
+  }
+}
+
 // Async version for testing
 class TestAsyncDisposable extends AsyncDisposable {
   public cleanupCalled = false;
@@ -71,6 +87,16 @@ describe('Disposable', () => {
       resource.dispose();
       resource.dispose();
       expect(resource.cleanupCalled).toBe(true);
+    });
+
+    test('does not run cleanup after construction is abandoned', () => {
+      const resource = new TestAbandonedDisposable();
+      resource.abandon();
+
+      expect(resource.disposed).toBe(true);
+
+      resource.dispose();
+      expect(resource.cleanupCalled).toBe(false);
     });
   });
 

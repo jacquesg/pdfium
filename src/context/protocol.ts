@@ -9,6 +9,7 @@
 import type {
   ActionType,
   AnnotationBorder,
+  AnnotationColourType,
   AnnotationType,
   Bookmark,
   CharacterInfo,
@@ -112,6 +113,11 @@ export type WorkerRequest =
   | { type: 'GET_CHAR_BOX'; id: string; payload: { pageId: string; charIndex: number } }
   // Page-level mutations
   | { type: 'FLATTEN_PAGE'; id: string; payload: { pageId: string; flags?: FlattenFlags } }
+  | {
+      type: 'APPLY_REDACTIONS';
+      id: string;
+      payload: { pageId: string; fillColour?: Colour; removeIntersectingAnnotations?: boolean };
+    }
   | { type: 'GET_FORM_WIDGETS'; id: string; payload: { pageId: string } }
   // Form operations
   | { type: 'GET_FORM_SELECTED_TEXT'; id: string; payload: { pageId: string } }
@@ -176,7 +182,57 @@ export type WorkerRequest =
   | { type: 'GET_JAVASCRIPT_ACTIONS'; id: string; payload: { documentId: string } }
   | { type: 'GET_SIGNATURES'; id: string; payload: { documentId: string } }
   | { type: 'GET_PRINT_PAGE_RANGES'; id: string; payload: { documentId: string } }
-  | { type: 'GET_EXTENDED_DOCUMENT_INFO'; id: string; payload: { documentId: string } };
+  | { type: 'GET_EXTENDED_DOCUMENT_INFO'; id: string; payload: { documentId: string } }
+  // Annotation mutations
+  | { type: 'CREATE_ANNOTATION'; id: string; payload: { pageId: string; subtype: AnnotationType } }
+  | { type: 'REMOVE_ANNOTATION'; id: string; payload: { pageId: string; annotationIndex: number } }
+  | { type: 'SET_ANNOTATION_RECT'; id: string; payload: { pageId: string; annotationIndex: number; rect: Rect } }
+  | {
+      type: 'SET_ANNOTATION_COLOUR';
+      id: string;
+      payload: { pageId: string; annotationIndex: number; colourType: AnnotationColourType; colour: Colour };
+    }
+  | { type: 'SET_ANNOTATION_FLAGS'; id: string; payload: { pageId: string; annotationIndex: number; flags: number } }
+  | {
+      type: 'SET_ANNOTATION_STRING';
+      id: string;
+      payload: { pageId: string; annotationIndex: number; key: string; value: string };
+    }
+  | {
+      type: 'SET_ANNOTATION_BORDER';
+      id: string;
+      payload: { pageId: string; annotationIndex: number; hRadius: number; vRadius: number; borderWidth: number };
+    }
+  | {
+      type: 'SET_ANNOTATION_ATTACHMENT_POINTS';
+      id: string;
+      payload: { pageId: string; annotationIndex: number; quadIndex: number; points: SerialisedQuadPoints };
+    }
+  | {
+      type: 'APPEND_ANNOTATION_ATTACHMENT_POINTS';
+      id: string;
+      payload: { pageId: string; annotationIndex: number; points: SerialisedQuadPoints };
+    }
+  | { type: 'SET_ANNOTATION_URI'; id: string; payload: { pageId: string; annotationIndex: number; uri: string } }
+  | {
+      type: 'ADD_INK_STROKE';
+      id: string;
+      payload: { pageId: string; annotationIndex: number; points: Array<{ x: number; y: number }> };
+    }
+  | { type: 'GENERATE_PAGE_CONTENT'; id: string; payload: { pageId: string } }
+  // Page management operations
+  | { type: 'DELETE_PAGE'; id: string; payload: { documentId: string; pageIndex: number } }
+  | {
+      type: 'INSERT_BLANK_PAGE';
+      id: string;
+      payload: { documentId: string; pageIndex: number; width: number; height: number };
+    }
+  | {
+      type: 'MOVE_PAGES';
+      id: string;
+      payload: { documentId: string; pageIndices: number[]; destPageIndex: number };
+    }
+  | { type: 'SET_PAGE_ROTATION'; id: string; payload: { pageId: string; rotation: PageRotation } };
 
 /**
  * Maps each worker request type to its payload type.
@@ -217,6 +273,7 @@ export type WorkerRequestPayloadMap = {
   GET_CHARACTER_INFO: { pageId: string; charIndex: number };
   GET_CHAR_BOX: { pageId: string; charIndex: number };
   FLATTEN_PAGE: { pageId: string; flags?: FlattenFlags };
+  APPLY_REDACTIONS: { pageId: string; fillColour?: Colour; removeIntersectingAnnotations?: boolean };
   GET_FORM_WIDGETS: { pageId: string };
   GET_FORM_SELECTED_TEXT: { pageId: string };
   CAN_FORM_UNDO: { pageId: string };
@@ -257,6 +314,44 @@ export type WorkerRequestPayloadMap = {
   GET_SIGNATURES: { documentId: string };
   GET_PRINT_PAGE_RANGES: { documentId: string };
   GET_EXTENDED_DOCUMENT_INFO: { documentId: string };
+  // Annotation mutations
+  CREATE_ANNOTATION: { pageId: string; subtype: AnnotationType };
+  REMOVE_ANNOTATION: { pageId: string; annotationIndex: number };
+  SET_ANNOTATION_RECT: { pageId: string; annotationIndex: number; rect: Rect };
+  SET_ANNOTATION_COLOUR: {
+    pageId: string;
+    annotationIndex: number;
+    colourType: AnnotationColourType;
+    colour: Colour;
+  };
+  SET_ANNOTATION_FLAGS: { pageId: string; annotationIndex: number; flags: number };
+  SET_ANNOTATION_STRING: { pageId: string; annotationIndex: number; key: string; value: string };
+  SET_ANNOTATION_BORDER: {
+    pageId: string;
+    annotationIndex: number;
+    hRadius: number;
+    vRadius: number;
+    borderWidth: number;
+  };
+  SET_ANNOTATION_ATTACHMENT_POINTS: {
+    pageId: string;
+    annotationIndex: number;
+    quadIndex: number;
+    points: SerialisedQuadPoints;
+  };
+  APPEND_ANNOTATION_ATTACHMENT_POINTS: {
+    pageId: string;
+    annotationIndex: number;
+    points: SerialisedQuadPoints;
+  };
+  SET_ANNOTATION_URI: { pageId: string; annotationIndex: number; uri: string };
+  ADD_INK_STROKE: { pageId: string; annotationIndex: number; points: Array<{ x: number; y: number }> };
+  GENERATE_PAGE_CONTENT: { pageId: string };
+  // Page management operations
+  DELETE_PAGE: { documentId: string; pageIndex: number };
+  INSERT_BLANK_PAGE: { documentId: string; pageIndex: number; width: number; height: number };
+  MOVE_PAGES: { documentId: string; pageIndices: number[]; destPageIndex: number };
+  SET_PAGE_ROTATION: { pageId: string; rotation: PageRotation };
 };
 
 /**
@@ -334,6 +429,16 @@ export interface PageInfoResponse {
     trim: PageBox | undefined;
     art: PageBox | undefined;
   };
+}
+
+/**
+ * Response payload for APPLY_REDACTIONS.
+ */
+export interface ApplyRedactionsResponse {
+  appliedRegionCount: number;
+  removedObjectCount: number;
+  removedAnnotationCount: number;
+  insertedFillObjectCount: number;
 }
 
 /**
@@ -417,6 +522,7 @@ export interface SerialisedAnnotation {
   appearance: string | null;
   fontSize: number;
   // Type-specific data
+  lineFallback?: boolean;
   line: { start: { x: number; y: number }; end: { x: number; y: number } } | undefined;
   vertices: Array<{ x: number; y: number }> | undefined;
   inkPaths: Array<Array<{ x: number; y: number }>> | undefined;

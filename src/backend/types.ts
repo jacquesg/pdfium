@@ -485,6 +485,14 @@ export interface PDFiumBackend {
     pagesPerColumn: number,
   ): number;
 
+  /**
+   * Move pages within a document to a new position.
+   *
+   * @param pageIndices - Zero-based page indices to move (no duplicates).
+   * @param destPageIndex - Zero-based destination index.
+   */
+  movePages(docHandle: number, pageIndices: number[], destPageIndex: number): void;
+
   /** Copy viewer preferences from source to destination document. */
   copyViewerPreferences(destHandle: number, srcHandle: number): boolean;
 }

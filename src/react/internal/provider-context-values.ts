@@ -10,6 +10,7 @@ interface PDFiumDocumentContextValue extends ProviderStableDocCallbacks {
   document: WorkerPDFiumDocument | null;
   documentName: string | null;
   documentRevision: number;
+  pageRevisionVersion: number;
   error: Error | null;
   isInitialising: boolean;
   password: ProviderPasswordValue;
@@ -19,6 +20,7 @@ interface BuildPDFiumDocumentContextValueOptions {
   document: WorkerPDFiumDocument | null;
   documentName: string | null;
   documentRevision: number;
+  pageRevisionVersion: number;
   stableDocCallbacks: ProviderStableDocCallbacks;
   error: Error | null;
   isInitialising: boolean;
@@ -33,6 +35,7 @@ function buildPDFiumDocumentContextValue({
   document,
   documentName,
   documentRevision,
+  pageRevisionVersion,
   stableDocCallbacks,
   error,
   isInitialising,
@@ -42,6 +45,7 @@ function buildPDFiumDocumentContextValue({
     document,
     documentName,
     documentRevision,
+    pageRevisionVersion,
     ...stableDocCallbacks,
     error,
     isInitialising,
@@ -54,6 +58,7 @@ function usePDFiumContextValues({
   document,
   documentName,
   documentRevision,
+  pageRevisionVersion,
   stableDocCallbacks,
   error,
   isInitialising,
@@ -73,12 +78,22 @@ function usePDFiumContextValues({
         document,
         documentName,
         documentRevision,
+        pageRevisionVersion,
         stableDocCallbacks,
         error,
         isInitialising,
         passwordValue,
       }),
-    [document, documentName, documentRevision, stableDocCallbacks, error, isInitialising, passwordValue],
+    [
+      document,
+      documentName,
+      documentRevision,
+      pageRevisionVersion,
+      stableDocCallbacks,
+      error,
+      isInitialising,
+      passwordValue,
+    ],
   );
 
   return {

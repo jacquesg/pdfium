@@ -443,6 +443,10 @@ export class NativeBackend implements PDFiumBackend {
     return this.#binding.importNPagesToOne(srcHandle, outputWidth, outputHeight, pagesPerRow, pagesPerColumn);
   }
 
+  movePages(docHandle: number, pageIndices: number[], destPageIndex: number): void {
+    this.#binding.movePages(docHandle, pageIndices, destPageIndex);
+  }
+
   copyViewerPreferences(destHandle: number, srcHandle: number): boolean {
     return this.#binding.copyViewerPreferences(destHandle, srcHandle);
   }

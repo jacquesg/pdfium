@@ -252,6 +252,6 @@ describe('PDFPageView', () => {
     const { container } = render(<PDFPageView document={mockDoc} pageIndex={0} scale={1} />);
 
     const canvas = container.querySelector('[data-testid="pdf-canvas"]') as HTMLElement;
-    expect(canvas.style.opacity).toBe('0.7');
+    expect(canvas.style.opacity).toBe('var(--pdfium-page-placeholder-opacity, 0.7)');
   });
 });

@@ -16,6 +16,8 @@ describe('provider-types contracts', () => {
 
     const callbacks: ProviderStableDocCallbacks = {
       bumpDocumentRevision: () => undefined,
+      bumpPageRevision: (_pageIndex: number) => undefined,
+      getPageRevision: (_pageIndex: number) => 0,
       invalidateCache: () => undefined,
       loadDocument: async (_data: ArrayBuffer | Uint8Array, _name: string) => undefined,
       loadDocumentFromUrl: async (_url: string, _name: string) => undefined,
@@ -41,6 +43,8 @@ describe('provider-types contracts', () => {
   it('enforces async document loaders in callback contract at compile time', () => {
     const invalid: ProviderStableDocCallbacks = {
       bumpDocumentRevision: () => undefined,
+      bumpPageRevision: (_pageIndex: number) => undefined,
+      getPageRevision: (_pageIndex: number) => 0,
       invalidateCache: () => undefined,
       // @ts-expect-error `loadDocument` must return Promise<void>
       loadDocument: (_data: ArrayBuffer | Uint8Array, _name: string) => undefined,

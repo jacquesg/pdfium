@@ -5,7 +5,9 @@ import { queryStore } from '../../../../src/react/internal/query-store.js';
 import { createMockDocument, createMockPage, renderHookWithStores } from '../../../react-setup.js';
 
 vi.mock('../../../../src/react/context.js', () => ({
-  usePDFiumDocument: vi.fn().mockReturnValue({ documentRevision: 0 }),
+  usePDFiumDocument: vi
+    .fn()
+    .mockReturnValue({ documentRevision: 0, pageRevisionVersion: 0, getPageRevision: vi.fn(() => 0) }),
 }));
 
 const { useWebLinks } = await import('../../../../src/react/hooks/use-web-links.js');
@@ -24,13 +26,13 @@ describe('useWebLinks', () => {
   });
 
   it('builds the correct cache key', () => {
-    const key = buildCacheKey('mock-doc-id', 'webLinks', 0, 0);
-    expect(key).toBe('mock-doc-id\0webLinks\x000\x000');
+    const key = buildCacheKey('mock-doc-id', 'webLinks', 0, 0, 0);
+    expect(key).toBe('mock-doc-id\0webLinks\x000\x000\x000');
   });
 
   it('returns cached data on cache hit', () => {
     const webLinks = [{ url: 'https://example.com', rects: [{ left: 0, top: 10, right: 50, bottom: 0 }] }];
-    const key = buildCacheKey('mock-doc-id', 'webLinks', 0, 0);
+    const key = buildCacheKey('mock-doc-id', 'webLinks', 0, 0, 0);
     queryStore.set(key, { status: 'success', data: webLinks });
 
     const mockDoc = createMockDocument();

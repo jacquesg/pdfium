@@ -34,9 +34,21 @@ vi.mock('../../../../../src/react/components/pdf-viewer.js', () => ({
 }));
 
 const mockAnnotationsData: SerialisedAnnotation[] = [];
+let mockSelectionBridgeEnabled = false;
+const mockSelectionBridge = {
+  selection: null as { pageIndex: number; annotationIndex: number } | null,
+  setSelection: vi.fn(),
+};
+mockSelectionBridge.setSelection.mockImplementation((selection) => {
+  mockSelectionBridge.selection = selection;
+});
 
 vi.mock('../../../../../src/react/hooks/use-annotations.js', () => ({
   useAnnotations: () => ({ data: mockAnnotationsData }),
+}));
+
+vi.mock('../../../../../src/react/internal/annotation-selection-bridge-context.js', () => ({
+  useAnnotationSelectionBridgeOptional: () => (mockSelectionBridgeEnabled ? mockSelectionBridge : null),
 }));
 
 vi.mock('../../../../../src/react/components/annotation-overlay.js', () => ({
@@ -50,6 +62,9 @@ afterEach(() => {
   vi.clearAllMocks();
   mockAnnotationsData.length = 0;
   mockViewerState.viewer.navigation.pageIndex = 0;
+  mockViewerState.viewer.document = { id: 'mock-doc' };
+  mockSelectionBridgeEnabled = false;
+  mockSelectionBridge.selection = null;
 });
 
 // ---------------------------------------------------------------------------
@@ -161,6 +176,62 @@ describe('AnnotationsPanel', () => {
     expect(mockSetPanelOverlay).toHaveBeenCalledWith(expect.any(Function));
   });
 
+  it('does not replace the editor page overlay for bridged non-Link selections', () => {
+    mockSelectionBridgeEnabled = true;
+    mockAnnotationsData.push(makeAnnotation({ index: 7, type: AnnotationType.Square }));
+
+    render(<AnnotationsPanel />);
+
+    const itemButton = screen.getByText('#7').closest('button')!;
+    act(() => {
+      itemButton.click();
+    });
+
+    expect(mockSetPanelOverlay).toHaveBeenCalledWith(null);
+  });
+
+  it('forwards selectable annotation clicks into the editor selection bridge', () => {
+    mockSelectionBridgeEnabled = true;
+    mockAnnotationsData.push(makeAnnotation({ index: 4, type: AnnotationType.Square }));
+
+    render(<AnnotationsPanel />);
+
+    const itemButton = screen.getByText('#4').closest('button')!;
+    act(() => {
+      itemButton.click();
+    });
+
+    expect(mockSelectionBridge.setSelection).toHaveBeenCalledWith({ pageIndex: 0, annotationIndex: 4 });
+  });
+
+  it('does not forward Link annotations into the editor selection bridge', () => {
+    mockSelectionBridgeEnabled = true;
+    mockAnnotationsData.push(makeAnnotation({ index: 5, type: AnnotationType.Link }));
+
+    render(<AnnotationsPanel />);
+
+    const itemButton = screen.getByText('#5').closest('button')!;
+    act(() => {
+      itemButton.click();
+    });
+
+    expect(mockSelectionBridge.setSelection).toHaveBeenCalledWith(null);
+  });
+
+  it('keeps the panel overlay for Link annotations even when the editor bridge is enabled', () => {
+    mockSelectionBridgeEnabled = true;
+    mockAnnotationsData.push(makeAnnotation({ index: 8, type: AnnotationType.Link }));
+
+    render(<AnnotationsPanel />);
+
+    const itemButton = screen.getByText('#8').closest('button')!;
+    act(() => {
+      itemButton.click();
+    });
+
+    expect(mockSetPanelOverlay).toHaveBeenCalledWith(expect.any(Function));
+  });
+
   it('clears overlay on deselection (clicking selected annotation again)', () => {
     mockAnnotationsData.push(makeAnnotation({ index: 0 }));
 
@@ -180,6 +251,21 @@ describe('AnnotationsPanel', () => {
     });
 
     expect(mockSetPanelOverlay).toHaveBeenCalledWith(null);
+  });
+
+  it('clears the editor selection bridge when closing a non-Link detail panel', () => {
+    mockSelectionBridgeEnabled = true;
+    mockAnnotationsData.push(makeAnnotation({ index: 6, type: AnnotationType.Square }));
+    mockSelectionBridge.selection = { pageIndex: 0, annotationIndex: 6 };
+
+    render(<AnnotationsPanel />);
+
+    const closeButton = screen.getByRole('button', { name: 'Close detail panel' });
+    act(() => {
+      closeButton.click();
+    });
+
+    expect(mockSelectionBridge.setSelection).toHaveBeenLastCalledWith(null);
   });
 
   it('shows empty state when no annotations exist', () => {

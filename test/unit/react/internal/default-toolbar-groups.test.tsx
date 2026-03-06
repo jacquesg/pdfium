@@ -74,9 +74,8 @@ vi.mock('../../../../src/react/components/pdf-viewer-context.js', () => ({
   usePDFViewerOptional: () => viewerContext,
 }));
 
-const { FitGroup, FullscreenButton, PanelToggles, PrintProgress, ScrollAndSpreadGroup, SearchButton } = await import(
-  '../../../../src/react/internal/default-toolbar-groups.js'
-);
+const { FitGroup, FullscreenButton, PanelToggles, PrintProgress, RotationGroup, ScrollAndSpreadGroup, SearchButton } =
+  await import('../../../../src/react/internal/default-toolbar-groups.js');
 
 afterEach(() => {
   cleanup();
@@ -108,6 +107,26 @@ describe('default-toolbar-groups', () => {
     expect(setSpreadMode).not.toHaveBeenCalled();
   });
 
+  it('renders all scroll mode buttons and updates single-page and horizontal modes', () => {
+    render(<ScrollAndSpreadGroup />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Single page' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Horizontal scroll' }));
+
+    expect(setScrollMode).toHaveBeenCalledWith('single');
+    expect(setScrollMode).toHaveBeenCalledWith('horizontal');
+  });
+
+  it('updates odd and even spread modes when spreads are enabled', () => {
+    render(<ScrollAndSpreadGroup />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Odd page spreads' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Even page spreads' }));
+
+    expect(setSpreadMode).toHaveBeenCalledWith('odd');
+    expect(setSpreadMode).toHaveBeenCalledWith('even');
+  });
+
   it('renders panel toggles only when viewer and panel contexts are present', () => {
     render(<PanelToggles />);
     fireEvent.click(screen.getByRole('button', { name: 'Show thumbnails' }));
@@ -117,6 +136,14 @@ describe('default-toolbar-groups', () => {
     panelContext = null;
     render(<PanelToggles />);
     expect(screen.queryByRole('button', { name: 'Show thumbnails' })).toBeNull();
+  });
+
+  it('hides panel toggles when the panel bar is already present', () => {
+    panelContext = { activePanel: null, hasPanelBar: true, togglePanel };
+    render(<PanelToggles />);
+
+    expect(screen.queryByRole('button', { name: 'Show thumbnails' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Show bookmarks' })).toBeNull();
   });
 
   it('renders print progress circles', () => {
@@ -147,5 +174,10 @@ describe('default-toolbar-groups', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Enter fullscreen' }));
     expect(toggleFullscreen).toHaveBeenCalledTimes(1);
+  });
+
+  it('returns null for hidden rotation groups', () => {
+    const { container } = render(<RotationGroup hidden />);
+    expect(container.firstChild).toBeNull();
   });
 });

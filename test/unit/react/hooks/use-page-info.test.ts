@@ -5,7 +5,9 @@ import { queryStore } from '../../../../src/react/internal/query-store.js';
 import { createMockDocument, createMockPage, renderHookWithStores } from '../../../react-setup.js';
 
 vi.mock('../../../../src/react/context.js', () => ({
-  usePDFiumDocument: vi.fn().mockReturnValue({ documentRevision: 0 }),
+  usePDFiumDocument: vi
+    .fn()
+    .mockReturnValue({ documentRevision: 0, pageRevisionVersion: 0, getPageRevision: vi.fn(() => 0) }),
 }));
 
 // Must import after mock is set up
@@ -25,8 +27,8 @@ describe('usePageInfo', () => {
   });
 
   it('builds the correct cache key', () => {
-    const key = buildCacheKey('mock-doc-id', 'pageInfo', 0, 0);
-    expect(key).toBe('mock-doc-id\0pageInfo\x000\x000');
+    const key = buildCacheKey('mock-doc-id', 'pageInfo', 0, 0, 0);
+    expect(key).toBe('mock-doc-id\0pageInfo\x000\x000\x000');
   });
 
   it('returns cached data on cache hit', () => {
@@ -37,7 +39,7 @@ describe('usePageInfo', () => {
       charCount: 100,
       pageBoxes: {},
     };
-    const key = buildCacheKey('mock-doc-id', 'pageInfo', 0, 0);
+    const key = buildCacheKey('mock-doc-id', 'pageInfo', 0, 0, 0);
     queryStore.set(key, { status: 'success', data: pageInfo });
 
     const mockDoc = createMockDocument();
@@ -80,8 +82,8 @@ describe('usePageInfo', () => {
   });
 
   it('uses the correct page index in the cache key', () => {
-    const key0 = buildCacheKey('mock-doc-id', 'pageInfo', 0, 0);
-    const key3 = buildCacheKey('mock-doc-id', 'pageInfo', 0, 3);
+    const key0 = buildCacheKey('mock-doc-id', 'pageInfo', 0, 0, 0);
+    const key3 = buildCacheKey('mock-doc-id', 'pageInfo', 0, 3, 0);
     expect(key0).not.toBe(key3);
   });
 

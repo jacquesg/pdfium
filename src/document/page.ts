@@ -31,6 +31,7 @@ import {
   PageObjectType,
   PageRotation,
   type PageSize,
+  PathFillMode,
   type PDFAction,
   type PDFDestination,
   type PDFiumLimits,
@@ -76,6 +77,7 @@ import {
   fromNative,
   pageActionTypeMap,
   pageRotationMap,
+  pathFillModeMap,
   progressiveRenderStatusMap,
   toNative,
 } from '../internal/enum-maps.js';
@@ -97,6 +99,7 @@ import type {
   WASMPointer,
 } from '../internal/handles.js';
 import { convertBgraToRgba } from '../internal/pixel-conversion.js';
+import { REDACTION_FALLBACK_CONTENTS_MARKER } from '../internal/redaction-markers.js';
 import { INTERNAL } from '../internal/symbols.js';
 import type { Mutable } from '../internal/utility-types.js';
 import { NativeHandle, type WASMAllocation } from '../wasm/allocation.js';
@@ -136,6 +139,55 @@ const MAX_STRUCT_TREE_DEPTH = 100;
 
 /** Default tolerance for character position lookups (in points). */
 const DEFAULT_CHAR_POSITION_TOLERANCE = 10;
+/** Default fill colour for applied redactions (opaque black). */
+const DEFAULT_REDACTION_FILL_COLOUR: Colour = { r: 0, g: 0, b: 0, a: 255 };
+
+function normaliseRect(rect: Rect): Rect {
+  return {
+    left: Math.min(rect.left, rect.right),
+    top: Math.max(rect.top, rect.bottom),
+    right: Math.max(rect.left, rect.right),
+    bottom: Math.min(rect.top, rect.bottom),
+  };
+}
+
+function isNonZeroRect(rect: Rect): boolean {
+  return rect.right - rect.left > 0.001 && rect.top - rect.bottom > 0.001;
+}
+
+function rectsIntersect(a: Rect, b: Rect): boolean {
+  return !(a.right <= b.left || a.left >= b.right || a.top <= b.bottom || a.bottom >= b.top);
+}
+
+/**
+ * Options for applying redactions to a page.
+ */
+export interface ApplyRedactionsOptions {
+  /**
+   * Fill colour used for applied redaction boxes inserted into page content.
+   * Defaults to opaque black.
+   */
+  readonly fillColour?: Colour;
+  /**
+   * Whether to remove any annotation that intersects a redaction region.
+   * Defaults to `true`.
+   */
+  readonly removeIntersectingAnnotations?: boolean;
+}
+
+/**
+ * Result summary for redaction application.
+ */
+export interface ApplyRedactionsResult {
+  /** Number of redaction regions applied. */
+  readonly appliedRegionCount: number;
+  /** Number of page objects removed from redacted regions. */
+  readonly removedObjectCount: number;
+  /** Number of annotations removed from redacted regions. */
+  readonly removedAnnotationCount: number;
+  /** Number of redaction fill rectangles successfully inserted. */
+  readonly insertedFillObjectCount: number;
+}
 
 /**
  * Represents a single page in a PDF document.
@@ -616,7 +668,7 @@ export class PDFiumPage extends Disposable implements IPageReader {
       onProgress?.(0.3);
 
       // Render page
-      const flags = RenderFlags.ANNOT;
+      const flags = options.renderAnnotations === false ? 0 : RenderFlags.ANNOT;
       const rotation = options.rotation ?? PageRotation.None;
       const nativeRotation = toNative(pageRotationMap.toNative, rotation);
 
@@ -1712,6 +1764,136 @@ export class PDFiumPage extends Disposable implements IPageReader {
     return this.#openAnnotation(handle);
   }
 
+  #insertFilledRectObject(rect: Rect, fillColour: Colour): boolean {
+    const normalised = normaliseRect(rect);
+    if (!isNonZeroRect(normalised)) {
+      return false;
+    }
+
+    const width = normalised.right - normalised.left;
+    const height = normalised.top - normalised.bottom;
+    const objectHandle = this.#module._FPDFPageObj_CreateNewRect(normalised.left, normalised.bottom, width, height);
+    if (objectHandle === NULL_PAGE_OBJECT) {
+      return false;
+    }
+
+    const fillOk =
+      this.#module._FPDFPageObj_SetFillColor(objectHandle, fillColour.r, fillColour.g, fillColour.b, fillColour.a) !==
+      0;
+    const drawModeOk =
+      this.#module._FPDFPath_SetDrawMode(objectHandle, toNative(pathFillModeMap.toNative, PathFillMode.Winding), 0) !==
+      0;
+    if (!fillOk || !drawModeOk) {
+      this.#module._FPDFPageObj_Destroy(objectHandle);
+      return false;
+    }
+
+    this.#module._FPDFPage_InsertObject(this.#pageHandle, objectHandle);
+    return true;
+  }
+
+  /**
+   * Apply all pending redactions by removing overlapping page content.
+   *
+   * This performs destructive content redaction:
+   * - removes page objects overlapping redaction regions
+   * - optionally removes intersecting annotations
+   * - inserts opaque fill rectangles into page content for visual redaction marks
+   *
+   * After applying, the page content stream is regenerated.
+   */
+  applyRedactions(options: ApplyRedactionsOptions = {}): ApplyRedactionsResult {
+    this.ensureNotDisposed();
+    const fillColour = options.fillColour ?? DEFAULT_REDACTION_FILL_COLOUR;
+    const removeIntersectingAnnotations = options.removeIntersectingAnnotations ?? true;
+
+    const redactionRegions: Rect[] = [];
+    const allAnnotationRects: Array<{ index: number; rect: Rect; isRedaction: boolean }> = [];
+    const annotationCount = this.annotationCount;
+
+    for (let index = 0; index < annotationCount; index++) {
+      using annotation = this.getAnnotation(index);
+      const rect = annotation.getRect();
+      if (rect === null) {
+        continue;
+      }
+      const normalisedRect = normaliseRect(rect);
+      if (!isNonZeroRect(normalisedRect)) {
+        continue;
+      }
+      const isRedaction =
+        annotation.type === AnnotationType.Redact ||
+        (annotation.type === AnnotationType.Square && annotation.contents === REDACTION_FALLBACK_CONTENTS_MARKER);
+      allAnnotationRects.push({ index, rect: normalisedRect, isRedaction });
+      if (isRedaction) {
+        redactionRegions.push(normalisedRect);
+      }
+    }
+
+    if (redactionRegions.length === 0) {
+      return {
+        appliedRegionCount: 0,
+        removedObjectCount: 0,
+        removedAnnotationCount: 0,
+        insertedFillObjectCount: 0,
+      };
+    }
+
+    let removedObjectCount = 0;
+    for (const object of this.objects()) {
+      const objectBounds = normaliseRect(object.bounds);
+      if (!isNonZeroRect(objectBounds)) {
+        continue;
+      }
+      const intersectsRegion = redactionRegions.some((region) => rectsIntersect(objectBounds, region));
+      if (!intersectsRegion) {
+        continue;
+      }
+      if (this.removeObject(object)) {
+        removedObjectCount++;
+      }
+    }
+
+    const removableAnnotationIndices = new Set<number>();
+    for (const annotation of allAnnotationRects) {
+      if (annotation.isRedaction) {
+        removableAnnotationIndices.add(annotation.index);
+        continue;
+      }
+      if (!removeIntersectingAnnotations) {
+        continue;
+      }
+      const intersectsRegion = redactionRegions.some((region) => rectsIntersect(annotation.rect, region));
+      if (intersectsRegion) {
+        removableAnnotationIndices.add(annotation.index);
+      }
+    }
+
+    const sortedAnnotationIndices = [...removableAnnotationIndices].sort((a, b) => b - a);
+    let removedAnnotationCount = 0;
+    for (const annotationIndex of sortedAnnotationIndices) {
+      if (this.removeAnnotation(annotationIndex)) {
+        removedAnnotationCount++;
+      }
+    }
+
+    let insertedFillObjectCount = 0;
+    for (const region of redactionRegions) {
+      if (this.#insertFilledRectObject(region, fillColour)) {
+        insertedFillObjectCount++;
+      }
+    }
+
+    this.generateContent();
+
+    return {
+      appliedRegionCount: redactionRegions.length,
+      removedObjectCount,
+      removedAnnotationCount,
+      insertedFillObjectCount,
+    };
+  }
+
   /**
    * Check if an annotation subtype is supported for object extraction.
    *
@@ -2420,10 +2602,19 @@ export class PDFiumPage extends Disposable implements IPageReader {
     }
 
     const type = this.#readStructString((buf, len) => this.#module._FPDF_StructElement_GetType(element, buf, len));
+    const objectType = this.#readStructString((buf, len) =>
+      this.#module._FPDF_StructElement_GetObjType(element, buf, len),
+    );
+    const id = this.#readStructString((buf, len) => this.#module._FPDF_StructElement_GetID(element, buf, len));
+    const title = this.#readStructString((buf, len) => this.#module._FPDF_StructElement_GetTitle(element, buf, len));
+    const actualText = this.#readStructString((buf, len) =>
+      this.#module._FPDF_StructElement_GetActualText(element, buf, len),
+    );
     const altText = this.#readStructString((buf, len) =>
       this.#module._FPDF_StructElement_GetAltText(element, buf, len),
     );
     const lang = this.#readStructString((buf, len) => this.#module._FPDF_StructElement_GetLang(element, buf, len));
+    const markedContentId = this.#module._FPDF_StructElement_GetMarkedContentID(element);
 
     const childCount = this.#module._FPDF_StructElement_CountChildren(element);
     const children: StructureElement[] = [];
@@ -2435,11 +2626,26 @@ export class PDFiumPage extends Disposable implements IPageReader {
     }
 
     const result: StructureElement = { type, children };
+    if (objectType) {
+      (result as Mutable<StructureElement>).objectType = objectType;
+    }
+    if (id) {
+      (result as Mutable<StructureElement>).id = id;
+    }
+    if (title) {
+      (result as Mutable<StructureElement>).title = title;
+    }
+    if (actualText) {
+      (result as Mutable<StructureElement>).actualText = actualText;
+    }
     if (altText) {
       (result as Mutable<StructureElement>).altText = altText;
     }
     if (lang) {
       (result as Mutable<StructureElement>).lang = lang;
+    }
+    if (markedContentId !== -1) {
+      (result as Mutable<StructureElement>).markedContentId = markedContentId;
     }
     return result;
   }

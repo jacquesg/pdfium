@@ -30,6 +30,8 @@ function createMockStores(): PDFiumStores {
 function createStableDocCallbacks(): ProviderStableDocCallbacks {
   return {
     bumpDocumentRevision: vi.fn(),
+    bumpPageRevision: vi.fn(),
+    getPageRevision: vi.fn(() => 0),
     invalidateCache: vi.fn(),
     loadDocument: vi.fn(async () => undefined),
     loadDocumentFromUrl: vi.fn(async () => undefined),
@@ -559,6 +561,52 @@ describe('usePDFiumProviderController', () => {
     });
 
     expect(openedDocument.dispose).not.toHaveBeenCalled();
+  });
+
+  it('clears browser text selection when a document load succeeds', async () => {
+    const stores = createMockStores();
+    const openedDocument = {
+      id: 'selection-reset-doc',
+      dispose: vi.fn().mockResolvedValue(undefined),
+    };
+    const worker = {
+      openDocument: vi.fn().mockResolvedValue(openedDocument),
+      dispose: vi.fn(),
+    } as unknown as WorkerPDFium;
+    const removeAllRanges = vi.fn();
+    vi.stubGlobal(
+      'getSelection',
+      vi.fn(() => ({
+        removeAllRanges,
+      })),
+    );
+
+    const { result } = renderHook(() =>
+      usePDFiumProviderController({
+        wasmBinary: new ArrayBuffer(8),
+        wasmUrl: undefined,
+        workerUrl: '/worker.js',
+        initialDocument: undefined,
+        maxCachedPages: undefined,
+        stores,
+      }),
+    );
+
+    const providerApiOptions = mockUseProviderDocumentApi.mock.calls[0]?.[0] as {
+      loadDocumentInternal: (
+        instance: WorkerPDFium,
+        data: ArrayBuffer | Uint8Array,
+        name: string,
+        password?: string,
+      ) => Promise<void>;
+    };
+
+    await providerApiOptions.loadDocumentInternal(worker, new Uint8Array([1, 2, 3]), 'selection-reset.pdf');
+
+    expect(removeAllRanges).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      expect(result.current.document).toBe(openedDocument);
+    });
   });
 
   it('does not start worker initialisation until a binary is resolved', () => {

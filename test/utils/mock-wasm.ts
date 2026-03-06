@@ -346,11 +346,32 @@ export function createMockWasmModule() {
     _FPDF_StructTree_CountChildren: vi.fn(() => 0),
     _FPDF_StructTree_GetChildAtIndex: vi.fn(() => 0),
     _FPDF_StructElement_GetType: vi.fn(() => 0),
+    _FPDF_StructElement_GetObjType: vi.fn(() => 0),
+    _FPDF_StructElement_GetID: vi.fn(() => 0),
     _FPDF_StructElement_GetTitle: vi.fn(() => 0),
+    _FPDF_StructElement_GetActualText: vi.fn(() => 0),
     _FPDF_StructElement_GetAltText: vi.fn(() => 0),
     _FPDF_StructElement_GetLang: vi.fn(() => 0),
     _FPDF_StructElement_CountChildren: vi.fn(() => 0),
     _FPDF_StructElement_GetChildAtIndex: vi.fn(() => 0),
+    _FPDF_StructElement_GetParent: vi.fn(() => 0),
+    _FPDF_StructElement_GetMarkedContentID: vi.fn(() => -1),
+    _FPDF_StructElement_GetMarkedContentIdCount: vi.fn(() => 0),
+    _FPDF_StructElement_GetMarkedContentIdAtIndex: vi.fn(() => -1),
+    _FPDF_StructElement_GetChildMarkedContentID: vi.fn(() => -1),
+    _FPDF_StructElement_GetStringAttribute: vi.fn(() => 0),
+    _FPDF_StructElement_GetAttributeCount: vi.fn(() => 0),
+    _FPDF_StructElement_GetAttributeAtIndex: vi.fn(() => 0),
+    _FPDF_StructElement_Attr_GetCount: vi.fn(() => 0),
+    _FPDF_StructElement_Attr_GetName: vi.fn(() => 0),
+    _FPDF_StructElement_Attr_GetType: vi.fn(() => 0),
+    _FPDF_StructElement_Attr_GetBooleanValue: vi.fn(() => 0),
+    _FPDF_StructElement_Attr_GetNumberValue: vi.fn(() => 0),
+    _FPDF_StructElement_Attr_GetStringValue: vi.fn(() => 0),
+    _FPDF_StructElement_Attr_GetBlobValue: vi.fn(() => 0),
+    _FPDF_StructElement_Attr_CountChildren: vi.fn(() => 0),
+    _FPDF_StructElement_Attr_GetChildAtIndex: vi.fn(() => 0),
+    _FPDF_StructElement_Attr_GetValue: vi.fn(() => 0),
 
     // Text Search
     _FPDFText_FindStart: vi.fn(() => 0),
@@ -421,10 +442,11 @@ export function createMockWasmModule() {
     _FPDFSignatureObj_GetTime: vi.fn(() => 0),
     _FPDFSignatureObj_GetDocMDPPermission: vi.fn(() => 0),
 
-    // Page Import/Export
+    // Page Import/Export/Move
     _FPDF_ImportPages: vi.fn(() => 1),
     _FPDF_ImportPagesByIndex: vi.fn(() => 1),
     _FPDF_ImportNPagesToOne: vi.fn(() => 100),
+    _FPDF_MovePages: vi.fn(() => 1),
     _FPDF_CopyViewerPreferences: vi.fn(() => 1),
 
     // Document

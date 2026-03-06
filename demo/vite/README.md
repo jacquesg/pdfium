@@ -35,18 +35,22 @@ A comprehensive React application demonstrating the full `@scaryterry/pdfium` AP
    pnpm build
    ```
 
-2. Run the setup script to copy required assets:
-   ```bash
-   pnpm tsx demo/scripts/setup.ts
-   ```
-
-3. Install dependencies and start the dev server:
+2. Install dependencies and start the dev server:
    ```bash
    pnpm --dir demo/vite install
    pnpm --dir demo/vite dev
    ```
+   `dev` runs asset sync automatically (`demo/scripts/setup.ts`) before starting Vite.
+   It also auto-heals stale linked library output via `demo/scripts/ensure-lib-build.ts`
+   (which runs `pnpm build` only when `dist/` is out of date).
 
-4. Open http://localhost:5173
+   For the editor workflow, use the root-level orchestrator:
+   ```bash
+   pnpm dev:editor
+   ```
+   This runs an initial library build, starts `build:watch`, and launches the Vite demo together.
+
+3. Open http://localhost:5173
 
 ### Standalone Mode (from npm)
 
@@ -124,10 +128,10 @@ demo/vite/
 │   ├── sample.pdf            # Default document
 │   ├── reference.pdf         # Reference document (for Text lab)
 │   ├── annots.pdf            # Annotated document (for Annotations lab)
-│   ├── protected.pdf         # Password-protected document (for Security lab)
-│   └── worker.js             # Web Worker script
+│   └── protected.pdf         # Password-protected document (for Security lab)
 ├── src/
 │   ├── App.tsx               # Main app with 12-tab navigation, React.lazy code splitting
+│   ├── pdfium.worker.ts      # Worker entry (imports @scaryterry/pdfium/worker)
 │   ├── client.ts             # React Query client configuration
 │   ├── main.tsx              # Entry point with providers
 │   ├── index.css             # Utility CSS classes
@@ -200,13 +204,32 @@ pnpm --dir demo/vite test
 
 Tests use Vitest with `@testing-library/react` in browser mode (Playwright). Each lab has a test file with smoke tests verifying key UI elements render correctly.
 
+## Editor Guarantees And Limits
+
+The `#editor` demo is alpha-quality but now enforces a stricter model:
+
+- Text markup annotations (Highlight/Underline/Strikeout) are text-selection actions, not draggable/resizeable shape modes.
+- Shape tools are one-shot create actions: after creation, the editor returns to neutral selection mode.
+- Selection overlays and property edits are driven by optimistic mutation state to stay responsive while worker commits finish.
+- Undo/redo is session-scoped and reliable before saving/reloading.
+
+Known limits to keep in mind:
+
+- Line creation currently uses an Ink-based line fallback for rendering/editing consistency across current PDFium bindings.
+- Redaction is a two-step workflow (`mark` then `apply`); apply is destructive page-content rewriting and should be validated in compliance workflows.
+- CI currently validates editor browser behavior in Chromium. Firefox can be run via `pnpm test:browser:editor:firefox`; WebKit parity is planned separately.
+
 ## Troubleshooting
 
 ### Error: Failed to fetch /pdfium.cjs
 
 **Cause**: The `pdfium.cjs` file is not in the `public/` directory.
 
-**Solution**: Run the setup script (`pnpm tsx demo/scripts/setup.ts`) or manually copy:
+**Solution**: Run asset sync:
+```bash
+pnpm --dir demo/vite run sync-assets
+```
+Or manually copy:
 ```bash
 cp ../../dist/vendor/pdfium.cjs public/
 ```
@@ -215,7 +238,11 @@ cp ../../dist/vendor/pdfium.cjs public/
 
 **Cause**: The sample PDF is not in the `public/` directory.
 
-**Solution**: Run the setup script, or manually copy:
+**Solution**: Run asset sync:
+```bash
+pnpm --dir demo/vite run sync-assets
+```
+Or manually copy:
 ```bash
 cp ../shared/sample.pdf public/
 ```
@@ -225,7 +252,7 @@ cp ../shared/sample.pdf public/
 **Cause**: Dependencies not installed or main package not built.
 
 **Solution**:
-1. Build the main package: `pnpm build` (from repository root)
+1. Re-sync the linked build (auto-builds if needed): `pnpm --dir demo/vite run ensure-lib-build`
 2. Install demo dependencies: `pnpm --dir demo/vite install`
 
 ### Vite optimisation breaks the WASM loading

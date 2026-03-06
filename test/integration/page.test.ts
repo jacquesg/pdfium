@@ -5,13 +5,28 @@
  */
 
 import { RenderError } from '../../src/core/errors.js';
-import { PageRotation, TextSearchFlags } from '../../src/core/types.js';
+import { AnnotationType, PageRotation, TextSearchFlags } from '../../src/core/types.js';
+import { REDACTION_FALLBACK_CONTENTS_MARKER } from '../../src/internal/redaction-markers.js';
 import { INTERNAL } from '../../src/internal/symbols.js';
 import { describe, expect, test } from '../utils/fixtures.js';
 
 // A4 page dimensions in points (72 DPI)
 const A4_WIDTH = 595;
 const A4_HEIGHT = 842;
+
+function createPageRedactionAnnotation(
+  page: import('../../src/document/page.js').PDFiumPage,
+  rect: { left: number; bottom: number; right: number; top: number },
+) {
+  const nativeRedaction = page.createAnnotation(AnnotationType.Redact);
+  const annotation = nativeRedaction ?? page.createAnnotation(AnnotationType.Square);
+  expect(annotation).not.toBeNull();
+  expect(annotation!.setRect(rect)).toBe(true);
+  if (nativeRedaction === null) {
+    expect(annotation!.setStringValue('Contents', REDACTION_FALLBACK_CONTENTS_MARKER)).toBe(true);
+  }
+  return annotation!;
+}
 
 describe('PDFiumPage', () => {
   describe('size', () => {
@@ -354,6 +369,99 @@ describe('PDFiumPage annotations', () => {
     const doc = await openDocument('test_6_with_form.pdf');
     using page = doc.getPage(0);
     expect(page.annotationCount).toBe(49);
+  });
+
+  describe('applyRedactions', () => {
+    test('returns an empty summary when the page has no redaction annotations', async ({ pdfium }) => {
+      using builder = pdfium.createDocument();
+      const pageBuilder = builder.addPage();
+      const font = builder.loadStandardFont('Helvetica');
+      pageBuilder.addText('Visible text', 72, 720, font, 18);
+      const bytes = builder.save();
+
+      using document = await pdfium.openDocument(bytes);
+      using page = document.getPage(0);
+
+      expect(page.applyRedactions()).toEqual({
+        appliedRegionCount: 0,
+        removedObjectCount: 0,
+        removedAnnotationCount: 0,
+        insertedFillObjectCount: 0,
+      });
+    });
+
+    test('removes overlapping page objects and inserts fill rectangles for redactions', async ({ pdfium }) => {
+      using builder = pdfium.createDocument();
+      const pageBuilder = builder.addPage();
+      pageBuilder.addRectangle(50, 50, 100, 100, {
+        fill: { r: 255, g: 0, b: 0, a: 255 },
+      });
+      const bytes = builder.save();
+
+      using document = await pdfium.openDocument(bytes);
+      using page = document.getPage(0);
+
+      using _redaction = createPageRedactionAnnotation(page, {
+        left: 40,
+        bottom: 40,
+        right: 170,
+        top: 170,
+      });
+
+      const result = page.applyRedactions({
+        fillColour: { r: 0, g: 0, b: 0, a: 255 },
+      });
+
+      expect(result.appliedRegionCount).toBe(1);
+      expect(result.removedObjectCount).toBeGreaterThanOrEqual(1);
+      expect(result.removedAnnotationCount).toBeGreaterThanOrEqual(1);
+      expect(result.insertedFillObjectCount).toBe(1);
+    });
+
+    test('keeps intersecting non-redaction annotations when removeIntersectingAnnotations is false', async ({
+      pdfium,
+    }) => {
+      using builder = pdfium.createDocument();
+      const pageBuilder = builder.addPage();
+      pageBuilder.addRectangle(60, 60, 120, 120, {
+        fill: { r: 0, g: 0, b: 255, a: 255 },
+      });
+      const bytes = builder.save();
+
+      using document = await pdfium.openDocument(bytes);
+      using page = document.getPage(0);
+
+      using _redaction = createPageRedactionAnnotation(page, {
+        left: 50,
+        bottom: 50,
+        right: 190,
+        top: 190,
+      });
+      using note = page.createAnnotation(AnnotationType.Text);
+      expect(note).not.toBeNull();
+      expect(
+        note!.setRect({
+          left: 80,
+          bottom: 80,
+          right: 120,
+          top: 120,
+        }),
+      ).toBe(true);
+
+      const result = page.applyRedactions({
+        removeIntersectingAnnotations: false,
+      });
+
+      expect(result.appliedRegionCount).toBe(1);
+      expect(result.removedAnnotationCount).toBe(1);
+
+      const remainingTypes = page.getAnnotations().map((annotation) => {
+        const type = annotation.type;
+        annotation.dispose();
+        return type;
+      });
+      expect(remainingTypes).toContain(AnnotationType.Text);
+    });
   });
 
   test('should get annotations array', async ({ openDocument }) => {

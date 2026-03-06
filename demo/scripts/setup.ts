@@ -14,7 +14,7 @@
  *   pnpm tsx demo/scripts/setup.ts
  */
 
-import { copyFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
+import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -97,17 +97,12 @@ function setupPlainDemo(): void {
   const sourceCjs = join(REPO_ROOT, "dist", "vendor", "pdfium.cjs");
   const targetCjs = join(REPO_ROOT, "pdfium.cjs");
 
-  if (!existsSync(targetCjs)) {
-    copyFileSync(sourceCjs, targetCjs);
-    log("Copied pdfium.cjs to repository root (for plain demo)");
-  } else {
-    log("pdfium.cjs already exists in repository root");
-  }
+  copyFileSync(sourceCjs, targetCjs);
+  log("Synced pdfium.cjs to repository root (for plain demo)");
 }
 
 function setupViteDemo(): void {
   const vitePublicDir = join(DEMO_ROOT, "vite", "public");
-  const distDir = join(REPO_ROOT, "dist");
   const sourceCjs = join(REPO_ROOT, "dist", "vendor", "pdfium.cjs");
   const sourcePdf = join(DEMO_ROOT, "shared", "sample.pdf");
   const targetCjs = join(vitePublicDir, "pdfium.cjs");
@@ -117,12 +112,8 @@ function setupViteDemo(): void {
     mkdirSync(vitePublicDir, { recursive: true });
   }
 
-  if (!existsSync(targetCjs)) {
-    copyFileSync(sourceCjs, targetCjs);
-    log("Copied pdfium.cjs to demo/vite/public/");
-  } else {
-    log("demo/vite/public/pdfium.cjs already exists");
-  }
+  copyFileSync(sourceCjs, targetCjs);
+  log("Synced pdfium.cjs to demo/vite/public/");
 
   if (!existsSync(targetPdf)) {
     copyFileSync(sourcePdf, targetPdf);
@@ -196,17 +187,14 @@ function setupViteDemo(): void {
     log(`Copied ${sampleCount} fixture PDFs to public/samples/`);
   }
 
-  // Copy all JS chunks from dist to public
-  // This ensures the worker can load its dependencies (split chunks)
-  const files = readdirSync(distDir);
-  let chunkCount = 0;
-  for (const file of files) {
-    if (file.endsWith(".js") || file.endsWith(".js.map")) {
-      copyFileSync(join(distDir, file), join(vitePublicDir, file));
-      chunkCount++;
-    }
+  const legacyWorker = join(vitePublicDir, "worker.js");
+  if (existsSync(legacyWorker)) {
+    rmSync(legacyWorker);
+    log("Removed stale demo/vite/public/worker.js (worker now comes from src/pdfium.worker.ts)");
   }
-  log(`Copied ${chunkCount} JS/Map files from dist/ to demo/vite/public/`);
+
+  // Worker entry is authored in demo/vite/src/pdfium.worker.ts and bundled by Vite.
+  // No worker artefact copy is required here.
 }
 
 function main(): void {

@@ -35,10 +35,19 @@ interface UsePDFiumProviderControllerResult {
   document: WorkerPDFiumDocument | null;
   documentName: string | null;
   documentRevision: number;
+  pageRevisionVersion: number;
   error: Error | null;
   isInitialising: boolean;
   stableDocCallbacks: ProviderStableDocCallbacks;
   passwordValue: ProviderPasswordValue;
+}
+
+function clearBrowserSelection(): void {
+  try {
+    globalThis.getSelection?.()?.removeAllRanges();
+  } catch {
+    // Ignore browser selection cleanup failures. Document load must still complete.
+  }
 }
 
 function usePDFiumProviderController({
@@ -58,12 +67,14 @@ function usePDFiumProviderController({
   const document = documentLifecycle.document;
   const documentName = documentLifecycle.documentName;
   const [documentRevision, setDocumentRevision] = useState(0);
+  const [pageRevisionVersion, setPageRevisionVersion] = useState(0);
   const [error, setError] = useState<Error | null>(null);
   const [isInitialising, setIsInitialising] = useState(true);
 
   const documentRef = useRef<WorkerPDFiumDocument | null>(null);
   const instanceRef = useRef<WorkerPDFium | null>(null);
   const loadGenerationRef = useRef(0);
+  const pageRevisionsRef = useRef<Map<number, number>>(new Map());
   const storesRef = useRef<PDFiumStores | null>(null);
   const warnedStoresChangeRef = useRef(false);
   const mountedRef = useRef(true);
@@ -76,6 +87,11 @@ function usePDFiumProviderController({
   const setDocumentRevisionSafe = useCallback((updater: (prev: number) => number) => {
     if (!mountedRef.current) return;
     setDocumentRevision(updater);
+  }, []);
+
+  const setPageRevisionVersionSafe = useCallback((updater: (prev: number) => number) => {
+    if (!mountedRef.current) return;
+    setPageRevisionVersion(updater);
   }, []);
 
   const setResolvedBinarySafe = useCallback((binary: ArrayBuffer) => {
@@ -102,6 +118,28 @@ function usePDFiumProviderController({
     if (!mountedRef.current) return;
     setError(null);
   }, []);
+
+  const getPageRevision = useCallback((pageIndex: number): number => {
+    return pageRevisionsRef.current.get(pageIndex) ?? 0;
+  }, []);
+
+  const bumpPageRevisionSafe = useCallback(
+    (pageIndex: number) => {
+      if (!mountedRef.current) return;
+      if (!Number.isInteger(pageIndex) || pageIndex < 0) return;
+      const nextRevision = (pageRevisionsRef.current.get(pageIndex) ?? 0) + 1;
+      pageRevisionsRef.current.set(pageIndex, nextRevision);
+      setPageRevisionVersionSafe((prev) => prev + 1);
+    },
+    [setPageRevisionVersionSafe],
+  );
+
+  const resetPageRevisionsSafe = useCallback(() => {
+    if (!mountedRef.current) return;
+    if (pageRevisionsRef.current.size === 0) return;
+    pageRevisionsRef.current.clear();
+    setPageRevisionVersionSafe((prev) => prev + 1);
+  }, [setPageRevisionVersionSafe]);
 
   const handleErrorState = useMemo(() => createErrorStateHandler(setErrorStateSafe), [setErrorStateSafe]);
 
@@ -181,8 +219,10 @@ function usePDFiumProviderController({
         openDocument: (nextData, options) => inst.openDocument(nextData, options),
         disposePreviousDocument: disposeOld,
         onLoadSuccess: (newDoc) => {
+          clearBrowserSelection();
           documentRef.current = newDoc;
           dispatchDocumentLifecycleSafe({ type: 'loadSuccess', document: newDoc, name });
+          resetPageRevisionsSafe();
           setDocumentRevisionSafe((prev: number) => prev + 1);
           clearErrorStateSafe();
         },
@@ -207,7 +247,14 @@ function usePDFiumProviderController({
         ...(password !== undefined ? { password } : {}),
       });
     },
-    [clearErrorStateSafe, dispatchDocumentLifecycleSafe, handleErrorState, scopedStores, setDocumentRevisionSafe],
+    [
+      clearErrorStateSafe,
+      dispatchDocumentLifecycleSafe,
+      handleErrorState,
+      resetPageRevisionsSafe,
+      scopedStores,
+      setDocumentRevisionSafe,
+    ],
   );
 
   const loadDocumentBufferFromUrl = useCallback(
@@ -228,6 +275,9 @@ function usePDFiumProviderController({
     scopedStores,
     loadDocumentInternal,
     loadDocumentBufferFromUrl,
+    bumpPageRevision: bumpPageRevisionSafe,
+    getPageRevision,
+    resetPageRevisions: resetPageRevisionsSafe,
     setDocumentRevision: setDocumentRevisionSafe,
     setError: handleErrorState,
   });
@@ -277,6 +327,7 @@ function usePDFiumProviderController({
     document,
     documentName,
     documentRevision,
+    pageRevisionVersion,
     error,
     isInitialising,
     stableDocCallbacks,

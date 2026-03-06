@@ -38,6 +38,10 @@
       "types": "./dist/react.d.ts",
       "import": "./dist/react.js"
     },
+    "./react/editor": {
+      "types": "./dist/react/editor/index.d.ts",
+      "import": "./dist/react/editor/index.js"
+    },
     "./package.json": "./package.json"
   },
   "typesVersions": {
@@ -56,6 +60,9 @@
       ],
       "react": [
         "./dist/react.d.ts"
+      ],
+      "react/editor": [
+        "./dist/react/editor/index.d.ts"
       ]
     }
   },
@@ -75,7 +82,9 @@
       "optional": false
     }
   },
-  "sideEffects": false,
+  "sideEffects": [
+    "./dist/core/logger.js"
+  ],
   "files": [
     "dist/**/*",
     "scripts/postinstall.js"
@@ -96,6 +105,7 @@
     "postinstall": "node scripts/postinstall.js",
     "build": "tsup && node --import tsx scripts/finalize-react-build.ts",
     "build:watch": "tsup --watch",
+    "dev:editor": "node --import tsx demo/scripts/dev-editor.ts",
     "build:native": "napi build --features napi --platform --release",
     "download:pdfium": "node --import tsx scripts/download-pdfium.ts",
     "check:pdfium-updates": "node --import tsx scripts/check-pdfium-updates.ts",
@@ -111,7 +121,10 @@
     "test:mutation": "stryker run",
     "test:bench": "vitest bench --config vitest.bench.config.ts",
     "test:visual": "vitest run test/visual",
-    "test:browser": "playwright test",
+    "test:browser": "env -u NO_COLOR playwright test",
+    "test:browser:editor": "env -u NO_COLOR -u FORCE_COLOR playwright test --config playwright.editor.config.ts",
+    "test:browser:editor:firefox": "EDITOR_E2E_INCLUDE_FIREFOX=1 env -u NO_COLOR -u FORCE_COLOR playwright test --config playwright.editor.config.ts --project=firefox",
+    "test:browser:editor:stress": "env -u NO_COLOR -u FORCE_COLOR playwright test --config playwright.editor.config.ts --project=chromium --repeat-each=2",
     "test:worker-runtime": "node --import tsx scripts/verify-worker-runtime.ts",
     "serve:test": "vite --config vite.test.config.ts",
     "lint": "biome check --error-on-warnings .",

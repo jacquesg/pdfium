@@ -166,6 +166,8 @@ export interface RenderOptions {
   width?: number;
   /** Target height in pixels (overrides scale) */
   height?: number;
+  /** Include annotations in the rendered page bitmap (default: true) */
+  renderAnnotations?: boolean;
   /** Include form fields in render (default: false) */
   renderFormFields?: boolean;
   /** Background colour as ARGB integer (default: 0xFFFFFFFF - white) */
@@ -684,12 +686,20 @@ export interface TextSearchResult {
 export interface StructureElement {
   /** The element type (e.g., "P", "H1", "Table", "Figure"). */
   readonly type: string;
+  /** The object type (role mapping), if present. */
+  readonly objectType?: string;
+  /** The element ID, if present. */
+  readonly id?: string;
   /** The title attribute, if present. */
   readonly title?: string;
+  /** The actual text content, if present. */
+  readonly actualText?: string;
   /** Alternative text for accessibility, if present. */
   readonly altText?: string;
   /** The language attribute (e.g., "en-US"), if present. */
   readonly lang?: string;
+  /** The marked content ID, or -1 if not set. */
+  readonly markedContentId?: number;
   /** Child structure elements. */
   readonly children: readonly StructureElement[];
 }

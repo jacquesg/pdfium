@@ -192,4 +192,61 @@ describe('createViewerKeyboardActions', () => {
 
     expect(viewer.navigation.setPageIndex).toHaveBeenCalledWith(0);
   });
+
+  it('delegates direct viewer actions to the underlying controller APIs', () => {
+    const viewer = createViewer({ pageCount: 7, pageIndex: 3 });
+    const zoomReset = vi.fn();
+    const actions = createViewerKeyboardActions({
+      viewer,
+      showSearch: true,
+      isSearchOpen: false,
+      toggleSearch: vi.fn(),
+      search: createSearchResult(),
+      zoomReset,
+    });
+
+    actions.firstPage?.();
+    actions.nextPage?.();
+    actions.prevPage?.();
+    actions.zoomIn?.();
+    actions.zoomOut?.();
+    actions.zoomReset?.();
+    actions.rotateClockwise?.();
+    actions.rotateCounterClockwise?.();
+    actions.toggleFullscreen?.();
+    actions.print?.();
+    actions.setPointerMode?.();
+    actions.setPanMode?.();
+    actions.setMarqueeMode?.();
+
+    expect(viewer.navigation.setPageIndex).toHaveBeenCalledWith(0);
+    expect(viewer.navigation.next).toHaveBeenCalledTimes(1);
+    expect(viewer.navigation.prev).toHaveBeenCalledTimes(1);
+    expect(viewer.zoom.zoomIn).toHaveBeenCalledTimes(1);
+    expect(viewer.zoom.zoomOut).toHaveBeenCalledTimes(1);
+    expect(zoomReset).toHaveBeenCalledTimes(1);
+    expect(viewer.rotation.rotatePage).toHaveBeenNthCalledWith(1, 3, 'cw');
+    expect(viewer.rotation.rotatePage).toHaveBeenNthCalledWith(2, 3, 'ccw');
+    expect(viewer.fullscreen.toggleFullscreen).toHaveBeenCalledTimes(1);
+    expect(viewer.print.print).toHaveBeenCalledTimes(1);
+    expect(viewer.interaction.setMode).toHaveBeenNthCalledWith(1, 'pointer');
+    expect(viewer.interaction.setMode).toHaveBeenNthCalledWith(2, 'pan');
+    expect(viewer.interaction.setMode).toHaveBeenNthCalledWith(3, 'marquee-zoom');
+  });
+
+  it('escape leaves pointer mode unchanged when search is closed and pointer mode is already active', () => {
+    const viewer = createViewer({ mode: 'pointer' });
+    const actions = createViewerKeyboardActions({
+      viewer,
+      showSearch: true,
+      isSearchOpen: false,
+      toggleSearch: vi.fn(),
+      search: createSearchResult(),
+      zoomReset: vi.fn(),
+    });
+
+    actions.escape?.();
+
+    expect(viewer.interaction.setMode).not.toHaveBeenCalled();
+  });
 });

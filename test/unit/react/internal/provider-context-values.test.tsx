@@ -14,6 +14,8 @@ import type {
 function createStableDocCallbacks(): ProviderStableDocCallbacks {
   return {
     bumpDocumentRevision: vi.fn(),
+    bumpPageRevision: vi.fn(),
+    getPageRevision: vi.fn(() => 0),
     invalidateCache: vi.fn(),
     loadDocument: vi.fn(async () => undefined),
     loadDocumentFromUrl: vi.fn(async () => undefined),
@@ -56,6 +58,7 @@ describe('buildPDFiumDocumentContextValue', () => {
       document,
       documentName: 'a.pdf',
       documentRevision: 7,
+      pageRevisionVersion: 0,
       stableDocCallbacks,
       error: null,
       isInitialising: false,
@@ -82,6 +85,7 @@ describe('usePDFiumContextValues', () => {
       document: createMockDocument('doc-1'),
       documentName: 'a.pdf',
       documentRevision: 1,
+      pageRevisionVersion: 0,
       stableDocCallbacks,
       error: null as Error | null,
       isInitialising: false,
@@ -108,6 +112,7 @@ describe('usePDFiumContextValues', () => {
       document: createMockDocument('doc-1'),
       documentName: 'a.pdf',
       documentRevision: 1,
+      pageRevisionVersion: 0,
       stableDocCallbacks,
       error: null as Error | null,
       isInitialising: false,

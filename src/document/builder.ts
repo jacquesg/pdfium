@@ -43,24 +43,29 @@ export class PDFiumDocumentBuilder extends Disposable {
     this.#module = module;
     this.#memory = memory;
 
-    const handle = module._FPDF_CreateNewDocument();
-    if (handle === asHandle<DocumentHandle>(0)) {
-      throw new DocumentError(PDFiumErrorCode.DOC_CREATE_FAILED, 'Failed to create new document');
-    }
-    this.#documentHandle = handle;
+    try {
+      const handle = module._FPDF_CreateNewDocument();
+      if (handle === asHandle<DocumentHandle>(0)) {
+        throw new DocumentError(PDFiumErrorCode.DOC_CREATE_FAILED, 'Failed to create new document');
+      }
+      this.#documentHandle = handle;
 
-    this.setFinalizerCleanup(() => {
-      for (const builder of this.#pageBuilders) {
-        if (!builder.disposed) builder.dispose();
-      }
-      for (const page of this.#pages) {
-        this.#module._FPDF_ClosePage(page);
-      }
-      for (const font of this.#fonts) {
-        this.#module._FPDFFont_Close(font[INTERNAL].handle);
-      }
-      this.#module._FPDF_CloseDocument(this.#documentHandle);
-    });
+      this.setFinalizerCleanup(() => {
+        for (const builder of this.#pageBuilders) {
+          if (!builder.disposed) builder.dispose();
+        }
+        for (const page of this.#pages) {
+          this.#module._FPDF_ClosePage(page);
+        }
+        for (const font of this.#fonts) {
+          this.#module._FPDFFont_Close(font[INTERNAL].handle);
+        }
+        this.#module._FPDF_CloseDocument(this.#documentHandle);
+      });
+    } catch (error) {
+      this.abandonDuringConstruction();
+      throw error;
+    }
   }
 
   /**

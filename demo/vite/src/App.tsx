@@ -13,11 +13,12 @@ const ViewerLab = lazy(() => import('./features/Viewer/ViewerLab').then((m) => (
 const CreatorLab = lazy(() => import('./features/Creation/CreatorLab').then((m) => ({ default: m.CreatorLab })));
 const MixerLab = lazy(() => import('./features/Layouts/MixerLab').then((m) => ({ default: m.MixerLab })));
 const RenderLab = lazy(() => import('./features/Rendering/RenderLab').then((m) => ({ default: m.RenderLab })));
+const EditorLab = lazy(() => import('./features/Editor/EditorLab').then((m) => ({ default: m.EditorLab })));
 const SecurityLab = lazy(() => import('./features/Security/SecurityLab').then((m) => ({ default: m.SecurityLab })));
 
 const ITEMS_WITHOUT_DOCUMENT = new Set<NavItem>(['creator', 'security']);
 
-const ALL_NAV_ITEMS = new Set<string>(['viewer', 'creator', 'mixer', 'render', 'security']);
+const ALL_NAV_ITEMS = new Set<string>(['viewer', 'editor', 'creator', 'mixer', 'render', 'security']);
 
 function getInitialNav(): NavItem {
   const hash = window.location.hash.slice(1);
@@ -179,6 +180,7 @@ function AppContent() {
     const lab = (() => {
       switch (activeNav) {
         case 'viewer': return <ViewerLab />;
+        case 'editor': return <EditorLab />;
         case 'creator': return <CreatorLab />;
         case 'mixer': return <MixerLab />;
         case 'render': return <RenderLab />;

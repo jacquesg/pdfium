@@ -26,7 +26,7 @@ import { asHandle, NULL_PTR, WASMMemoryManager } from './wasm/memory.js';
 const WASM_MAGIC = new Uint8Array([0x00, 0x61, 0x73, 0x6d]);
 
 function importRuntimeModule<T>(specifier: string): Promise<T> {
-  return import(specifier) as Promise<T>;
+  return import(/* @vite-ignore */ specifier) as Promise<T>;
 }
 
 function validateWasmBinary(binary: ArrayBuffer): void {

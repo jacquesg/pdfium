@@ -1,12 +1,23 @@
 /**
  * Integration tests for specialised annotation types.
  *
- * Tests Line, Ink, Polygon/Polyline, and Highlight annotations using
+ * Tests Line, Ink, Polygon/Polyline, and text-markup annotations using
  * external test fixtures from the chromium/pdfium test corpus.
  */
 
 import { AnnotationType } from '../../src/core/types.js';
 import { describe, expect, test } from '../utils/fixtures.js';
+
+const QUAD_POINT_MARKUP_TYPES = new Set<AnnotationType>([
+  AnnotationType.Highlight,
+  AnnotationType.Underline,
+  AnnotationType.Strikeout,
+  AnnotationType.Squiggly,
+]);
+
+function isQuadPointMarkup(type: AnnotationType): boolean {
+  return QUAD_POINT_MARKUP_TYPES.has(type);
+}
 
 describe('Line Annotations', () => {
   test('should load line_annot.pdf and find Line annotations', async ({ openDocument }) => {
@@ -270,16 +281,16 @@ describe('Mixed Annotations (annots.pdf)', () => {
     expect(foundLink).toBe(true);
   });
 
-  test('should find Underline annotations with attachment points', async ({ openDocument }) => {
+  test('should find text-markup annotations with attachment points', async ({ openDocument }) => {
     using doc = await openDocument('pdfium/annots.pdf');
     using page = doc.getPage(0);
 
     const annotations = page.getAnnotations();
-    let foundUnderline = false;
+    let foundMarkup = false;
 
     for (const annot of annotations) {
-      if (annot.type === AnnotationType.Underline) {
-        foundUnderline = true;
+      if (isQuadPointMarkup(annot.type)) {
+        foundMarkup = true;
 
         const attachmentCount = annot.attachmentPointCount;
         expect(attachmentCount).toBeGreaterThan(0);
@@ -313,7 +324,7 @@ describe('Mixed Annotations (annots.pdf)', () => {
       annot.dispose();
     }
 
-    expect(foundUnderline).toBe(true);
+    expect(foundMarkup).toBe(true);
   });
 
   test('should return null for out-of-range attachment points', async ({ openDocument }) => {
@@ -321,19 +332,23 @@ describe('Mixed Annotations (annots.pdf)', () => {
     using page = doc.getPage(0);
 
     const annotations = page.getAnnotations();
+    let foundMarkup = false;
 
     for (const annot of annotations) {
-      if (annot.type === AnnotationType.Underline) {
+      if (isQuadPointMarkup(annot.type)) {
+        foundMarkup = true;
         const count = annot.attachmentPointCount;
         const outOfRange = annot.getAttachmentPoints(count + 999);
         expect(outOfRange).toBeNull();
       }
       annot.dispose();
     }
+
+    expect(foundMarkup).toBe(true);
   });
 });
 
-describe('Underline Annotations with Long Content', () => {
+describe('Text-Markup Annotations with Long Content', () => {
   test('should load annotation_highlight_long_content.pdf', async ({ openDocument }) => {
     using doc = await openDocument('pdfium/annotation_highlight_long_content.pdf');
     expect(doc.pageCount).toBeGreaterThan(0);
@@ -343,16 +358,16 @@ describe('Underline Annotations with Long Content', () => {
     expect(annotCount).toBeGreaterThan(0);
   });
 
-  test('should find Underline annotations', async ({ openDocument }) => {
+  test('should find text-markup annotations', async ({ openDocument }) => {
     using doc = await openDocument('pdfium/annotation_highlight_long_content.pdf');
     using page = doc.getPage(0);
 
     const annotations = page.getAnnotations();
-    let foundUnderline = false;
+    let foundMarkup = false;
 
     for (const annot of annotations) {
-      if (annot.type === AnnotationType.Underline) {
-        foundUnderline = true;
+      if (isQuadPointMarkup(annot.type)) {
+        foundMarkup = true;
 
         const attachmentCount = annot.attachmentPointCount;
         expect(attachmentCount).toBeGreaterThanOrEqual(0);
@@ -360,17 +375,19 @@ describe('Underline Annotations with Long Content', () => {
       annot.dispose();
     }
 
-    expect(foundUnderline).toBe(true);
+    expect(foundMarkup).toBe(true);
   });
 
-  test('should read attachment points from Underline annotation', async ({ openDocument }) => {
+  test('should read attachment points from text-markup annotation', async ({ openDocument }) => {
     using doc = await openDocument('pdfium/annotation_highlight_long_content.pdf');
     using page = doc.getPage(0);
 
     const annotations = page.getAnnotations();
+    let foundMarkup = false;
 
     for (const annot of annotations) {
-      if (annot.type === AnnotationType.Underline) {
+      if (isQuadPointMarkup(annot.type)) {
+        foundMarkup = true;
         const count = annot.attachmentPointCount;
 
         if (count > 0) {
@@ -388,6 +405,8 @@ describe('Underline Annotations with Long Content', () => {
       }
       annot.dispose();
     }
+
+    expect(foundMarkup).toBe(true);
   });
 });
 

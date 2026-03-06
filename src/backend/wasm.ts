@@ -1258,9 +1258,8 @@ export class WasmBackend implements PDFiumBackend {
     }
 
     using indicesAlloc = this.#memory.alloc(pageIndices.length * 4);
-    const intView = new Int32Array(this.#memory.heapU8.buffer, indicesAlloc.ptr, pageIndices.length);
     for (let i = 0; i < pageIndices.length; i++) {
-      intView[i] = pageIndices[i] ?? 0;
+      this.#memory.writeInt32(ptrOffset(indicesAlloc.ptr, i * 4), pageIndices[i] ?? 0);
     }
 
     const result = this.#module._FPDF_ImportPagesByIndex(
@@ -1290,6 +1289,28 @@ export class WasmBackend implements PDFiumBackend {
       pagesPerRow,
       pagesPerColumn,
     ) as number;
+  }
+
+  movePages(docHandle: number, pageIndices: number[], destPageIndex: number): void {
+    if (pageIndices.length === 0) {
+      return;
+    }
+
+    using indicesAlloc = this.#memory.alloc(pageIndices.length * 4);
+    for (let i = 0; i < pageIndices.length; i++) {
+      this.#memory.writeInt32(ptrOffset(indicesAlloc.ptr, i * 4), pageIndices[i] ?? 0);
+    }
+
+    const result = this.#module._FPDF_MovePages(
+      docHandle as never,
+      indicesAlloc.ptr,
+      pageIndices.length,
+      destPageIndex,
+    );
+
+    if (result === 0) {
+      throw new Error('Failed to move pages');
+    }
   }
 
   copyViewerPreferences(destHandle: number, srcHandle: number): boolean {

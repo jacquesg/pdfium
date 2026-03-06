@@ -2,6 +2,8 @@ import { PDFiumProvider as LibPDFiumProvider, usePDFium as useLibPDFium } from '
 import wasmUrl from '@scaryterry/pdfium/pdfium.wasm?url';
 import { useEffect, useRef, type ReactNode } from 'react';
 
+const workerUrl = new URL('../pdfium.worker.ts', import.meta.url).toString();
+
 function SampleDocumentBootstrap() {
   const { isInitialising, document, loadDocument } = useLibPDFium();
   const attemptedRef = useRef(false);
@@ -31,7 +33,7 @@ function SampleDocumentBootstrap() {
 
 export function PDFiumProvider({ children }: { children: ReactNode }) {
   return (
-    <LibPDFiumProvider wasmUrl={wasmUrl} workerUrl="/worker.js">
+    <LibPDFiumProvider wasmUrl={wasmUrl} workerUrl={workerUrl}>
       <SampleDocumentBootstrap />
       {children}
     </LibPDFiumProvider>

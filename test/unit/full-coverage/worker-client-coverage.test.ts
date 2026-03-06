@@ -273,6 +273,75 @@ describe('WorkerClient - coverage for uncovered branches', () => {
     expect(mockWorker.terminated).toBe(true);
   });
 
+  test('WorkerPDFiumDocumentBuilder suppresses DOC_ALREADY_CLOSED on dispose', async () => {
+    const pdfium = await createWorkerPDFium();
+
+    const createBuilderPromise = pdfium.createDocumentBuilder();
+    const createBuilderMsg = mockWorker.posted[mockWorker.posted.length - 1]!.data as { type: string; id: string };
+    mockWorker.respondSuccess(createBuilderMsg.id, { builderId: 'builder-1' });
+    const builder = await createBuilderPromise;
+
+    const disposeBuilderPromise = builder.dispose();
+    const disposeBuilderMsg = mockWorker.posted[mockWorker.posted.length - 1]!.data as { type: string; id: string };
+    mockWorker.respondError(disposeBuilderMsg.id, {
+      name: 'DocumentError',
+      message: 'Document already closed',
+      code: PDFiumErrorCode.DOC_ALREADY_CLOSED,
+    });
+
+    await expect(disposeBuilderPromise).resolves.toBeUndefined();
+    await disposeWorkerPDFium(pdfium);
+  });
+
+  test('WorkerPDFiumDocumentBuilder re-throws non-DOC_ALREADY_CLOSED disposal errors', async () => {
+    const pdfium = await createWorkerPDFium();
+
+    const createBuilderPromise = pdfium.createDocumentBuilder();
+    const createBuilderMsg = mockWorker.posted[mockWorker.posted.length - 1]!.data as { type: string; id: string };
+    mockWorker.respondSuccess(createBuilderMsg.id, { builderId: 'builder-1' });
+    const builder = await createBuilderPromise;
+
+    const disposeBuilderPromise = builder.dispose();
+    const disposeBuilderMsg = mockWorker.posted[mockWorker.posted.length - 1]!.data as { type: string; id: string };
+    mockWorker.respondError(disposeBuilderMsg.id, {
+      name: 'WorkerError',
+      message: 'boom',
+      code: PDFiumErrorCode.WORKER_COMMUNICATION_FAILED,
+    });
+
+    await expect(disposeBuilderPromise).rejects.toMatchObject({
+      code: PDFiumErrorCode.WORKER_COMMUNICATION_FAILED,
+    });
+    await disposeWorkerPDFium(pdfium);
+  });
+
+  test('WorkerPDFium.dispose handles builder disposal errors', async () => {
+    const pdfium = await createWorkerPDFium();
+
+    const createBuilderPromise = pdfium.createDocumentBuilder();
+    const createBuilderMsg = mockWorker.posted[mockWorker.posted.length - 1]!.data as { type: string; id: string };
+    mockWorker.respondSuccess(createBuilderMsg.id, { builderId: 'builder-1' });
+    await createBuilderPromise;
+
+    const disposePromise = pdfium.dispose();
+    const disposeBuilderMsg = mockWorker.posted[mockWorker.posted.length - 1]!.data as { type: string; id: string };
+    if (disposeBuilderMsg.type === 'DISPOSE_DOCUMENT_BUILDER') {
+      mockWorker.respondError(disposeBuilderMsg.id, {
+        name: 'WorkerError',
+        message: 'builder failed',
+        code: PDFiumErrorCode.WORKER_COMMUNICATION_FAILED,
+      });
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const destroyMsg = mockWorker.posted[mockWorker.posted.length - 1]!.data as { type: string; id: string };
+    if (destroyMsg.type === 'DESTROY') {
+      mockWorker.respondSuccess(destroyMsg.id, undefined);
+    }
+
+    await expect(disposePromise).resolves.toBeUndefined();
+  });
+
   test('openDocument with ArrayBuffer input uses toOwnedArrayBuffer', async () => {
     const pdfium = await createWorkerPDFium();
 

@@ -6,7 +6,7 @@ title: PDFium
 
 ***
 
-Defined in: [src/pdfium.ts:140](https://github.com/jacquesg/pdfium/blob/eb78f1525d0ef66e0ec6e14c7c146e9379a1b1f5/src/pdfium.ts#L140)
+Defined in: [src/pdfium.ts:147](https://github.com/jacquesg/pdfium/blob/07db56721a432d590a375a1cb31ed4aec4e370be/src/pdfium.ts#L147)
 
 Main PDFium library class.
 
@@ -33,7 +33,7 @@ console.log(`Document has ${document.pageCount} pages`);
 
 > **get** **disposed**(): `boolean`
 
-Defined in: [src/core/disposable.ts:73](https://github.com/jacquesg/pdfium/blob/eb78f1525d0ef66e0ec6e14c7c146e9379a1b1f5/src/core/disposable.ts#L73)
+Defined in: [src/core/disposable.ts:73](https://github.com/jacquesg/pdfium/blob/07db56721a432d590a375a1cb31ed4aec4e370be/src/core/disposable.ts#L73)
 
 Whether this resource has been disposed.
 
@@ -53,7 +53,7 @@ Whether this resource has been disposed.
 
 > **get** **limits**(): `Readonly`\<`Required`\<[`PDFiumLimits`](../interfaces/PDFiumLimits.md)\>\>
 
-Defined in: [src/pdfium.ts:461](https://github.com/jacquesg/pdfium/blob/eb78f1525d0ef66e0ec6e14c7c146e9379a1b1f5/src/pdfium.ts#L461)
+Defined in: [src/pdfium.ts:469](https://github.com/jacquesg/pdfium/blob/07db56721a432d590a375a1cb31ed4aec4e370be/src/pdfium.ts#L469)
 
 Get the configured resource limits.
 
@@ -67,7 +67,7 @@ Get the configured resource limits.
 
 > **\[dispose\]**(): `void`
 
-Defined in: [src/core/disposable.ts:148](https://github.com/jacquesg/pdfium/blob/eb78f1525d0ef66e0ec6e14c7c146e9379a1b1f5/src/core/disposable.ts#L148)
+Defined in: [src/core/disposable.ts:162](https://github.com/jacquesg/pdfium/blob/07db56721a432d590a375a1cb31ed4aec4e370be/src/core/disposable.ts#L162)
 
 Dispose of this resource, freeing WASM memory.
 
@@ -88,7 +88,7 @@ after the first call.
 
 > **createDocument**(): [`PDFiumDocumentBuilder`](PDFiumDocumentBuilder.md)
 
-Defined in: [src/pdfium.ts:441](https://github.com/jacquesg/pdfium/blob/eb78f1525d0ef66e0ec6e14c7c146e9379a1b1f5/src/pdfium.ts#L441)
+Defined in: [src/pdfium.ts:449](https://github.com/jacquesg/pdfium/blob/07db56721a432d590a375a1cb31ed4aec4e370be/src/pdfium.ts#L449)
 
 Create a new empty PDF document.
 
@@ -104,7 +104,7 @@ A document builder for adding pages and content
 
 > **createProgressiveLoader**(`data`): [`ProgressivePDFLoader`](ProgressivePDFLoader.md)
 
-Defined in: [src/pdfium.ts:452](https://github.com/jacquesg/pdfium/blob/eb78f1525d0ef66e0ec6e14c7c146e9379a1b1f5/src/pdfium.ts#L452)
+Defined in: [src/pdfium.ts:460](https://github.com/jacquesg/pdfium/blob/07db56721a432d590a375a1cb31ed4aec4e370be/src/pdfium.ts#L460)
 
 Create a progressive loader for linearisation detection and incremental loading.
 
@@ -126,7 +126,7 @@ A progressive loader instance
 
 > **dispose**(): `void`
 
-Defined in: [src/core/disposable.ts:164](https://github.com/jacquesg/pdfium/blob/eb78f1525d0ef66e0ec6e14c7c146e9379a1b1f5/src/core/disposable.ts#L164)
+Defined in: [src/core/disposable.ts:178](https://github.com/jacquesg/pdfium/blob/07db56721a432d590a375a1cb31ed4aec4e370be/src/core/disposable.ts#L178)
 
 Alias for Symbol.dispose for explicit calls.
 
@@ -150,7 +150,7 @@ document.dispose();
 
 > **openDocument**(`data`, `options`): `Promise`\<[`PDFiumDocument`](PDFiumDocument.md)\>
 
-Defined in: [src/pdfium.ts:343](https://github.com/jacquesg/pdfium/blob/eb78f1525d0ef66e0ec6e14c7c146e9379a1b1f5/src/pdfium.ts#L343)
+Defined in: [src/pdfium.ts:351](https://github.com/jacquesg/pdfium/blob/07db56721a432d590a375a1cb31ed4aec4e370be/src/pdfium.ts#L351)
 
 Open a PDF document from binary data.
 
@@ -183,7 +183,7 @@ If the document cannot be opened
 
 > `static` **init**(`options`): `Promise`\<[`WorkerPDFium`](WorkerPDFium.md)\>
 
-Defined in: [src/pdfium.ts:176](https://github.com/jacquesg/pdfium/blob/eb78f1525d0ef66e0ec6e14c7c146e9379a1b1f5/src/pdfium.ts#L176)
+Defined in: [src/pdfium.ts:183](https://github.com/jacquesg/pdfium/blob/07db56721a432d590a375a1cb31ed4aec4e370be/src/pdfium.ts#L183)
 
 Initialise the PDFium library.
 
@@ -212,7 +212,7 @@ If initialisation fails or options conflict
 
 > `static` **init**(`options`): `Promise`\<`PDFium`\>
 
-Defined in: [src/pdfium.ts:177](https://github.com/jacquesg/pdfium/blob/eb78f1525d0ef66e0ec6e14c7c146e9379a1b1f5/src/pdfium.ts#L177)
+Defined in: [src/pdfium.ts:184](https://github.com/jacquesg/pdfium/blob/07db56721a432d590a375a1cb31ed4aec4e370be/src/pdfium.ts#L184)
 
 Initialise the PDFium library.
 
@@ -241,7 +241,7 @@ If initialisation fails or options conflict
 
 > `static` **init**(`options`): `Promise`\<[`NativePDFiumInstance`](NativePDFiumInstance.md) \| `PDFium`\>
 
-Defined in: [src/pdfium.ts:178](https://github.com/jacquesg/pdfium/blob/eb78f1525d0ef66e0ec6e14c7c146e9379a1b1f5/src/pdfium.ts#L178)
+Defined in: [src/pdfium.ts:185](https://github.com/jacquesg/pdfium/blob/07db56721a432d590a375a1cb31ed4aec4e370be/src/pdfium.ts#L185)
 
 Initialise the PDFium library.
 
@@ -270,7 +270,7 @@ If initialisation fails or options conflict
 
 > `static` **init**(`options?`): `Promise`\<`PDFium`\>
 
-Defined in: [src/pdfium.ts:179](https://github.com/jacquesg/pdfium/blob/eb78f1525d0ef66e0ec6e14c7c146e9379a1b1f5/src/pdfium.ts#L179)
+Defined in: [src/pdfium.ts:186](https://github.com/jacquesg/pdfium/blob/07db56721a432d590a375a1cb31ed4aec4e370be/src/pdfium.ts#L186)
 
 Initialise the PDFium library.
 
@@ -301,7 +301,7 @@ If initialisation fails or options conflict
 
 > `static` **initNative**(`options`): `Promise`\<[`NativePDFiumInstance`](NativePDFiumInstance.md) \| `null`\>
 
-Defined in: [src/pdfium.ts:302](https://github.com/jacquesg/pdfium/blob/eb78f1525d0ef66e0ec6e14c7c146e9379a1b1f5/src/pdfium.ts#L302)
+Defined in: [src/pdfium.ts:309](https://github.com/jacquesg/pdfium/blob/07db56721a432d590a375a1cb31ed4aec4e370be/src/pdfium.ts#L309)
 
 Initialise a native PDFium instance (Node.js only).
 

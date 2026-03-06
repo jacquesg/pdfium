@@ -258,5 +258,6 @@ export interface NativePdfium {
     pagesPerRow: number,
     pagesPerColumn: number,
   ): number;
+  movePages(docHandle: number, pageIndices: number[], destPageIndex: number): void;
   copyViewerPreferences(destHandle: number, srcHandle: number): boolean;
 }

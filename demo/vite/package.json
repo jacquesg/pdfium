@@ -4,11 +4,16 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "sync-assets": "node --import tsx ../scripts/setup.ts",
+    "ensure-lib-build": "node --import tsx ../scripts/ensure-lib-build.ts",
+    "verify-lib-build": "node --import tsx ../scripts/verify-lib-build.ts",
+    "predev": "pnpm run ensure-lib-build && pnpm run sync-assets",
+    "prebuild": "pnpm run ensure-lib-build && pnpm run sync-assets",
+    "pretest": "pnpm run ensure-lib-build && pnpm run sync-assets",
     "dev": "vite",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test": "vitest",
-    "setup": "tsx ../scripts/setup.ts"
+    "test": "vitest"
   },
   "dependencies": {
     "@radix-ui/react-collapsible": "^1.1.12",
@@ -19,7 +24,7 @@
     "@radix-ui/react-tooltip": "^1.2.8",
     "@scaryterry/pdfium": "link:../..",
     "@tailwindcss/vite": "^4.1.18",
-"class-variance-authority": "^0.7.1",
+    "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "^0.564.0",
     "react": "^19.2.4",

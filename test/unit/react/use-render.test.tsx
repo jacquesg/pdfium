@@ -55,8 +55,9 @@ describe('useRenderPage', () => {
     } as unknown as WorkerPDFiumDocument;
 
     // Pre-populate the render store with the expected cache key
-    // Key format: documentId\0hookName\0revision\0pageIndex\0scale\0rotation\0renderFormFields
-    const cacheKey = 'cached-doc\0renderPage\x000\x000\x001\0none\0false';
+    // Key format:
+    // documentId\0hookName\0docRevision\0pageRevision\0pageIndex\0scale\0rotation\0renderAnnotations\0renderFormFields
+    const cacheKey = 'cached-doc\0renderPage\x000\x000\x000\x001\0none\0true\0false';
     const cachedResult = {
       data: new Uint8Array(16),
       width: 200,

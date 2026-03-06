@@ -149,8 +149,9 @@ export const PDFPageView = memo(function PDFPageView({
           // maps to physical display pixels on HiDPI screens.
           width: containerWidth,
           height: containerHeight,
-          // Dim the stale render while the new one loads.
-          opacity: isPlaceholderData ? 0.7 : 1,
+          // Placeholder opacity is theme-configurable to avoid perceptual flicker
+          // in high-frequency mutation flows (for example live editor updates).
+          opacity: isPlaceholderData ? 'var(--pdfium-page-placeholder-opacity, 0.7)' : 1,
         }}
       />
       {showTextLayer && textContent && (

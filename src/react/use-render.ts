@@ -25,7 +25,9 @@ function useRenderPage(
   /** Clear the error for the current cache key and re-trigger rendering. */
   retry: () => void;
 } {
-  const { documentRevision } = usePDFiumDocument();
+  const { documentRevision, pageRevisionVersion, getPageRevision } = usePDFiumDocument();
+  void pageRevisionVersion;
+  const pageRevision = getPageRevision(pageIndex);
   const { renderStore, queryStore } = usePDFiumStores();
   const renderErrorsByKeyRef = useRef<Map<string, Error>>(new Map());
   const prevResultRef = useRef<{
@@ -49,11 +51,13 @@ function useRenderPage(
         document.id,
         'renderPage',
         documentRevision,
+        pageRevision,
         pageIndex,
         options?.scale ?? 1,
         options?.rotation ?? 'none',
         options?.width,
         options?.height,
+        options?.renderAnnotations ?? true,
         options?.renderFormFields ?? false,
         options?.backgroundColour,
         options?.clipRect?.left,

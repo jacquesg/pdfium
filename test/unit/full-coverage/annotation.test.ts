@@ -72,6 +72,89 @@ describe('PDFiumAnnotation (Full Coverage)', () => {
     });
   });
 
+  describe('colour', () => {
+    it('should clear normal appearance and retry stroke colour when initial set fails', async () => {
+      mockModule._FPDFAnnot_SetColor.mockReturnValueOnce(0).mockReturnValueOnce(1);
+      mockModule._FPDFAnnot_SetAP.mockReturnValue(1);
+
+      using doc = await pdfium.openDocument(new Uint8Array(10));
+      using page = doc.getPage(0);
+      using annot = page.getAnnotation(0);
+
+      const result = annot.setColour({ r: 12, g: 34, b: 56, a: 200 }, 'stroke');
+
+      expect(result).toBe(true);
+      expect(annot.colour).toEqual({ r: 12, g: 34, b: 56, a: 200 });
+      expect(mockModule._FPDFAnnot_SetColor).toHaveBeenNthCalledWith(1, 700, 0, 12, 34, 56, 200);
+      expect(mockModule._FPDFAnnot_SetAP).toHaveBeenCalledWith(700, 0, 0);
+      expect(mockModule._FPDFAnnot_SetColor).toHaveBeenNthCalledWith(2, 700, 0, 12, 34, 56, 200);
+    });
+
+    it('should return false when AP clear fails after colour set failure', async () => {
+      mockModule._FPDFAnnot_SetColor.mockReturnValue(0);
+      mockModule._FPDFAnnot_SetAP.mockReturnValue(0);
+
+      using doc = await pdfium.openDocument(new Uint8Array(10));
+      using page = doc.getPage(0);
+      using annot = page.getAnnotation(0);
+
+      const result = annot.setColour({ r: 1, g: 2, b: 3, a: 255 }, 'stroke');
+
+      expect(result).toBe(false);
+      expect(mockModule._FPDFAnnot_SetColor).toHaveBeenCalledTimes(1);
+      expect(mockModule._FPDFAnnot_SetAP).toHaveBeenCalledWith(700, 0, 0);
+    });
+  });
+
+  describe('geometry and border appearance sync', () => {
+    it('setRect clears normal appearance for shape-like annotations', async () => {
+      mockModule._FPDFAnnot_GetSubtype.mockReturnValue(5); // Square
+      mockModule._FPDFAnnot_SetRect.mockReturnValue(1);
+      mockModule._FPDFAnnot_SetAP.mockReturnValue(1);
+
+      using doc = await pdfium.openDocument(new Uint8Array(10));
+      using page = doc.getPage(0);
+      using annot = page.getAnnotation(0);
+
+      const result = annot.setRect({ left: 10, top: 100, right: 200, bottom: 50 });
+
+      expect(result).toBe(true);
+      expect(mockModule._FPDFAnnot_SetRect).toHaveBeenCalled();
+      expect(mockModule._FPDFAnnot_SetAP).toHaveBeenCalledWith(700, 0, 0);
+    });
+
+    it('setBorder clears normal appearance for shape-like annotations', async () => {
+      mockModule._FPDFAnnot_GetSubtype.mockReturnValue(5); // Square
+      mockModule._FPDFAnnot_SetBorder.mockReturnValue(1);
+      mockModule._FPDFAnnot_SetAP.mockReturnValue(1);
+
+      using doc = await pdfium.openDocument(new Uint8Array(10));
+      using page = doc.getPage(0);
+      using annot = page.getAnnotation(0);
+
+      const result = annot.setBorder({ horizontalRadius: 0, verticalRadius: 0, borderWidth: 3 });
+
+      expect(result).toBe(true);
+      expect(mockModule._FPDFAnnot_SetBorder).toHaveBeenCalledWith(700, 0, 0, 3);
+      expect(mockModule._FPDFAnnot_SetAP).toHaveBeenCalledWith(700, 0, 0);
+    });
+
+    it('setRect does not clear normal appearance for non-shape annotations', async () => {
+      mockModule._FPDFAnnot_GetSubtype.mockReturnValue(1); // Text
+      mockModule._FPDFAnnot_SetRect.mockReturnValue(1);
+      mockModule._FPDFAnnot_SetAP.mockClear();
+
+      using doc = await pdfium.openDocument(new Uint8Array(10));
+      using page = doc.getPage(0);
+      using annot = page.getAnnotation(0);
+
+      const result = annot.setRect({ left: 10, top: 100, right: 200, bottom: 50 });
+
+      expect(result).toBe(true);
+      expect(mockModule._FPDFAnnot_SetAP).not.toHaveBeenCalled();
+    });
+  });
+
   describe('appearance', () => {
     it('should call _FPDFAnnot_GetAP with correct mode', async () => {
       using doc = await pdfium.openDocument(new Uint8Array(10));

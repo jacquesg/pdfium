@@ -5,7 +5,9 @@ import { queryStore } from '../../../../src/react/internal/query-store.js';
 import { createMockDocument, createMockPage, renderHookWithStores } from '../../../react-setup.js';
 
 vi.mock('../../../../src/react/context.js', () => ({
-  usePDFiumDocument: vi.fn().mockReturnValue({ documentRevision: 0 }),
+  usePDFiumDocument: vi
+    .fn()
+    .mockReturnValue({ documentRevision: 0, pageRevisionVersion: 0, getPageRevision: vi.fn(() => 0) }),
 }));
 
 const { useTextContent } = await import('../../../../src/react/hooks/use-text-content.js');
@@ -24,13 +26,13 @@ describe('useTextContent', () => {
   });
 
   it('builds the correct cache key', () => {
-    const key = buildCacheKey('mock-doc-id', 'textContent', 0, 0);
-    expect(key).toBe('mock-doc-id\0textContent\x000\x000');
+    const key = buildCacheKey('mock-doc-id', 'textContent', 0, 0, 0);
+    expect(key).toBe('mock-doc-id\0textContent\x000\x000\x000');
   });
 
   it('returns cached data on cache hit', () => {
     const textData = { text: 'Hello world', rects: new Float32Array(44) };
-    const key = buildCacheKey('mock-doc-id', 'textContent', 0, 2);
+    const key = buildCacheKey('mock-doc-id', 'textContent', 0, 2, 0);
     queryStore.set(key, { status: 'success', data: textData });
 
     const mockDoc = createMockDocument();

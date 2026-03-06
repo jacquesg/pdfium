@@ -5,7 +5,9 @@ import { queryStore } from '../../../../src/react/internal/query-store.js';
 import { createMockDocument, createMockPage, renderHookWithStores } from '../../../react-setup.js';
 
 vi.mock('../../../../src/react/context.js', () => ({
-  usePDFiumDocument: vi.fn().mockReturnValue({ documentRevision: 0 }),
+  usePDFiumDocument: vi
+    .fn()
+    .mockReturnValue({ documentRevision: 0, pageRevisionVersion: 0, getPageRevision: vi.fn(() => 0) }),
 }));
 
 const { useStructureTree } = await import('../../../../src/react/hooks/use-structure-tree.js');
@@ -24,13 +26,13 @@ describe('useStructureTree', () => {
   });
 
   it('builds the correct cache key', () => {
-    const key = buildCacheKey('mock-doc-id', 'structureTree', 0, 0);
-    expect(key).toBe('mock-doc-id\0structureTree\x000\x000');
+    const key = buildCacheKey('mock-doc-id', 'structureTree', 0, 0, 0);
+    expect(key).toBe('mock-doc-id\0structureTree\x000\x000\x000');
   });
 
   it('returns cached data on cache hit', () => {
     const tree = [{ type: 'Document', children: [{ type: 'P', children: [] }] }];
-    const key = buildCacheKey('mock-doc-id', 'structureTree', 0, 0);
+    const key = buildCacheKey('mock-doc-id', 'structureTree', 0, 0, 0);
     queryStore.set(key, { status: 'success', data: tree });
 
     const mockDoc = createMockDocument();

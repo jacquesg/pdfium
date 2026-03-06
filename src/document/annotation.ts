@@ -13,7 +13,7 @@ import { Disposable } from '../core/disposable.js';
 import { PDFiumErrorCode } from '../core/errors.js';
 import {
   type Annotation,
-  type AnnotationAppearanceMode,
+  AnnotationAppearanceMode,
   type AnnotationBorder,
   type AnnotationColourType,
   type AnnotationFlags,
@@ -30,6 +30,7 @@ import {
   type Rect,
   type WidgetOption,
 } from '../core/types.js';
+import { parseAppearanceInteriorColour, parseAppearanceStrokeColour } from '../internal/annotation-appearance.js';
 import { NULL_FORM, NULL_LINK, SIZEOF_FLOAT, SIZEOF_FS_POINTF, SIZEOF_FS_QUADPOINTSF } from '../internal/constants.js';
 import {
   annotationAppearanceModeMap,
@@ -82,6 +83,13 @@ export interface AnnotationContext {
  */
 
 const COLOUR_TYPE_NATIVE: Readonly<Record<AnnotationColourType, number>> = { stroke: 0, interior: 1 };
+const AP_RESET_ANNOTATION_TYPES = new Set<AnnotationType>([
+  AnnotationType.Square,
+  AnnotationType.Circle,
+  AnnotationType.Ink,
+  AnnotationType.Line,
+  AnnotationType.Redact,
+]);
 
 export class PDFiumAnnotation extends Disposable implements Annotation {
   readonly #ctx: AnnotationContext;
@@ -203,6 +211,20 @@ export class PDFiumAnnotation extends Disposable implements Annotation {
     return { left: rect.left, top: rect.top, right: rect.right, bottom: rect.bottom };
   }
 
+  #shouldResetNormalAppearanceForGeometry(): boolean {
+    return AP_RESET_ANNOTATION_TYPES.has(this.type);
+  }
+
+  #resetNormalAppearanceForGeometry(): void {
+    if (!this.#shouldResetNormalAppearanceForGeometry()) {
+      return;
+    }
+
+    // Shape-like annotations can keep stale AP streams after geometry/border
+    // changes, preventing visible redraw until another mutation occurs.
+    this.setAppearance(AnnotationAppearanceMode.Normal, undefined);
+  }
+
   /**
    * Sets the bounding rectangle of this annotation.
    *
@@ -211,12 +233,33 @@ export class PDFiumAnnotation extends Disposable implements Annotation {
    */
   setRect(bounds: Rect): boolean {
     this.ensureNotDisposed();
-    using rect = new FSRectF(this.#ctx.memory);
-    rect.left = bounds.left;
-    rect.top = bounds.top;
-    rect.right = bounds.right;
-    rect.bottom = bounds.bottom;
-    return this.#ctx.module._FPDFAnnot_SetRect(this.#handle, rect.ptr) !== 0;
+    const shouldResetAppearance = this.#shouldResetNormalAppearanceForGeometry();
+    const setNativeRect = (): boolean => {
+      using rect = new FSRectF(this.#ctx.memory);
+      rect.left = bounds.left;
+      rect.top = bounds.top;
+      rect.right = bounds.right;
+      rect.bottom = bounds.bottom;
+      return this.#ctx.module._FPDFAnnot_SetRect(this.#handle, rect.ptr) !== 0;
+    };
+
+    if (shouldResetAppearance) {
+      this.setAppearance(AnnotationAppearanceMode.Normal, undefined);
+    }
+
+    let success = setNativeRect();
+    if (!success) {
+      const clearedNormalAppearance = this.setAppearance(AnnotationAppearanceMode.Normal, undefined);
+      if (clearedNormalAppearance) {
+        success = setNativeRect();
+      }
+    }
+
+    if (success && shouldResetAppearance) {
+      this.#resetNormalAppearanceForGeometry();
+    }
+
+    return success;
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -250,7 +293,15 @@ export class PDFiumAnnotation extends Disposable implements Annotation {
       aPtr,
     );
     if (!success) {
-      return null;
+      const appearance = this.getAppearance(AnnotationAppearanceMode.Normal);
+      if (appearance === undefined) {
+        return null;
+      }
+      const strokeOpacity = this.getNumberValue('CA');
+      const interiorOpacity = this.getNumberValue('ca') ?? strokeOpacity;
+      return colourType === 'stroke'
+        ? (parseAppearanceStrokeColour(appearance, strokeOpacity) ?? null)
+        : (parseAppearanceInteriorColour(appearance, interiorOpacity) ?? null);
     }
 
     return {
@@ -270,7 +321,7 @@ export class PDFiumAnnotation extends Disposable implements Annotation {
    */
   setColour(colour: Colour, colourType: AnnotationColourType = 'stroke'): boolean {
     this.ensureNotDisposed();
-    const success =
+    const setNativeColour = (): boolean =>
       this.#ctx.module._FPDFAnnot_SetColor(
         this.#handle,
         COLOUR_TYPE_NATIVE[colourType],
@@ -279,6 +330,17 @@ export class PDFiumAnnotation extends Disposable implements Annotation {
         colour.b,
         colour.a,
       ) !== 0;
+
+    let success = setNativeColour();
+
+    // Some created annotations reject SetColor once a normal AP stream exists.
+    // Clearing AP and retrying allows PDFium to apply colour mutations.
+    if (!success) {
+      const clearedNormalAppearance = this.setAppearance(AnnotationAppearanceMode.Normal, undefined);
+      if (clearedNormalAppearance) {
+        success = setNativeColour();
+      }
+    }
 
     if (success && colourType === 'stroke') {
       this.#cachedStrokeColour = colour;
@@ -352,6 +414,26 @@ export class PDFiumAnnotation extends Disposable implements Annotation {
     return this.#ctx.module._FPDFAnnot_SetStringValue(this.#handle, keyBuffer.ptr, valueBuffer.ptr) !== 0;
   }
 
+  /**
+   * Gets a numeric value from this annotation's dictionary.
+   *
+   * @param key - The dictionary key
+   * @returns The number value, or undefined if not available
+   */
+  getNumberValue(key: DictionaryKey): number | undefined {
+    this.ensureNotDisposed();
+    const keyBytes = textEncoder.encode(`${key}\0`);
+    using keyBuffer = this.#ctx.memory.alloc(keyBytes.length);
+    this.#ctx.memory.heapU8.set(keyBytes, keyBuffer.ptr);
+
+    using valueBuffer = this.#ctx.memory.alloc(SIZEOF_FLOAT);
+    const success = this.#ctx.module._FPDFAnnot_GetNumberValue(this.#handle, keyBuffer.ptr, valueBuffer.ptr);
+    if (!success) {
+      return undefined;
+    }
+    return this.#ctx.memory.readFloat32(valueBuffer.ptr);
+  }
+
   /** The 'Contents' dictionary value (e.g. text body of a note). */
   get contents(): string | undefined {
     return this.getStringValue('Contents');
@@ -372,11 +454,11 @@ export class PDFiumAnnotation extends Disposable implements Annotation {
 
   /** The subject of this annotation. */
   get subject(): string | undefined {
-    return this.getStringValue('Subject');
+    return this.getStringValue('Subj') ?? this.getStringValue('Subject');
   }
 
   set subject(value: string) {
-    this.setStringValue('Subject', value);
+    this.setStringValue('Subj', value);
   }
 
   // ─────────────────────────────────────────────────────────────────────────
@@ -415,14 +497,34 @@ export class PDFiumAnnotation extends Disposable implements Annotation {
    */
   setBorder(border: AnnotationBorder): boolean {
     this.ensureNotDisposed();
-    return (
+    const shouldResetAppearance = this.#shouldResetNormalAppearanceForGeometry();
+    const setNativeBorder = (): boolean =>
       this.#ctx.module._FPDFAnnot_SetBorder(
         this.#handle,
         border.horizontalRadius,
         border.verticalRadius,
         border.borderWidth,
-      ) !== 0
-    );
+      ) !== 0;
+
+    if (shouldResetAppearance) {
+      // Clear stale AP first so the next SetBorder call mutates the live
+      // annotation dictionary values that will be regenerated on render.
+      this.setAppearance(AnnotationAppearanceMode.Normal, undefined);
+    }
+
+    let success = setNativeBorder();
+    if (!success) {
+      const clearedNormalAppearance = this.setAppearance(AnnotationAppearanceMode.Normal, undefined);
+      if (clearedNormalAppearance) {
+        success = setNativeBorder();
+      }
+    }
+
+    if (success && shouldResetAppearance) {
+      this.#resetNormalAppearanceForGeometry();
+    }
+
+    return success;
   }
 
   // ─────────────────────────────────────────────────────────────────────────
