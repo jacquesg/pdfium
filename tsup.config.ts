@@ -11,9 +11,15 @@ const wasmHash = wasmExists
   ? createHash('sha256').update(readFileSync(wasmPath)).digest('hex').slice(0, 8)
   : 'development';
 
+const ERM_SYMBOL_BANNER = [
+  "if (Symbol.dispose === undefined) Object.defineProperty(Symbol, 'dispose', { value: Symbol.for('Symbol.dispose'), configurable: true });",
+  "if (Symbol.asyncDispose === undefined) Object.defineProperty(Symbol, 'asyncDispose', { value: Symbol.for('Symbol.asyncDispose'), configurable: true });",
+].join('\n');
+
 function applyCommonEsbuildOptions(opts: { legalComments?: string; charset?: string }) {
   opts.legalComments = 'none';
   opts.charset = 'utf8';
+  (opts as { banner?: { js?: string } }).banner = { js: ERM_SYMBOL_BANNER };
 }
 
 async function bundleStandaloneWorker() {
@@ -49,6 +55,9 @@ async function bundleStandaloneWorker() {
       'crypto',
       'worker_threads',
     ],
+    banner: {
+      js: ERM_SYMBOL_BANNER,
+    },
   });
   console.log(`Bundled standalone worker → ${workerBundle}`);
 }

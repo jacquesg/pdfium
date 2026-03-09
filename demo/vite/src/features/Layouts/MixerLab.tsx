@@ -1,4 +1,3 @@
-import type { WorkerPDFiumDocument } from '@scaryterry/pdfium/browser';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from '../../components/Button';
 import { DocPanel } from '../../components/DocPanel';
@@ -10,17 +9,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/ca
 import { Skeleton } from '../../components/ui/skeleton';
 import { ResponsiveSidebar } from '../../components/ResponsiveSidebar';
 import { usePDFium } from '../../hooks/usePDFium';
+import type { DemoPDFiumDocument } from '../../hooks/pdfium-provider.types';
 import { useRenderPage } from '@scaryterry/pdfium/react';
 
 export function MixerLab() {
   const { instance: workerPdfium, document: docA, documentName: docAName } = usePDFium();
   const syncPdfium = workerPdfium;
-  const [docB, setDocB] = useState<WorkerPDFiumDocument | null>(null);
-  const docBRef = useRef<WorkerPDFiumDocument | null>(null);
+  const [docB, setDocB] = useState<DemoPDFiumDocument | null>(null);
+  const docBRef = useRef<DemoPDFiumDocument | null>(null);
   const [docBName, setDocBName] = useState<string | null>(null);
 
-  const [resultDoc, setResultDoc] = useState<WorkerPDFiumDocument | null>(null);
-  const resultDocRef = useRef<WorkerPDFiumDocument | null>(null);
+  const [resultDoc, setResultDoc] = useState<DemoPDFiumDocument | null>(null);
+  const resultDocRef = useRef<DemoPDFiumDocument | null>(null);
   const [mixerError, setMixerError] = useState<string | null>(null);
 
   // Dispose docB and resultDoc on unmount
@@ -33,7 +33,7 @@ export function MixerLab() {
     };
   }, []);
 
-  const replaceResultDoc = (newDoc: WorkerPDFiumDocument) => {
+  const replaceResultDoc = (newDoc: DemoPDFiumDocument) => {
     void resultDocRef.current?.dispose();
     resultDocRef.current = newDoc;
     setResultDoc(newDoc);

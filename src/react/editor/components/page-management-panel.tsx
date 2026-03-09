@@ -7,8 +7,10 @@
  * @module react/editor/components/page-management-panel
  */
 
-import { type ReactNode, useCallback } from 'react';
+import type { ReactNode } from 'react';
 import type { PageManagementActions } from '../hooks/use-page-management.js';
+import { usePageManagementPanelActions } from '../hooks/use-page-management-panel-actions.js';
+import { PageManagementPanelControls } from './page-management-panel-controls.js';
 
 /**
  * Props for the `PageManagementPanel` component.
@@ -39,85 +41,27 @@ export function PageManagementPanel({
   pageHeight,
   actions,
 }: PageManagementPanelProps): ReactNode {
-  const handleDelete = useCallback(() => {
-    if (pageCount <= 1) return;
-    void actions.deletePage(pageIndex, pageWidth, pageHeight);
-  }, [pageIndex, pageCount, pageWidth, pageHeight, actions]);
-
-  const handleInsertBefore = useCallback(() => {
-    void actions.insertBlankPage(pageIndex);
-  }, [pageIndex, actions]);
-
-  const handleInsertAfter = useCallback(() => {
-    void actions.insertBlankPage(pageIndex + 1);
-  }, [pageIndex, actions]);
-
-  const handleMoveUp = useCallback(() => {
-    if (pageIndex <= 0) return;
-    void actions.movePage(pageIndex, pageIndex - 1);
-  }, [pageIndex, actions]);
-
-  const handleMoveDown = useCallback(() => {
-    if (pageIndex >= pageCount - 1) return;
-    void actions.movePage(pageIndex, pageIndex + 2);
-  }, [pageIndex, pageCount, actions]);
-
-  const buttonStyle = {
-    padding: '4px 8px',
-    fontSize: 12,
-    cursor: 'pointer',
-    border: '1px solid #ccc',
-    borderRadius: 3,
-    background: '#fff',
-  };
+  const panelActions = usePageManagementPanelActions({
+    actions,
+    pageHeight,
+    pageIndex,
+    pageCount,
+    pageWidth,
+  });
 
   return (
     <div data-testid="page-management-panel" style={{ padding: 8, display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <div style={{ fontWeight: 600, fontSize: 13 }}>
-        Page {pageIndex + 1} of {pageCount}
-      </div>
-
-      <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-        <button
-          type="button"
-          data-testid="delete-page-button"
-          onClick={handleDelete}
-          disabled={pageCount <= 1}
-          style={{ ...buttonStyle, opacity: pageCount <= 1 ? 0.5 : 1 }}
-        >
-          Delete
-        </button>
-
-        <button type="button" data-testid="insert-before-button" onClick={handleInsertBefore} style={buttonStyle}>
-          Insert Before
-        </button>
-
-        <button type="button" data-testid="insert-after-button" onClick={handleInsertAfter} style={buttonStyle}>
-          Insert After
-        </button>
-      </div>
-
-      <div style={{ display: 'flex', gap: 4 }}>
-        <button
-          type="button"
-          data-testid="move-up-button"
-          onClick={handleMoveUp}
-          disabled={pageIndex <= 0}
-          style={{ ...buttonStyle, opacity: pageIndex <= 0 ? 0.5 : 1 }}
-        >
-          Move Up
-        </button>
-
-        <button
-          type="button"
-          data-testid="move-down-button"
-          onClick={handleMoveDown}
-          disabled={pageIndex >= pageCount - 1}
-          style={{ ...buttonStyle, opacity: pageIndex >= pageCount - 1 ? 0.5 : 1 }}
-        >
-          Move Down
-        </button>
-      </div>
+      <div style={{ fontWeight: 600, fontSize: 13 }}>{panelActions.pageLabel}</div>
+      <PageManagementPanelControls
+        canDelete={panelActions.canDelete}
+        canMoveDown={panelActions.canMoveDown}
+        canMoveUp={panelActions.canMoveUp}
+        onDelete={panelActions.handleDelete}
+        onInsertAfter={panelActions.handleInsertAfter}
+        onInsertBefore={panelActions.handleInsertBefore}
+        onMoveDown={panelActions.handleMoveDown}
+        onMoveUp={panelActions.handleMoveUp}
+      />
     </div>
   );
 }

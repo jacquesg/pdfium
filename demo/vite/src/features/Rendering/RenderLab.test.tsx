@@ -11,23 +11,24 @@ function renderWithProviders(ui: React.ReactElement) {
 
 describe('RenderLab', () => {
   async function openRenderControls() {
-    fireEvent.click(await screen.findByRole('button', { name: /Open Render Controls/i }, { timeout: 5000 }));
-    await screen.findByRole('button', { name: /Close Render Controls/i }, { timeout: 5000 });
+    const openButton = screen.queryByRole('button', { name: /Open Render Controls/i });
+    if (openButton) {
+      fireEvent.click(openButton);
+      await screen.findByRole('button', { name: /Close Render Controls/i }, { timeout: 5000 });
+    }
   }
 
   it('renders navigator and controls', async () => {
     renderWithProviders(<RenderLab />);
     await openRenderControls();
-    await screen.findByRole('heading', { name: /Page Minimap/i }, { timeout: 5000 });
     await screen.findByRole('heading', { name: /Render Demos/i }, { timeout: 5000 });
     await screen.findByRole('heading', { name: /Page Boxes/i }, { timeout: 5000 });
   });
 
-  it('displays minimap navigator canvas', async () => {
+  it('shows minimap only when a document is loaded', async () => {
     renderWithProviders(<RenderLab />);
     await openRenderControls();
-    const minimapNavigator = await screen.findByRole('button', { name: /minimap navigator/i }, { timeout: 5000 });
-    expect(minimapNavigator.querySelector('canvas')).not.toBeNull();
+    expect(screen.queryByRole('heading', { name: /Page Minimap/i })).toBeNull();
   });
 
   it('shows viewport readout when demos are enabled', async () => {

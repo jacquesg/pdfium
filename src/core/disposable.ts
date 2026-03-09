@@ -8,6 +8,7 @@
  * @module core/disposable
  */
 
+import './explicit-resource-management.js';
 import { PDFiumError, PDFiumErrorCode } from './errors.js';
 import { getLogger } from './logger.js';
 

@@ -3,8 +3,10 @@ import type { WorkerPDFiumDocument } from '../context/worker-client.js';
 import { useMountedRef, useRequestCounter } from './internal/async-guards.js';
 import { clearObjectUrlRevokeTimers, triggerObjectUrlDownload } from './internal/object-url-download.js';
 
+type DownloadableDocument = Pick<WorkerPDFiumDocument, 'save'>;
+
 function useDownload(): {
-  download: (document: WorkerPDFiumDocument, filename?: string) => Promise<void>;
+  download: (document: DownloadableDocument, filename?: string) => Promise<void>;
   isDownloading: boolean;
   error: Error | null;
 } {
@@ -23,7 +25,7 @@ function useDownload(): {
   }, [requestCounter]);
 
   const download = useCallback(
-    async (document: WorkerPDFiumDocument, filename?: string) => {
+    async (document: DownloadableDocument, filename?: string) => {
       if (typeof globalThis.document === 'undefined') return;
 
       const requestId = requestCounter.next();

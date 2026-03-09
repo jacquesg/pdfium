@@ -1,6 +1,9 @@
 import { defineConfig, devices } from '@playwright/test';
 
 const includeWebkitProject = process.env.PLAYWRIGHT_INCLUDE_WEBKIT === '1';
+const browserTestHost = process.env.PLAYWRIGHT_TEST_HOST ?? '127.0.0.1';
+const browserTestPort = Number.parseInt(process.env.PLAYWRIGHT_TEST_PORT ?? '3000', 10);
+const browserTestBaseUrl = `http://${browserTestHost}:${String(browserTestPort)}`;
 
 /**
  * Playwright configuration for browser tests.
@@ -17,7 +20,7 @@ export default defineConfig({
   reporter: process.env.CI !== undefined ? 'github' : 'list',
 
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: browserTestBaseUrl,
     trace: 'on-first-retry',
   },
 
@@ -30,8 +33,8 @@ export default defineConfig({
       name: 'firefox',
       use: { ...devices['Desktop Firefox'] },
     },
-    // WebKit has known issues with PDFium WASM initialization.
-    // Keep it opt-in so the default browser suite remains stable.
+    // Keep WebKit opt-in for local targeted reruns; CI enables it via
+    // `pnpm test:browser:cross-browser`.
     ...(includeWebkitProject
       ? [
           {
@@ -43,9 +46,9 @@ export default defineConfig({
   ],
 
   webServer: {
-    command: 'pnpm run serve:test',
-    url: 'http://localhost:3000',
+    command: 'env -u NO_COLOR pnpm run serve:test',
+    url: browserTestBaseUrl,
     reuseExistingServer: !process.env.CI,
-    timeout: 30000,
+    timeout: 60000,
   },
 });

@@ -16,6 +16,8 @@
  * @packageDocumentation
  */
 
+import './core/explicit-resource-management.js';
+
 export type {
   BuilderAddPageResponse,
   BuilderLoadStandardFontResponse,

@@ -7,6 +7,8 @@
  * @packageDocumentation
  */
 
+import './core/explicit-resource-management.js';
+
 export * from './core/index.js';
 
 export const VERSION = __PACKAGE_VERSION__;

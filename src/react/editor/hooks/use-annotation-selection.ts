@@ -6,50 +6,13 @@
  * @module react/editor/hooks/use-annotation-selection
  */
 
-import { useCallback, useEffect } from 'react';
+import { useCallback } from 'react';
 import type { SerialisedAnnotation } from '../../../context/protocol.js';
 import { useEditor } from '../context.js';
 import type { AnnotationSelection } from '../types.js';
+import { clearNativeSelection } from './annotation-selection-support.js';
 import type { AnnotationCrudActions } from './use-annotation-crud.js';
-
-function clearNativeSelection(): void {
-  const selection = globalThis.getSelection?.();
-  if (!selection || selection.rangeCount === 0) {
-    return;
-  }
-
-  selection.removeAllRanges();
-
-  const clearAgain = () => {
-    globalThis.getSelection?.()?.removeAllRanges();
-  };
-
-  if (typeof globalThis.requestAnimationFrame === 'function') {
-    globalThis.requestAnimationFrame(() => {
-      clearAgain();
-    });
-    return;
-  }
-
-  globalThis.setTimeout(clearAgain, 0);
-}
-
-function isEditableTarget(target: EventTarget | null): boolean {
-  if (!(target instanceof Element)) {
-    return false;
-  }
-  if (
-    target instanceof HTMLInputElement ||
-    target instanceof HTMLTextAreaElement ||
-    target instanceof HTMLSelectElement
-  ) {
-    return true;
-  }
-  if (target instanceof HTMLElement && target.isContentEditable) {
-    return true;
-  }
-  return target.closest('[contenteditable]:not([contenteditable="false"])') !== null;
-}
+import { useAnnotationSelectionKeyboard } from './use-annotation-selection-keyboard.js';
 
 /**
  * Return type of `useAnnotationSelection`.
@@ -90,45 +53,13 @@ export function useAnnotationSelection(
     setSelection(null);
   }, [setSelection]);
 
-  // Keyboard handler
-  useEffect(() => {
-    const handlesCurrentSelection =
-      selection !== null && (currentPageIndex === undefined || selection.pageIndex === currentPageIndex);
-    if (!handlesCurrentSelection) {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey) {
-        return;
-      }
-      if (isEditableTarget(event.target)) {
-        return;
-      }
-      if (event.repeat && (event.key === 'Delete' || event.key === 'Backspace')) {
-        return;
-      }
-
-      if (event.key === 'Escape') {
-        clearSelection();
-        return;
-      }
-
-      if ((event.key === 'Delete' || event.key === 'Backspace') && selection && crud && annotations) {
-        const snapshot = annotations.find((annotation) => annotation.index === selection.annotationIndex);
-        if (snapshot) {
-          event.preventDefault();
-          void crud.removeAnnotation(selection.annotationIndex, snapshot);
-          clearSelection();
-        }
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => {
-      document.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [selection, crud, annotations, clearSelection, currentPageIndex]);
+  useAnnotationSelectionKeyboard({
+    annotations,
+    clearSelection,
+    crud,
+    currentPageIndex,
+    selection,
+  });
 
   return { selection, select, clearSelection };
 }

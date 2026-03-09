@@ -6,6 +6,7 @@ import {
   useCallback,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import {
@@ -21,6 +22,8 @@ import {
   AnnotationPropertyPanel,
   EditorOverlay,
   EditorProvider,
+  EDITOR_TOOLBAR_GROUP_LABELS,
+  EDITOR_TOOLBAR_TOOLS,
   getUnknownErrorMessage,
   isEditorRedactionAnnotation,
   useAnnotationCrud,
@@ -33,7 +36,12 @@ import {
   useResolvedEditorAnnotations,
 } from '@scaryterry/pdfium/react/editor';
 import type { OptimisticAnnotationPatch } from '@scaryterry/pdfium/react/editor';
-import type { EditorTool, TextMarkupActionTool } from '@scaryterry/pdfium/react/editor';
+import type {
+  EditorTool,
+  EditorToolbarGroup,
+  EditorToolbarToolDefinition,
+  TextMarkupActionTool,
+} from '@scaryterry/pdfium/react/editor';
 import {
   Circle,
   Highlighter,
@@ -51,43 +59,37 @@ import {
   Underline,
   Undo2,
 } from 'lucide-react';
+import { Button } from '../../components/ui/button';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../../components/ui/dialog';
 
 // ── Tool definitions ─────────────────────────────────────────
 
-interface ToolDef {
-  readonly tool: EditorTool | TextMarkupActionTool;
-  readonly label: string;
+interface DemoToolDef extends EditorToolbarToolDefinition {
   readonly icon: LucideIcon;
-  readonly action?: boolean;
 }
 
-const TOOL_GROUPS: readonly { title: string; tools: readonly ToolDef[] }[] = [
-  {
-    title: 'Text markup',
-    tools: [
-      { tool: 'highlight', label: 'Highlight', icon: Highlighter, action: true },
-      { tool: 'underline', label: 'Underline', icon: Underline, action: true },
-      { tool: 'strikeout', label: 'Strikeout', icon: Strikethrough, action: true },
-    ],
-  },
-  {
-    title: 'Drawing',
-    tools: [
-      { tool: 'freetext', label: 'Text', icon: Type },
-      { tool: 'ink', label: 'Draw', icon: Pen },
-      { tool: 'rectangle', label: 'Rectangle', icon: Square },
-      { tool: 'circle', label: 'Circle', icon: Circle },
-      { tool: 'line', label: 'Line', icon: Minus },
-    ],
-  },
-  {
-    title: 'Advanced',
-    tools: [
-      { tool: 'stamp', label: 'Stamp', icon: Stamp },
-      { tool: 'redact', label: 'Redact', icon: ShieldOff },
-    ],
-  },
-];
+const TOOL_ICONS: Readonly<Record<EditorToolbarToolDefinition['tool'], LucideIcon>> = {
+  highlight: Highlighter,
+  underline: Underline,
+  strikeout: Strikethrough,
+  freetext: Type,
+  ink: Pen,
+  rectangle: Square,
+  circle: Circle,
+  line: Minus,
+  stamp: Stamp,
+  redact: ShieldOff,
+};
+
+const TOOL_GROUP_ORDER: readonly EditorToolbarGroup[] = ['markup', 'drawing', 'advanced'];
+
+const TOOL_GROUPS: readonly { title: string; tools: readonly DemoToolDef[] }[] = TOOL_GROUP_ORDER.map((group) => ({
+  title: EDITOR_TOOLBAR_GROUP_LABELS[group],
+  tools: EDITOR_TOOLBAR_TOOLS.filter((entry) => entry.group === group).map((entry) => ({
+    ...entry,
+    icon: TOOL_ICONS[entry.tool],
+  })),
+}));
 
 const MARKUP_ACTION_TOOLS = new Set<TextMarkupActionTool>(['highlight', 'underline', 'strikeout']);
 const VIEWER_SELECT_TEXT_BUTTON_SELECTOR = 'button[aria-label="Select text (V)"], button[aria-label="Pointer tool"]';
@@ -103,6 +105,10 @@ interface RedactionSummaryState {
   readonly loading: boolean;
 }
 
+interface CachedRedactionPageCount extends RedactionPageCount {
+  readonly revision: number;
+}
+
 const EMPTY_REDACTION_SUMMARY: RedactionSummaryState = {
   pageCounts: [],
   totalCount: 0,
@@ -110,45 +116,90 @@ const EMPTY_REDACTION_SUMMARY: RedactionSummaryState = {
 };
 const REDACTION_SUMMARY_DEBOUNCE_MS = 120;
 
+function buildRedactionSummaryState(cache: ReadonlyMap<number, CachedRedactionPageCount>, loading: boolean): RedactionSummaryState {
+  const pageCounts = Array.from(cache.values())
+    .filter((entry) => entry.count > 0)
+    .sort((a, b) => a.pageIndex - b.pageIndex)
+    .map(({ pageIndex, count }) => ({ pageIndex, count }));
+  const totalCount = pageCounts.reduce((sum, entry) => sum + entry.count, 0);
+  return { pageCounts, totalCount, loading };
+}
+
 function useRedactionSummary(document: ReturnType<typeof usePDFium>['document']): RedactionSummaryState {
-  const { documentRevision, pageRevisionVersion } = usePDFiumDocument();
+  const { documentRevision, getPageRevision, pageRevisionVersion } = usePDFiumDocument();
   const [summary, setSummary] = useState<RedactionSummaryState>(EMPTY_REDACTION_SUMMARY);
+  const cacheRef = useRef<Map<number, CachedRedactionPageCount>>(new Map());
+  const documentRef = useRef<typeof document>(null);
 
   useEffect(() => {
     let cancelled = false;
     let timer: ReturnType<typeof setTimeout> | null = null;
     if (!document) {
+      cacheRef.current.clear();
+      documentRef.current = null;
       setSummary(EMPTY_REDACTION_SUMMARY);
       return () => {
         cancelled = true;
       };
     }
 
-    setSummary((previous) => ({ ...previous, loading: true }));
+    if (documentRef.current !== document) {
+      cacheRef.current.clear();
+      documentRef.current = document;
+    }
+
+    const nextCache = new Map<number, CachedRedactionPageCount>();
+    for (const [pageIndex, entry] of cacheRef.current) {
+      if (pageIndex < document.pageCount) {
+        nextCache.set(pageIndex, entry);
+      }
+    }
+
+    const pagesToRefresh: Array<{ pageIndex: number; revision: number }> = [];
+    for (let pageIndex = 0; pageIndex < document.pageCount; pageIndex++) {
+      const revision = getPageRevision(pageIndex);
+      const cached = nextCache.get(pageIndex);
+      if (!cached || cached.revision !== revision) {
+        pagesToRefresh.push({ pageIndex, revision });
+      }
+    }
+
+    if (pagesToRefresh.length === 0) {
+      cacheRef.current = nextCache;
+      setSummary(buildRedactionSummaryState(nextCache, false));
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    setSummary(buildRedactionSummaryState(nextCache, true));
     timer = globalThis.setTimeout(() => {
       void (async () => {
-        const pageCounts: RedactionPageCount[] = [];
-        let totalCount = 0;
-        for (let pageIndex = 0; pageIndex < document.pageCount; pageIndex++) {
-          const page = await document.getPage(pageIndex);
-          try {
-            const annotations = await page.getAnnotations();
-            const count = annotations.filter(isEditorRedactionAnnotation).length;
-            if (count > 0) {
-              pageCounts.push({ pageIndex, count });
-              totalCount += count;
+        const refreshedCache = new Map(nextCache);
+        const refreshedEntries = await Promise.all(
+          pagesToRefresh.map(async ({ pageIndex, revision }) => {
+            const page = await document.getPage(pageIndex);
+            try {
+              const annotations = await page.getAnnotations();
+              const count = annotations.filter(isEditorRedactionAnnotation).length;
+              return { pageIndex, count, revision } satisfies CachedRedactionPageCount;
+            } finally {
+              await page[Symbol.asyncDispose]();
             }
-          } finally {
-            await page[Symbol.asyncDispose]();
-          }
+          }),
+        );
+
+        for (const entry of refreshedEntries) {
+          refreshedCache.set(entry.pageIndex, entry);
         }
 
         if (cancelled) return;
-        setSummary({ pageCounts, totalCount, loading: false });
+        cacheRef.current = refreshedCache;
+        setSummary(buildRedactionSummaryState(refreshedCache, false));
       })().catch((error: unknown) => {
         if (cancelled) return;
         console.error('[PDFium Editor] Failed to compute redaction summary:', error);
-        setSummary({ pageCounts: [], totalCount: 0, loading: false });
+        setSummary(buildRedactionSummaryState(nextCache, false));
       });
     }, REDACTION_SUMMARY_DEBOUNCE_MS);
 
@@ -158,7 +209,7 @@ function useRedactionSummary(document: ReturnType<typeof usePDFium>['document'])
         clearTimeout(timer);
       }
     };
-  }, [document, documentRevision, pageRevisionVersion]);
+  }, [document, documentRevision, getPageRevision, pageRevisionVersion]);
 
   return summary;
 }
@@ -246,6 +297,7 @@ function EditorToolbarChildren() {
   });
   const { save, isSaving } = useEditorSave(document);
   const [editorError, setEditorError] = useState<string | null>(null);
+  const [redactionConfirmOpen, setRedactionConfirmOpen] = useState(false);
   const currentPageIndex = viewer.navigation.pageIndex;
   const currentPageCrud = useAnnotationCrud(document, currentPageIndex);
   const redaction = useRedaction(currentPageCrud, document);
@@ -314,24 +366,14 @@ function EditorToolbarChildren() {
     }
   }, [save]);
 
-  const handleApplyRedactions = useCallback(async () => {
+  const handleOpenRedactionConfirm = useCallback(() => {
     if (markedRedactionCount === 0 || redaction.isApplying) return;
-    const otherPagesMarkedCount = Math.max(0, totalMarkedRedactionCount - markedRedactionCount);
-    const noun = markedRedactionCount === 1 ? 'region' : 'regions';
-    const confirmed = globalThis.confirm(
-      [
-        `Apply ${String(markedRedactionCount)} marked redaction ${noun} on page ${String(currentPageIndex + 1)}?`,
-        otherPagesMarkedCount > 0
-          ? `${String(otherPagesMarkedCount)} marked redaction${otherPagesMarkedCount === 1 ? '' : 's'} on other pages will remain marked (not applied).`
-          : 'No other pages currently have marked redactions.',
-        'This permanently removes overlapping page content in those regions.',
-        'Undo/redo is available in this session until you save, reload, or close the document.',
-        'This action cannot be undone after saving.',
-      ]
-        .filter((line): line is string => line !== null)
-        .join('\n'),
-    );
-    if (!confirmed) return;
+    setRedactionConfirmOpen(true);
+  }, [markedRedactionCount, redaction.isApplying]);
+
+  const handleConfirmApplyRedactions = useCallback(async () => {
+    if (markedRedactionCount === 0 || redaction.isApplying) return;
+    setRedactionConfirmOpen(false);
     try {
       await redaction.applyRedactions(currentPageIndex);
       setActiveTool('idle');
@@ -339,9 +381,10 @@ function EditorToolbarChildren() {
     } catch (error) {
       setEditorError(getUnknownErrorMessage(error));
     }
-  }, [markedRedactionCount, redaction, totalMarkedRedactionCount, currentPageIndex, setActiveTool]);
+  }, [currentPageIndex, markedRedactionCount, redaction, setActiveTool]);
 
   const flattenDisabled = markedRedactionCount === 0 || redaction.isApplying;
+  const otherPagesMarkedCount = Math.max(0, totalMarkedRedactionCount - markedRedactionCount);
   const flattenTitle =
     markedRedactionCount === 0
       ? totalMarkedRedactionCount === 0
@@ -351,6 +394,12 @@ function EditorToolbarChildren() {
   const redactionStatusText = redactionSummary.loading
     ? `Marked redactions: Page ${String(currentPageIndex + 1)}: ${String(markedRedactionCount)} (updating totals...)`
     : `Marked redactions: Page ${String(currentPageIndex + 1)}: ${String(markedRedactionCount)} | Total: ${String(totalMarkedRedactionCount)}`;
+
+  useEffect(() => {
+    if (flattenDisabled && redactionConfirmOpen) {
+      setRedactionConfirmOpen(false);
+    }
+  }, [flattenDisabled, redactionConfirmOpen]);
 
   return (
     <>
@@ -438,7 +487,7 @@ function EditorToolbarChildren() {
         aria-label="Apply redactions on current page"
         disabled={flattenDisabled}
         onMouseDown={preventSelectionClear}
-        onClick={handleApplyRedactions}
+        onClick={handleOpenRedactionConfirm}
         style={editorBtnStyle(false, flattenDisabled)}
       >
         <ShieldAlert size={ICON_SIZE} strokeWidth={2} />
@@ -498,6 +547,43 @@ function EditorToolbarChildren() {
       >
         <Save size={ICON_SIZE} strokeWidth={2} />
       </button>
+
+      <Dialog open={redactionConfirmOpen} onOpenChange={setRedactionConfirmOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Apply marked redactions?</DialogTitle>
+            <DialogDescription>
+              Review the scope before permanently removing content from the current page.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 text-sm text-gray-600">
+            <span className="block">
+              Current page: apply {String(markedRedactionCount)} marked redaction{markedRedactionCount === 1 ? '' : 's'} on page {String(currentPageIndex + 1)}.
+            </span>
+            <span className="block">
+              Other pages: {otherPagesMarkedCount > 0
+                ? `${String(otherPagesMarkedCount)} marked redaction${otherPagesMarkedCount === 1 ? '' : 's'} will remain marked and unapplied.`
+                : 'No other pages currently have marked redactions.'}
+            </span>
+            <span className="block">
+              This permanently removes overlapping page content in the selected regions. Undo works only until you save, reload, or close the document.
+            </span>
+          </div>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setRedactionConfirmOpen(false)}>
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              onClick={() => void handleConfirmApplyRedactions()}
+              disabled={flattenDisabled}
+            >
+              Apply Redactions
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
@@ -572,6 +658,7 @@ function EditorContent() {
           panels={['thumbnails', 'annotations']}
           initialPanel="annotations"
           showAnnotations={false}
+          bufferPages={2}
           renderPageOverlay={renderEditorOverlay}
         >
           <DefaultToolbar>

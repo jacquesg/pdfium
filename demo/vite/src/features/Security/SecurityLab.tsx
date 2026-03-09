@@ -1,4 +1,6 @@
 import { DocPanel } from '../../components/DocPanel';
+import { Alert, AlertDescription, AlertTitle } from '../../components/ui/alert';
+import { Button } from '../../components/ui/button';
 import { Separator } from '../../components/ui/separator';
 import { Skeleton } from '../../components/ui/skeleton';
 import { usePDFium } from '../../hooks/usePDFium';
@@ -6,9 +8,25 @@ import { ErrorCatalogue } from './ErrorCatalogue';
 import { PasswordDemo } from './PasswordDemo';
 
 export function SecurityLab() {
-  const { instance } = usePDFium();
+  const { error, instance, isInitialising, retryInitialisation } = usePDFium();
 
-  if (!instance) {
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-full p-4">
+        <Alert variant="destructive" className="max-w-xl">
+          <AlertTitle>PDFium failed to initialise</AlertTitle>
+          <AlertDescription className="space-y-3">
+            <span className="block">{error.message}</span>
+            <Button type="button" variant="danger" onClick={retryInitialisation}>
+              Retry Initialisation
+            </Button>
+          </AlertDescription>
+        </Alert>
+      </div>
+    );
+  }
+
+  if (isInitialising || !instance) {
     return (
       <div role="status" aria-label="Loading" className="flex items-center justify-center h-full gap-2 text-gray-500">
         <Skeleton className="h-4 w-4 rounded-full" />

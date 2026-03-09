@@ -7,8 +7,10 @@ import { getPageDimensionsCacheKey } from './hooks/use-page-dimensions.js';
 import { buildCacheKey } from './internal/cache-key.js';
 import { usePDFiumStores } from './internal/stores-context.js';
 
+type RenderableDocument = Pick<WorkerPDFiumDocument, 'id' | 'renderPage'>;
+
 function useRenderPage(
-  document: WorkerPDFiumDocument | null,
+  document: RenderableDocument | null,
   pageIndex: number,
   options?: RenderOptions,
 ): {
@@ -33,11 +35,11 @@ function useRenderPage(
   const prevResultRef = useRef<{
     key: string;
     result: RenderResult;
-    document: WorkerPDFiumDocument;
+    document: RenderableDocument;
   } | null>(null);
 
   // Clear error map when document identity changes to prevent leaks.
-  const prevDocumentRef = useRef<WorkerPDFiumDocument | null | undefined>(undefined);
+  const prevDocumentRef = useRef<RenderableDocument | null | undefined>(undefined);
   useEffect(() => {
     if (prevDocumentRef.current !== undefined && prevDocumentRef.current !== document) {
       renderErrorsByKeyRef.current.clear();

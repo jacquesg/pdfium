@@ -50,7 +50,7 @@ function PasswordFlowHarness() {
 function renderHarness() {
   const user = userEvent.setup();
   render(
-    <PDFiumProvider>
+    <PDFiumProvider mode="mock">
       <PasswordFlowHarness />
     </PDFiumProvider>,
   );

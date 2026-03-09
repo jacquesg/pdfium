@@ -113,6 +113,7 @@ function AppContent() {
     isInitialising,
     error,
     password,
+    retryInitialisation,
   } = usePDFium();
   const [activeNav, setActiveNav] = useState<NavItem>(getInitialNav);
 
@@ -166,10 +167,10 @@ function AppContent() {
           <p className="text-sm text-red-600 dark:text-red-400 font-mono break-all">{error.message}</p>
           <button
             type="button"
-            onClick={() => window.location.reload()}
+            onClick={retryInitialisation}
             className="inline-flex items-center gap-1.5 px-4 py-2 rounded-md bg-red-600 text-white text-sm font-medium hover:bg-red-700 transition-colors"
           >
-            Retry
+            Retry Initialisation
           </button>
         </div>
       </div>

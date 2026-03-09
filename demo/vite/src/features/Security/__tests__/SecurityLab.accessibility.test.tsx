@@ -5,7 +5,7 @@ import { SecurityLab } from '../SecurityLab';
 
 function renderWithProviders(ui: React.ReactElement) {
   return render(
-    <PDFiumProvider>{ui}</PDFiumProvider>
+    <PDFiumProvider mode="mock">{ui}</PDFiumProvider>
   );
 }
 

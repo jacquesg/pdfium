@@ -308,6 +308,18 @@ describe('ShapeCreationOverlay', () => {
   });
 
   describe('document and lifecycle fallbacks', () => {
+    it('supports pointer drag finalisation through document pointerup', () => {
+      const onCreate = vi.fn();
+      render(<ShapeCreationOverlay {...defaultProps} onCreate={onCreate} />);
+      const overlay = screen.getByTestId('shape-creation-overlay');
+
+      fireEvent.pointerDown(overlay, { pointerId: 1, clientX: 20, clientY: 20 });
+      fireEvent.pointerMove(overlay, { pointerId: 1, clientX: 90, clientY: 110 });
+      fireEvent.pointerUp(document, { pointerId: 1, clientX: 90, clientY: 110 });
+
+      expect(onCreate).toHaveBeenCalledTimes(1);
+    });
+
     it('supports mouse-only drag fallback through document mousemove and mouseup', () => {
       const onCreate = vi.fn();
       render(<ShapeCreationOverlay {...defaultProps} onCreate={onCreate} />);

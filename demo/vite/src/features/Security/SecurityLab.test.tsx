@@ -5,7 +5,7 @@ import { SecurityLab } from './SecurityLab';
 
 function renderWithProviders(ui: React.ReactElement) {
   return render(
-    <PDFiumProvider>{ui}</PDFiumProvider>
+    <PDFiumProvider mode="mock">{ui}</PDFiumProvider>
   );
 }
 
@@ -25,5 +25,17 @@ describe('SecurityLab', () => {
   it('shows error code reference table', async () => {
     renderWithProviders(<SecurityLab />);
     await screen.findByText(/Error Code Reference/i, {}, { timeout: 5000 });
+  });
+
+  it('shows a retryable init error state', async () => {
+    render(
+      <PDFiumProvider mode="mock" mockOptions={{ initialisationError: new Error('Mock init failure') }}>
+        <SecurityLab />
+      </PDFiumProvider>,
+    );
+
+    await screen.findByText(/PDFium failed to initialise/i, {}, { timeout: 5000 });
+    await screen.findByText(/Mock init failure/i, {}, { timeout: 5000 });
+    await screen.findByRole('button', { name: /Retry Initialisation/i }, { timeout: 5000 });
   });
 });

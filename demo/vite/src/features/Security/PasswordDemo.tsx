@@ -1,6 +1,4 @@
 import {
-  type WorkerPDFium,
-  type WorkerPDFiumDocument,
   PDFiumError,
   PDFiumErrorCode,
 } from '@scaryterry/pdfium/browser';
@@ -13,9 +11,10 @@ import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Skeleton } from '../../components/ui/skeleton';
+import type { DemoPDFium, DemoPDFiumDocument } from '../../hooks/pdfium-provider.types';
 
 interface PasswordDemoProps {
-  pdfium: WorkerPDFium;
+  pdfium: DemoPDFium;
 }
 
 interface ErrorInfo {
@@ -69,7 +68,7 @@ function ErrorDisplay({ error }: { error: ErrorInfo }) {
   );
 }
 
-async function extractSuccessData(doc: WorkerPDFiumDocument): Promise<SuccessDoc> {
+async function extractSuccessData(doc: DemoPDFiumDocument): Promise<SuccessDoc> {
   await using page = await doc.getPage(0);
   const rendered = await page.render({ scale: 1 });
   return {

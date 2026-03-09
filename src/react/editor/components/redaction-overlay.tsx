@@ -9,8 +9,8 @@
 
 import type { ReactNode } from 'react';
 import type { SerialisedAnnotation } from '../../../context/protocol.js';
-import { pdfRectToScreen } from '../../coordinates.js';
-import { isEditorRedactionAnnotation } from '../redaction-utils.js';
+import { buildRedactionOverlayRects } from './redaction-overlay-support.js';
+import { RedactionOverlayView } from './redaction-overlay-view.js';
 
 /**
  * Props for the `RedactionOverlay` component.
@@ -28,8 +28,6 @@ export interface RedactionOverlayProps {
   readonly height: number;
 }
 
-const PATTERN_ID = 'redaction-hatch';
-
 /**
  * SVG overlay that renders hatched patterns over pending Redact annotations.
  *
@@ -42,42 +40,12 @@ export function RedactionOverlay({
   width,
   height,
 }: RedactionOverlayProps): ReactNode {
-  const redactions = annotations.filter(isEditorRedactionAnnotation);
+  const rects = buildRedactionOverlayRects({
+    annotations,
+    originalHeight,
+    scale,
+  });
 
-  if (redactions.length === 0) return null;
-
-  return (
-    <svg
-      data-testid="redaction-overlay"
-      role="img"
-      aria-label="Pending redactions"
-      style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}
-      width={width}
-      height={height}
-    >
-      <title>Pending redactions</title>
-      <defs>
-        <pattern id={PATTERN_ID} patternUnits="userSpaceOnUse" width={8} height={8}>
-          <path d="M-1,1 l2,-2 M0,8 l8,-8 M7,9 l2,-2" stroke="#cc0000" strokeWidth={1.5} />
-        </pattern>
-      </defs>
-      {redactions.map((annot) => {
-        const screen = pdfRectToScreen(annot.bounds, { scale, originalHeight });
-        return (
-          <rect
-            key={annot.index}
-            data-testid={`redaction-rect-${annot.index}`}
-            x={screen.x}
-            y={screen.y}
-            width={screen.width}
-            height={screen.height}
-            fill={`url(#${PATTERN_ID})`}
-            stroke="#cc0000"
-            strokeWidth={1}
-            opacity={0.6}
-          />
-        );
-      })}
-    </svg>
-  );
+  if (rects.length === 0) return null;
+  return <RedactionOverlayView height={height} rects={rects} width={width} />;
 }

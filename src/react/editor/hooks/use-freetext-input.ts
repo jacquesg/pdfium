@@ -6,9 +6,11 @@
  * @module react/editor/hooks/use-freetext-input
  */
 
-import { useCallback, useState } from 'react';
+import { useState } from 'react';
 import type { AnnotationType, Rect } from '../../../core/types.js';
 import type { AnnotationCrudActions } from './use-annotation-crud.js';
+import { useFreeTextInputConfirm } from './use-freetext-input-confirm.js';
+import { INITIAL_FREE_TEXT_INPUT_STATE, useFreeTextInputStateActions } from './use-freetext-input-state-actions.js';
 
 /**
  * State for the freetext input.
@@ -38,12 +40,6 @@ export interface FreeTextInputActions {
   cancel(): void;
 }
 
-const INITIAL_STATE: FreeTextInputState = {
-  isActive: false,
-  position: null,
-  text: '',
-};
-
 /**
  * Manages FreeText annotation creation workflow.
  *
@@ -54,33 +50,13 @@ const INITIAL_STATE: FreeTextInputState = {
  * Must be used with `useAnnotationCrud`.
  */
 export function useFreeTextInput(crud: AnnotationCrudActions): FreeTextInputActions {
-  const [state, setState] = useState<FreeTextInputState>(INITIAL_STATE);
-
-  const activate = useCallback((position: { x: number; y: number }) => {
-    setState({ isActive: true, position, text: '' });
-  }, []);
-
-  const setText = useCallback((text: string) => {
-    setState((prev) => ({ ...prev, text }));
-  }, []);
-
-  const confirm = useCallback(
-    async (subtype: AnnotationType, rect: Rect): Promise<number | undefined> => {
-      if (!state.text) {
-        setState(INITIAL_STATE);
-        return undefined;
-      }
-
-      const index = await crud.createAnnotation(subtype, rect, { contents: state.text });
-      setState(INITIAL_STATE);
-      return index;
-    },
-    [crud, state.text],
-  );
-
-  const cancel = useCallback(() => {
-    setState(INITIAL_STATE);
-  }, []);
+  const [state, setState] = useState<FreeTextInputState>(INITIAL_FREE_TEXT_INPUT_STATE);
+  const { activate, cancel, setText } = useFreeTextInputStateActions({ setState });
+  const confirm = useFreeTextInputConfirm({
+    crud,
+    setState,
+    text: state.text,
+  });
 
   return { state, activate, setText, confirm, cancel };
 }

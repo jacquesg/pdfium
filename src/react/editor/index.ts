@@ -86,6 +86,8 @@ export {
   isUnsupportedAnnotationCreateError,
   REDACTION_FALLBACK_CONTENTS_MARKER,
 } from './redaction-utils.js';
+export type { EditorToolbarGroup, EditorToolbarToolDefinition } from './toolbar-config.js';
+export { EDITOR_TOOLBAR_GROUP_LABELS, EDITOR_TOOLBAR_TOOLS } from './toolbar-config.js';
 // ── Types ─────────────────────────────────────────────────────
 export type {
   AnnotationSelection,

@@ -83,7 +83,8 @@
     }
   },
   "sideEffects": [
-    "./dist/core/logger.js"
+    "./dist/core/logger.js",
+    "./dist/core/explicit-resource-management.js"
   ],
   "files": [
     "dist/**/*",
@@ -121,9 +122,15 @@
     "test:mutation": "stryker run",
     "test:bench": "vitest bench --config vitest.bench.config.ts",
     "test:visual": "vitest run test/visual",
-    "test:browser": "env -u NO_COLOR playwright test",
+    "test:browser": "node --import tsx demo/scripts/ensure-lib-build.ts && env -u NO_COLOR playwright test",
+    "test:browser:cross-browser": "node --import tsx demo/scripts/ensure-lib-build.ts && PLAYWRIGHT_INCLUDE_WEBKIT=1 env -u NO_COLOR playwright test",
+    "test:browser:cross-browser:stress": "node --import tsx demo/scripts/ensure-lib-build.ts && PLAYWRIGHT_INCLUDE_WEBKIT=1 env -u NO_COLOR playwright test --repeat-each=3",
+    "test:browser:webkit": "node --import tsx demo/scripts/ensure-lib-build.ts && PLAYWRIGHT_INCLUDE_WEBKIT=1 env -u NO_COLOR playwright test --project=webkit",
     "test:browser:editor": "env -u NO_COLOR -u FORCE_COLOR playwright test --config playwright.editor.config.ts",
+    "test:browser:editor:cross-browser": "EDITOR_E2E_INCLUDE_FIREFOX=1 EDITOR_E2E_INCLUDE_WEBKIT=1 env -u NO_COLOR -u FORCE_COLOR playwright test --config playwright.editor.config.ts",
+    "test:browser:editor:cross-browser:stress": "EDITOR_E2E_INCLUDE_FIREFOX=1 EDITOR_E2E_INCLUDE_WEBKIT=1 env -u NO_COLOR -u FORCE_COLOR playwright test --config playwright.editor.config.ts --repeat-each=3",
     "test:browser:editor:firefox": "EDITOR_E2E_INCLUDE_FIREFOX=1 env -u NO_COLOR -u FORCE_COLOR playwright test --config playwright.editor.config.ts --project=firefox",
+    "test:browser:editor:webkit": "EDITOR_E2E_INCLUDE_WEBKIT=1 env -u NO_COLOR -u FORCE_COLOR playwright test --config playwright.editor.config.ts --project=webkit",
     "test:browser:editor:stress": "env -u NO_COLOR -u FORCE_COLOR playwright test --config playwright.editor.config.ts --project=chromium --repeat-each=2",
     "test:worker-runtime": "node --import tsx scripts/verify-worker-runtime.ts",
     "serve:test": "vite --config vite.test.config.ts",

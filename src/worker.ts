@@ -15,6 +15,7 @@
  * @packageDocumentation
  */
 
+import './core/explicit-resource-management.js';
 import { setupWorker } from './context/worker-script.js';
 
 export * from './core/index.js';

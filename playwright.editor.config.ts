@@ -6,6 +6,7 @@ const editorE2EPort =
   Number.isFinite(parsedEditorE2EPort) && parsedEditorE2EPort > 0 ? parsedEditorE2EPort : DEFAULT_EDITOR_E2E_PORT;
 const editorE2EBaseUrl = process.env.EDITOR_E2E_BASE_URL ?? `http://127.0.0.1:${String(editorE2EPort)}`;
 const includeFirefoxProject = process.env.EDITOR_E2E_INCLUDE_FIREFOX === '1';
+const includeWebkitProject = process.env.EDITOR_E2E_INCLUDE_WEBKIT === '1';
 
 /**
  * Playwright configuration for editor end-to-end tests.
@@ -36,6 +37,14 @@ export default defineConfig({
           {
             name: 'firefox',
             use: { ...devices['Desktop Firefox'] },
+          },
+        ]
+      : []),
+    ...(includeWebkitProject
+      ? [
+          {
+            name: 'webkit',
+            use: { ...devices['Desktop Safari'] },
           },
         ]
       : []),

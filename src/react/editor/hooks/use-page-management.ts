@@ -7,23 +7,14 @@
  * @module react/editor/hooks/use-page-management
  */
 
-import { useCallback } from 'react';
 import type { WorkerPDFiumDocument } from '../../../context/worker-client.js';
-import { usePDFiumDocument } from '../../context.js';
-import { DeletePageCommand, InsertBlankPageCommand, MovePageCommand } from '../command.js';
-import { useEditor } from '../context.js';
+import type { PageManagementActions } from './page-management.types.js';
+import { usePageDeleteAction } from './use-page-delete-action.js';
+import { usePageInsertAction } from './use-page-insert-action.js';
+import { usePageManagementCommandRunner } from './use-page-management-command-runner.js';
+import { usePageMoveAction } from './use-page-move-action.js';
 
-/**
- * Return type of `usePageManagement`.
- */
-export interface PageManagementActions {
-  /** Delete a page by index. Requires width/height for undo (re-insert blank). */
-  deletePage(pageIndex: number, width: number, height: number): Promise<void>;
-  /** Insert a blank page at the given index. */
-  insertBlankPage(pageIndex: number, width?: number, height?: number): Promise<void>;
-  /** Move a page to a new destination index. */
-  movePage(pageIndex: number, destPageIndex: number): Promise<void>;
-}
+export type { PageManagementActions } from './page-management.types.js';
 
 /**
  * Provides page management operations integrated with the editor's undo/redo stack.
@@ -31,38 +22,10 @@ export interface PageManagementActions {
  * Must be called within an `EditorProvider` and `PDFiumProvider`.
  */
 export function usePageManagement(document: WorkerPDFiumDocument | null): PageManagementActions {
-  const { bumpDocumentRevision } = usePDFiumDocument();
-  const { commandStack } = useEditor();
-
-  const deletePage = useCallback(
-    async (pageIndex: number, width: number, height: number): Promise<void> => {
-      if (!document) return;
-      const cmd = new DeletePageCommand(document, pageIndex, width, height);
-      await commandStack.push(cmd);
-      bumpDocumentRevision();
-    },
-    [document, commandStack, bumpDocumentRevision],
-  );
-
-  const insertBlankPage = useCallback(
-    async (pageIndex: number, width = 612, height = 792): Promise<void> => {
-      if (!document) return;
-      const cmd = new InsertBlankPageCommand(document, pageIndex, width, height);
-      await commandStack.push(cmd);
-      bumpDocumentRevision();
-    },
-    [document, commandStack, bumpDocumentRevision],
-  );
-
-  const movePage = useCallback(
-    async (pageIndex: number, destPageIndex: number): Promise<void> => {
-      if (!document) return;
-      const cmd = new MovePageCommand(document, [pageIndex], destPageIndex);
-      await commandStack.push(cmd);
-      bumpDocumentRevision();
-    },
-    [document, commandStack, bumpDocumentRevision],
-  );
+  const runCommand = usePageManagementCommandRunner();
+  const deletePage = usePageDeleteAction(document, runCommand);
+  const insertBlankPage = usePageInsertAction(document, runCommand);
+  const movePage = usePageMoveAction(document, runCommand);
 
   return { deletePage, insertBlankPage, movePage };
 }

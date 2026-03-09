@@ -45,7 +45,7 @@ function ErrorTriggerConsumer() {
 describe('usePDFium', () => {
   it('provides stable callback references', () => {
     render(
-      <PDFiumProvider>
+      <PDFiumProvider mode="mock">
         <Consumer />
       </PDFiumProvider>,
     );
@@ -74,7 +74,7 @@ describe('usePDFium', () => {
 
   it('starts in loading state with no document or error', () => {
     render(
-      <PDFiumProvider>
+      <PDFiumProvider mode="mock">
         <Consumer />
       </PDFiumProvider>,
     );
@@ -90,7 +90,7 @@ describe('usePDFium', () => {
     const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     render(
-      <PDFiumProvider>
+      <PDFiumProvider mode="mock">
         <ErrorTriggerConsumer />
       </PDFiumProvider>,
     );
@@ -122,7 +122,7 @@ describe('usePDFium', () => {
 
     const { unmount } = render(
       <StrictMode>
-        <PDFiumProvider>
+        <PDFiumProvider mode="mock">
           <Consumer />
         </PDFiumProvider>
       </StrictMode>,

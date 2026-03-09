@@ -19,7 +19,9 @@ function main(): void {
   const state = getLibraryBuildState(SRC_DIR, DIST_DIR);
   if (state.kind !== 'fresh') {
     const suffix =
-      state.kind === 'stale' ? ' Run "pnpm build" (or "pnpm build:watch") in the repository root.' : '';
+      state.kind === 'stale' || state.kind === 'invalid-dist'
+        ? ' Run "pnpm build" (or "pnpm build:watch") in the repository root.'
+        : '';
     fail(`${state.message}${suffix}`);
   }
 

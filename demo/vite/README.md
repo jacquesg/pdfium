@@ -1,22 +1,16 @@
 # PDFium Workbench — Vite + React Demo
 
-A comprehensive React application demonstrating the full `@scaryterry/pdfium` API surface. 12 interactive labs cover rendering, text extraction, annotations, document creation, form handling, security, and more — all with proper resource management using `using` / `Symbol.dispose`.
+A React application demonstrating the currently shipped Vite showcase for `@scaryterry/pdfium`. It presently includes 6 interactive labs covering viewing, editing, document creation, page transforms, rendering, and security workflows.
 
 ## Labs
 
 | Tab | Lab | APIs Demonstrated |
 |-----|-----|-------------------|
 | Viewer | PDF rendering with page properties | `render()`, `getPageBox()`, `rotation`, `hasTransparency()`, `getPageLabel()`, `save()` |
+| Editor | Annotation editing, undo/redo, redaction workflows | `getAnnotations()`, annotation mutation APIs, `save()`, editor React toolkit |
 | Creator | Build PDFs from scratch | `createDocumentBuilder()`, `addPage()`, `addText()`, `addRectangle()`, `loadStandardFont()`, `save()` |
-| Text | Text extraction, search, character inspection | `getText()`, `findText()`, `getCharacterInfo()`, `getCharBox()`, `getCharIndexAtPos()`, `getTextInRect()` |
-| Annots | Annotation browsing and creation | `getAnnotations()`, `createAnnotation()`, `removeAnnotation()`, full `PDFiumAnnotation` API |
-| Objects | Page object inspection (text, image, path) | `getObjects()`, `PDFiumFont.getMetrics()`, font flags, `PDFiumImageObject` metadata, `PDFiumPathObject` details |
-| Structure | Bookmarks, attachments, links, structure tree | `getBookmarks()`, `getAttachments()`, `getLinks()`, `getWebLinks()`, `getStructureTree()`, `getNamedDestinations()` |
-| Forms | Interactive form fields and flattening | `hasForm()`, `formType`, widget annotations, `flatten()`, `FlattenFlags`, highlight colours |
 | Mixer | Merge documents and N-up layouts | `importPages()`, `createNUpDocument()`, `copyViewerPreferences()`, `save()` |
 | Render | Progressive rendering, thumbnails, coordinates | `startProgressiveRender()`, `hasThumbnail()`, `getThumbnailAsBitmap()`, `pageToDevice()`, `deviceToPage()` |
-| Worker | Off-main-thread processing via Web Workers | `WorkerPDFium`, `WorkerPDFiumDocument`, `WorkerPDFiumPage`, `getTextLayout()` |
-| Inspector | Document metadata, permissions, viewer prefs | `getMetadata()`, `getPermissions()`, `getViewerPreferences()`, `getSignatures()`, `getJavaScriptActions()` |
 | Security | Password-protected PDFs and error handling | `openDocument({ password })`, `PDFiumError` hierarchy, error codes |
 
 ## Prerequisites
@@ -130,7 +124,7 @@ demo/vite/
 │   ├── annots.pdf            # Annotated document (for Annotations lab)
 │   └── protected.pdf         # Password-protected document (for Security lab)
 ├── src/
-│   ├── App.tsx               # Main app with 12-tab navigation, React.lazy code splitting
+│   ├── App.tsx               # Main app with 6-tab navigation, React.lazy code splitting
 │   ├── pdfium.worker.ts      # Worker entry (imports @scaryterry/pdfium/worker)
 │   ├── client.ts             # React Query client configuration
 │   ├── main.tsx              # Entry point with providers
@@ -158,16 +152,10 @@ demo/vite/
 │   │   └── useOnScreen.ts    # IntersectionObserver visibility hook
 │   └── features/
 │       ├── Viewer/           # PDF rendering + page properties
+│       ├── Editor/           # Annotation editing, undo/redo, redaction workflow
 │       ├── Creation/         # Document builder
-│       ├── Text/             # Text extraction with 4 sub-tabs (Selection, Search, Characters, Extraction)
-│       ├── Annotations/      # Annotation browsing + creation + detail view
-│       ├── Objects/          # Page object inspection (text, image, path)
-│       ├── Structure/        # Bookmarks, attachments, links, web links, structure tree, named dests
-│       ├── Forms/            # Form fields, highlighting, flattening
 │       ├── Layouts/          # Document merger + N-up layouts
 │       ├── Rendering/        # Progressive render, thumbnails, coordinate transforms
-│       ├── Worker/           # Web Worker off-main-thread processing
-│       ├── Inspector/        # Metadata, permissions, signatures, JavaScript, viewer prefs
 │       └── Security/         # Password handling + error catalogue
 ├── index.html
 ├── package.json
@@ -183,7 +171,7 @@ Each lab is accessible via URL hash (e.g. `#viewer`, `#security`). The active ta
 
 ### Code Splitting
 
-All 12 labs are loaded via `React.lazy()` + `Suspense`, so only the active lab's code is downloaded.
+All 6 labs are loaded via `React.lazy()` + `Suspense`, so only the active lab's code is downloaded.
 
 ### Error Handling
 
@@ -217,7 +205,7 @@ Known limits to keep in mind:
 
 - Line creation currently uses an Ink-based line fallback for rendering/editing consistency across current PDFium bindings.
 - Redaction is a two-step workflow (`mark` then `apply`); apply is destructive page-content rewriting and should be validated in compliance workflows.
-- CI currently validates editor browser behavior in Chromium. Firefox can be run via `pnpm test:browser:editor:firefox`; WebKit parity is planned separately.
+- CI validates editor browser behavior in Chromium, Firefox, and WebKit via `pnpm test:browser:editor:cross-browser`. `pnpm test:browser:editor:firefox` and `pnpm test:browser:editor:webkit` remain available for targeted reruns.
 
 ## Troubleshooting
 

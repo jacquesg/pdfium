@@ -5,6 +5,8 @@ import { defineConfig } from 'vite';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const packageVersion = JSON.parse(readFileSync(resolve(__dirname, 'package.json'), 'utf8')).version as string;
+const browserTestHost = process.env.PLAYWRIGHT_TEST_HOST ?? '127.0.0.1';
+const browserTestPort = Number.parseInt(process.env.PLAYWRIGHT_TEST_PORT ?? '3000', 10);
 
 /**
  * Vite configuration for the test server used by Playwright browser tests.
@@ -19,7 +21,8 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3000,
+    host: browserTestHost,
+    port: browserTestPort,
     strictPort: true,
   },
   optimizeDeps: {

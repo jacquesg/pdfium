@@ -796,6 +796,7 @@ export function CreatorLab() {
                 {TEMPLATES.map((tpl) => (
                   <button
                     key={tpl.label}
+                    type="button"
                     onClick={() => applyTemplate(tpl.build)}
                     className="text-left p-2 rounded border hover:bg-blue-50 hover:border-blue-300 transition-colors"
                   >
@@ -817,6 +818,7 @@ export function CreatorLab() {
                 {pages.map((pg, i) => (
                   <button
                     key={pg.id}
+                    type="button"
                     onClick={() => setActivePageIndex(i)}
                     className={`text-xs px-2 py-1 rounded border ${
                       i === activePageIndex
@@ -828,6 +830,8 @@ export function CreatorLab() {
                   </button>
                 ))}
                 <button
+                  type="button"
+                  aria-label="Add page"
                   onClick={addPage}
                   className="text-xs px-2 py-1 rounded border border-dashed hover:bg-gray-100"
                 >
@@ -840,6 +844,7 @@ export function CreatorLab() {
                     {PAGE_PRESETS.map((preset) => (
                       <button
                         key={preset.label}
+                        type="button"
                         onClick={() => setPageSize(preset.width, preset.height)}
                         className={`text-[10px] px-2 py-0.5 rounded border ${
                           activePage.width === preset.width && activePage.height === preset.height
@@ -875,14 +880,16 @@ export function CreatorLab() {
                 ] as const).map(({ key, icon, label }) => (
                   <button
                     key={key}
+                    type="button"
                     onClick={() => setAddType(key)}
+                    aria-pressed={addType === key}
                     className={`flex-1 py-1.5 text-xs font-medium border-r last:border-r-0 ${
                       addType === key
                         ? 'bg-blue-600 text-white'
                         : 'bg-white text-gray-600 hover:bg-gray-50'
                     }`}
                   >
-                    <span className="font-mono mr-1">{icon}</span>
+                    <span aria-hidden="true" className="font-mono mr-1">{icon}</span>
                     {label}
                   </button>
                 ))}

@@ -8,35 +8,11 @@
  */
 
 import { useCallback } from 'react';
-import type { SerialisedQuadPoints } from '../../../context/protocol.js';
 import type { AnnotationType, Colour, Rect } from '../../../core/types.js';
+import { buildTextMarkupCreationRequest } from './text-markup-support.js';
 import type { AnnotationCrudActions } from './use-annotation-crud.js';
 
 type TextMarkupSubtype = AnnotationType.Highlight | AnnotationType.Underline | AnnotationType.Strikeout;
-
-function normaliseRect(rect: Rect): Rect {
-  return {
-    left: Math.min(rect.left, rect.right),
-    top: Math.max(rect.top, rect.bottom),
-    right: Math.max(rect.left, rect.right),
-    bottom: Math.min(rect.top, rect.bottom),
-  };
-}
-
-function rectToQuadPoints(rect: Rect): SerialisedQuadPoints {
-  const normalised = normaliseRect(rect);
-  return {
-    // QuadPoints contract: bottom-left, bottom-right, top-left, top-right.
-    x1: normalised.left,
-    y1: normalised.bottom,
-    x2: normalised.right,
-    y2: normalised.bottom,
-    x3: normalised.left,
-    y3: normalised.top,
-    x4: normalised.right,
-    y4: normalised.top,
-  };
-}
 
 /**
  * Return type of `useTextMarkup`.
@@ -65,12 +41,9 @@ export function useTextMarkup(crud: AnnotationCrudActions): TextMarkupActions {
       boundingRect: Rect,
       colour?: Colour,
     ): Promise<number | undefined> => {
-      if (rects.length === 0) return undefined;
-
-      const quadPoints: SerialisedQuadPoints[] = rects.map(rectToQuadPoints);
-      const normalisedBoundingRect = normaliseRect(boundingRect);
-
-      return crud.createAnnotation(subtype, normalisedBoundingRect, colour ? { quadPoints, colour } : { quadPoints });
+      const request = buildTextMarkupCreationRequest(rects, boundingRect, colour);
+      if (request === null) return undefined;
+      return crud.createAnnotation(subtype, request.bounds, request.options);
     },
     [crud],
   );

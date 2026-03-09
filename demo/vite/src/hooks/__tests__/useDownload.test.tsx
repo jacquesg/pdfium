@@ -31,7 +31,6 @@ describe('useDownload', () => {
       save: vi.fn(() => Promise.resolve(new Uint8Array([0x25, 0x50, 0x44, 0x46]))),
     };
 
-    // @ts-expect-error — minimal mock
     const downloadPromise = result.current.download(mockDoc, 'test.pdf');
 
     // The async save() needs to resolve — advance microtasks

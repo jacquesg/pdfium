@@ -728,6 +728,46 @@ describe('EditorOverlay', () => {
         }),
       );
     });
+
+    it('dispatches pdfium-editor-error when a tool mutation rejects', async () => {
+      const failure = new Error('shape failed');
+      const crud = createMockCrud();
+      vi.mocked(crud.createAnnotation).mockRejectedValue(failure);
+      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const dispatchEventSpy = vi.spyOn(globalThis, 'dispatchEvent');
+      try {
+        mockedUseEditor.mockReturnValue(createMockEditorContext('rectangle'));
+        mockedUseAnnotationCrud.mockReturnValue(crud);
+        mockedUseAnnotationSelection.mockReturnValue({ selection: null, select: vi.fn(), clearSelection: vi.fn() });
+        mockedUseFreeTextInput.mockReturnValue(createMockFreetextInput(false));
+        mockedUseInkDrawing.mockReturnValue(createMockInkDrawing());
+        mockedUseRedaction.mockReturnValue({
+          markRedaction: vi.fn().mockResolvedValue(undefined),
+          applyRedactions: vi.fn().mockResolvedValue(undefined),
+          isApplying: false,
+        });
+        mockedUseTextMarkup.mockReturnValue({ createMarkup: vi.fn().mockResolvedValue(undefined) });
+
+        render(<EditorOverlay {...defaultOverlayProps} />);
+        const overlay = screen.getByTestId('shape-creation-overlay');
+
+        fireEvent.pointerDown(overlay, { pointerId: 1, clientX: 10, clientY: 10 });
+        fireEvent.pointerMove(overlay, { pointerId: 1, clientX: 80, clientY: 80 });
+        fireEvent.pointerUp(overlay, { pointerId: 1, clientX: 80, clientY: 80 });
+
+        await waitFor(() => {
+          expect(dispatchEventSpy).toHaveBeenCalledTimes(1);
+        });
+
+        const errorEvent = dispatchEventSpy.mock.calls[0]?.[0] as CustomEvent<{ message: string }>;
+        expect(errorEvent.type).toBe('pdfium-editor-error');
+        expect(errorEvent.detail).toEqual({ message: 'shape failed' });
+        expect(consoleErrorSpy).toHaveBeenCalledWith('[PDFium Editor] Annotation mutation failed:', failure);
+      } finally {
+        consoleErrorSpy.mockRestore();
+        dispatchEventSpy.mockRestore();
+      }
+    });
   });
 
   describe('redact tool', () => {

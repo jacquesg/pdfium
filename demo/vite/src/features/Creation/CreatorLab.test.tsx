@@ -12,9 +12,10 @@ function renderWithProviders(ui: React.ReactElement) {
 describe('CreatorLab', () => {
   it('renders creation controls', async () => {
     renderWithProviders(<CreatorLab />);
-    await screen.findByText(/PDF Creator/i);
-    await screen.findByRole('button', { name: /Text/i });
-    await screen.findByRole('button', { name: /Rectangle/i });
+    await screen.findByRole('heading', { name: /Templates/i });
+    await screen.findByRole('heading', { name: /Add Object/i });
+    await screen.findByRole('button', { name: /^Text$/i });
+    await screen.findByRole('button', { name: /^Rect$/i });
     await screen.findByRole('button', { name: /Generate & Preview/i });
   });
 });

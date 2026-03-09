@@ -13,6 +13,8 @@ on:
     branches: [main]
   workflow_dispatch:
   workflow_call:
+  schedule:
+    - cron: '0 2 * * *'
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -210,10 +212,20 @@ jobs:
         run: pnpm download:pdfium --target wasm
 
       - name: Install Playwright browsers
-        run: npx playwright install chromium firefox --with-deps
+        run: npx playwright install chromium firefox webkit --with-deps
 
-      - name: Run browser tests
-        run: pnpm test:browser --project=chromium --project=firefox
+      - name: Run browser tests (Chromium + Firefox + WebKit)
+        run: pnpm test:browser:cross-browser
+
+      - name: Upload browser artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-artifacts
+          if-no-files-found: ignore
+          path: |
+            playwright-report/
+            test-results/
 
   editor-browser-test:
     name: Editor Browser Tests
@@ -242,13 +254,106 @@ jobs:
         run: pnpm download:pdfium --target wasm
 
       - name: Install Playwright browsers
-        run: npx playwright install chromium firefox --with-deps
+        run: npx playwright install chromium firefox webkit --with-deps
 
-      - name: Run editor browser tests
-        run: pnpm test:browser:editor
+      - name: Run editor browser tests (Chromium + Firefox + WebKit)
+        run: pnpm test:browser:editor:cross-browser
 
       - name: Run editor browser stress tests (Chromium repeat)
         run: pnpm test:browser:editor:stress
+
+      - name: Upload editor browser artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: editor-browser-artifacts
+          if-no-files-found: ignore
+          path: |
+            playwright-report/
+            test-results/
+
+  browser-stress:
+    name: Browser Stress Tests
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Download PDFium WASM
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm download:pdfium --target wasm
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium firefox webkit --with-deps
+
+      - name: Run browser stress tests (Chromium + Firefox + WebKit repeat)
+        run: pnpm test:browser:cross-browser:stress
+
+      - name: Upload browser stress artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-stress-artifacts
+          if-no-files-found: ignore
+          path: |
+            playwright-report/
+            test-results/
+
+  editor-browser-stress:
+    name: Editor Browser Stress Tests
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    needs: [build]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9.15.0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - run: pnpm install --frozen-lockfile
+
+      - name: Install demo Vite dependencies
+        run: pnpm --dir demo/vite install --frozen-lockfile
+
+      - name: Download PDFium WASM
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: pnpm download:pdfium --target wasm
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium firefox webkit --with-deps
+
+      - name: Run editor browser stress tests (Chromium + Firefox + WebKit repeat)
+        run: pnpm test:browser:editor:cross-browser:stress
+
+      - name: Upload editor browser stress artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: editor-browser-stress-artifacts
+          if-no-files-found: ignore
+          path: |
+            playwright-report/
+            test-results/
 
   rust-test:
     name: Rust Tests

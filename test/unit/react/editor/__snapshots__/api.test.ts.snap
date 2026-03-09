@@ -8,6 +8,8 @@ exports[`react/editor public API > exports match snapshot 1`] = `
   "CreateAnnotationCommand",
   "DEFAULT_TOOL_CONFIGS",
   "DeletePageCommand",
+  "EDITOR_TOOLBAR_GROUP_LABELS",
+  "EDITOR_TOOLBAR_TOOLS",
   "EditorOverlay",
   "EditorProvider",
   "EditorToolbar",

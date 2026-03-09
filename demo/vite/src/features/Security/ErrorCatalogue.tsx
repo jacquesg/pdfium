@@ -1,12 +1,13 @@
-import { type WorkerPDFium, PDFiumError } from '@scaryterry/pdfium/browser';
+import { PDFiumError } from '@scaryterry/pdfium/browser';
 import { useState } from 'react';
 import { Alert, AlertDescription } from '../../components/ui/alert';
 import { Badge } from '../../components/ui/badge';
 import { Button } from '../../components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '../../components/ui/card';
+import type { DemoPDFium } from '../../hooks/pdfium-provider.types';
 
 interface ErrorCatalogueProps {
-  pdfium: WorkerPDFium;
+  pdfium: DemoPDFium;
 }
 
 interface TriggeredError {
